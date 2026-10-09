@@ -228,7 +228,7 @@ test('reads the canvas as outdated after the pull request moved to another base 
   await expect(page.locator('section.layer').first()).toBeVisible()
   const release = '9'.repeat(40)
   const git = ctx.git as FakeGit
-  git.options.refs = { ...git.options.refs, 'refs/heads/release': release }
+  Object.assign(git.options.refs ?? {}, { 'refs/heads/release': release })
   moveFakeHead(git, {
     headRef: 'pull/42/head',
     baseRef: 'refs/pr/42/base',

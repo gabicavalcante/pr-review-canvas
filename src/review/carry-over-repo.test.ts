@@ -113,7 +113,10 @@ describe('the identical-diff rule against a real repository', () => {
 
   /** The diff of one commit as the store builds it from the clone. */
   async function patchesOf(commit: { headSha: string; mergeBaseSha: string }) {
-    const derived = await t.ctx.derived.readOrBuild(commit.headSha, commit.mergeBaseSha)
+    const derived = await t.ctx.derived.readOrBuild({
+      headSha: commit.headSha,
+      mergeBaseSha: commit.mergeBaseSha,
+    })
     expect(derived).not.toBeNull()
     return derived?.patches ?? {}
   }
@@ -213,7 +216,7 @@ describe('carrying attention points by their lines against a real repository', (
 
   /** A canvas of the basis commit, the one a later head's prepare builds on. */
   async function writeBasisCanvas(): Promise<void> {
-    const derived = await t.ctx.derived.ensure(canvas, base)
+    const derived = await t.ctx.derived.ensure({ headSha: canvas, mergeBaseSha: base })
     const template = syntheticArtifact()
     const layer = template.layers[0]
     if (layer === undefined) {
@@ -296,7 +299,7 @@ describe('carrying attention points by their lines against a real repository', (
     // Publish stands in: the shifted head gets a canvas with the point at its new line.
     const first = await split(heads.shifted)
     expect(first?.[0]).toEqual(['The rewritten line', 'carried', { side: 'new', line: 7, endLine: 7 }])
-    const shiftedDerived = await t.ctx.derived.ensure(heads.shifted, base)
+    const shiftedDerived = await t.ctx.derived.ensure({ headSha: heads.shifted, mergeBaseSha: base })
     const stored = await t.ctx.canvases.readArtifact(canvas)
     if (stored === null) {
       throw new Error('basis canvas missing')

@@ -275,6 +275,7 @@ export function wireReview(root, session, opts = {}) {
         comments: [],
         state: session.state,
         headSha: session.headSha,
+        mergeBaseSha: session.mergeBaseSha,
       },
       level
     )
@@ -362,15 +363,15 @@ export function wireReview(root, session, opts = {}) {
         setCardCollapsed(parts.card, reviewed)
       }
     }
-    refreshPendingBar(root, state, session.headSha)
-    refreshReviewPanel(root, state, { headSha: session.headSha, points: session.artifact.points })
+    refreshPendingBar(root, state, session)
+    refreshReviewPanel(root, state, { on: session, points: session.artifact.points })
     refreshComposerCommands(root, state.pending.length > 0)
     opts.chat?.()?.refreshProposed()
     applyCapabilityGating(root, session.capabilities)
   }
   const unsubscribe = session.subscribe(onState)
   // The review tab is drawn from the state too; the rest of the page came drawn with it.
-  refreshReviewPanel(root, session.state, { headSha: session.headSha, points: session.artifact.points })
+  refreshReviewPanel(root, session.state, { on: session, points: session.artifact.points })
 
   /** @param {import('./contract-types.js').PostCommentInput} input */
   const postComment = async input => {

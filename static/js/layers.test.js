@@ -61,7 +61,16 @@ const state = emptyState(NOW.toISOString())
 
 /** @returns {import('./layers.js').RenderContext} */
 function ctx() {
-  return { artifact, headSha: artifact.pr.headSha, files, patches, comments, state, now: NOW }
+  return {
+    artifact,
+    headSha: artifact.pr.headSha,
+    mergeBaseSha: artifact.pr.mergeBaseSha,
+    files,
+    patches,
+    comments,
+    state,
+    now: NOW,
+  }
 }
 
 describe('pending draft placement', () => {
@@ -74,6 +83,7 @@ describe('pending draft placement', () => {
         side: /** @type {const} */ ('new'),
         body: 'a comment',
         headSha: artifact.pr.headSha,
+        mergeBaseSha: artifact.pr.mergeBaseSha,
         createdAt: NOW.toISOString(),
         updatedAt: NOW.toISOString(),
       },
@@ -267,6 +277,7 @@ describe('layer sections', () => {
       firstCardFor: new Set(),
       comments: [],
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
     }
     document.body.innerHTML = renderLayerSection(drawn, 0, artifact, files, state, cctx)
     const body = document.querySelector('section.layer > .layer-body > .body')
@@ -297,6 +308,7 @@ describe('layer sections', () => {
       firstCardFor: new Set(),
       comments: [],
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
     }
     document.body.innerHTML = renderLayerSection(fenced, 0, artifact, files, state, cctx)
     expect([...document.querySelectorAll('.diagram')].map(el => el.getAttribute('data-mermaid'))).toEqual([
@@ -318,6 +330,7 @@ describe('layer sections', () => {
       firstCardFor: new Set(),
       comments: [],
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
     }
     const html = renderFileCard(
       { path: 'ghost.ts', hunks: ['ghost_ts#1'], isTest: false, annotations: [] },
@@ -410,7 +423,14 @@ describe('layer sections', () => {
     }
     const counts = layerHiddenLines(
       layer,
-      { artifact, files, comments: [], state, headSha: artifact.pr.headSha },
+      {
+        artifact,
+        files,
+        comments: [],
+        state,
+        headSha: artifact.pr.headSha,
+        mergeBaseSha: artifact.pr.mergeBaseSha,
+      },
       'light'
     )
 
@@ -418,7 +438,17 @@ describe('layer sections', () => {
     expect(hiddenLabel({ total: 10, hidden: 0 })).toBe('')
     expect(hiddenLabel({ total: 10, hidden: 4 })).toBe('4 of 10 lines hidden')
     expect(
-      canvasHiddenLines({ artifact, files, comments: [], state, headSha: artifact.pr.headSha }, 'light').total
+      canvasHiddenLines(
+        {
+          artifact,
+          files,
+          comments: [],
+          state,
+          headSha: artifact.pr.headSha,
+          mergeBaseSha: artifact.pr.mergeBaseSha,
+        },
+        'light'
+      ).total
     ).toBeGreaterThanOrEqual(counts.total)
   })
 })
@@ -829,6 +859,7 @@ describe('PR #278 fixture render', () => {
       const rendered = hydrateAll(document, {
         artifact: fixture,
         headSha: fixture.pr.headSha,
+        mergeBaseSha: fixture.pr.mergeBaseSha,
         files: fixture.files,
         patches: toPatchMap(live),
         comments: [],

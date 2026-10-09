@@ -17,11 +17,12 @@ import { fetchPrRefs } from '../git/pr-refs.js'
 import { type PrMeta, toPr } from '../host/pr.js'
 import { lookupCanvas } from '../review/carry-over.js'
 import { marksForCanvas } from '../review/carry-marks.js'
-import { reviewedCommit, stateForCanvas } from '../review/review-body.js'
+import { reviewedDiff, stateForCanvas } from '../review/review-body.js'
 import { readerResolves } from '../review/self-review.js'
 import { discoverSharedCanvas, discoveryFingerprint } from '../host/attachments.js'
 import { buildSkillCommand } from '../review/skill-command.js'
 import type { CanvasLookup } from '../store/canvas-store.js'
+import type { DiffedCommit } from '../store/derived-store.js'
 import type { AppContext } from './context.js'
 import { AppError } from './errors.js'
 import { postedFromPending } from '../review/posted-comments.js'
@@ -275,18 +276,16 @@ interface ShownDiff {
 }
 
 /**
- * The diffs of the canvas on screen, which is the one `found` names rather than the target's
- * current head: a stale canvas describes an older commit, and its own files are what the reader
- * is looking at.
+ * The diffs of the canvas on screen, `canvas` (see `reviewedDiff`), rather than the target's
+ * current diff: a stale canvas describes an older commit or an older base, and its own files are
+ * what the reader is looking at.
  */
 async function shownDiff(
   ctx: AppContext,
-  pr: Pr,
-  found: CanvasLookup,
+  canvas: DiffedCommit,
   loaded: LoadedCanvas | null
 ): Promise<ShownDiff> {
-  const mergeBaseSha = loaded?.canvas.manifest?.mergeBaseSha ?? pr.mergeBaseSha
-  const derived = await ctx.derived.readOrBuild(reviewedCommit(found, pr), mergeBaseSha)
+  const derived = await ctx.derived.readOrBuild(canvas)
   if (derived !== null) {
     return { files: derived.files, derivable: true, warning: null }
   }
@@ -333,18 +332,8 @@ function canvasScreen(
       ? { status: 'ready', skillCommand }
       : { status: 'ready', skillCommand, carriedOver: found.carriedOver }
   }
-  const stale: StaleInfo = {
-    canvasHeadSha: found.headSha,
-    currentHeadSha: pr.headSha,
-    relation: found.relation,
-  }
-  if (found.relation === 'ancestor') {
-    stale.commitsBehind = found.commitsBehind
-  } else if (found.relation === 'other-base') {
-    stale.canvasMergeBaseSha = found.mergeBaseSha
-    stale.currentMergeBaseSha = pr.mergeBaseSha
-  }
-  return { status: 'stale', skillCommand, stale }
+  const { status: _status, headSha: canvasHeadSha, ...relation } = found
+  return { status: 'stale', skillCommand, stale: { canvasHeadSha, currentHeadSha: pr.headSha, ...relation } }
 }
 
 /** Everything a bundle holds that does not depend on which canvas was found. */
@@ -357,8 +346,8 @@ async function bundleBase(
     /** A promise, so probing the forge runs alongside the chat and state reads. */
     capabilities: Promise<Capabilities>
     diff: ShownDiff
-    /** The commit of the canvas on screen: the marks the page shows are the ones made on it. */
-    canvasSha: string
+    /** The diff of the canvas on screen: the marks the page shows are the ones made on it. */
+    canvas: DiffedCommit
     /** The canvas on screen, when there is one: marks may follow the line of descent onto it. */
     artifact: ReviewArtifact | null
     /** Whether that canvas describes the current head, the only one whose points are resolved. */
@@ -381,8 +370,8 @@ async function bundleBase(
   // marks made on a canvas it descends from follow it wherever the diff is untouched.
   const marks =
     input.artifact === null
-      ? { state: stateForCanvas(stored, input.canvasSha), carriedFrom: undefined }
-      : await marksForCanvas(ctx, input.artifact, input.canvasSha, stored)
+      ? { state: stateForCanvas(stored, input.canvas), carriedFrom: undefined }
+      : await marksForCanvas(ctx, input.artifact, input.canvas, stored)
   const sharing = resolveSharing(ctx.projectConfig.config.sharing, personal)
   return {
     pr: input.pr,
@@ -438,7 +427,8 @@ export async function resolveLocalBundle(
 
   const found = await ctx.canvases.findForLocal(key, head.headSha)
   const loaded = found.status === 'missing' ? null : await loadCanvas(ctx, found)
-  const diff = await shownDiff(ctx, head, found, loaded)
+  const canvas = reviewedDiff(found, head, loaded?.canvas.manifest ?? null)
+  const diff = await shownDiff(ctx, canvas, loaded)
   if (diff.warning !== null && loaded !== null) {
     warnings.push(diff.warning)
   }
@@ -453,7 +443,7 @@ export async function resolveLocalBundle(
     comments: noComments(pr.headSha, ctx.now),
     capabilities: Promise.resolve(LOCAL_CAPABILITIES),
     diff,
-    canvasSha: reviewedCommit(found, pr),
+    canvas,
     artifact: loaded?.artifact ?? null,
     canvasCurrent: screen.status === 'ready',
     warnings,
@@ -474,7 +464,7 @@ export async function resolveBundle(
 
   if (ctx.fixtureArtifact !== null) {
     const artifact = rekeyFixture(ctx.fixtureArtifact, pr)
-    const live = await shownDiff(ctx, pr, { status: 'missing' }, null)
+    const live = await shownDiff(ctx, pr, null)
     if (live.warning !== null) {
       warnings.push(live.warning)
     }
@@ -485,7 +475,7 @@ export async function resolveBundle(
       comments,
       capabilities,
       diff,
-      canvasSha: pr.headSha,
+      canvas: pr,
       artifact: null,
       canvasCurrent: true,
       warnings,
@@ -518,7 +508,8 @@ export async function resolveBundle(
   }
 
   const loaded = found.status === 'missing' ? null : await loadCanvas(ctx, found)
-  const diff = await shownDiff(ctx, pr, found, loaded)
+  const canvas = reviewedDiff(found, pr, loaded?.canvas.manifest ?? null)
+  const diff = await shownDiff(ctx, canvas, loaded)
   if (diff.warning !== null) {
     warnings.push(diff.warning)
   }
@@ -531,7 +522,7 @@ export async function resolveBundle(
     comments,
     capabilities,
     diff,
-    canvasSha: reviewedCommit(found, pr),
+    canvas,
     artifact: loaded?.artifact ?? null,
     canvasCurrent: screen.status === 'ready',
     warnings,

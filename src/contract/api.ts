@@ -67,19 +67,19 @@ export interface CanvasInfo {
   importedAt?: string
 }
 
-/** How a canvas for another commit relates to the PR head: behind it, or off a discarded branch. */
-export type CanvasRelation = 'ancestor' | 'unrelated'
+/**
+ * How a canvas of another diff relates to the PR head: generated for a commit the head was built
+ * on, for one off a discarded branch, or for the head itself diffed from a merge base the pull
+ * request no longer has, as after it moved to another base branch.
+ */
+export type StaleRelation =
+  | { relation: 'ancestor'; commitsBehind: number }
+  | { relation: 'unrelated' }
+  | { relation: 'other-base'; canvasMergeBaseSha: string; currentMergeBaseSha: string }
 
-export interface StaleInfo {
-  canvasHeadSha: string
-  currentHeadSha: string
-  /** `other-base`: the canvas is of the head, diffed from a merge base the pull request no longer has. */
-  relation: CanvasRelation | 'other-base'
-  commitsBehind?: number
-  /** With `other-base`: the merge base the canvas was generated against, and the current one. */
-  canvasMergeBaseSha?: string
-  currentMergeBaseSha?: string
-}
+export type CanvasRelation = StaleRelation['relation']
+
+export type StaleInfo = { canvasHeadSha: string; currentHeadSha: string } & StaleRelation
 
 /**
  * A ready canvas generated for an earlier commit of the pull request whose diff is identical to
@@ -93,16 +93,13 @@ export interface CarriedOverInfo {
 }
 
 /** The answer of `POST /import`, of `pr-review import`, and of an imported shared canvas. */
-export interface ImportResult {
-  status: 'ready' | 'stale' | 'exists'
+export type ImportResult = {
   headSha: string
   currentHeadSha: string
-  relation?: CanvasRelation
-  commitsBehind?: number
   /** True when the diffs of this canvas can be rebuilt from the local clone. */
   derivable: boolean
   warnings: string[]
-}
+} & ({ status: 'ready' } | { status: 'exists' } | ({ status: 'stale' } & StaleRelation))
 
 /** The answer of `POST /shared-canvas/fetch`. */
 export interface SharedCanvasFetchResponse {

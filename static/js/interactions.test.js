@@ -49,6 +49,7 @@ const authored = {
   ),
 }
 const HEAD = artifact.pr.headSha
+const MERGE_BASE = artifact.pr.mergeBaseSha
 
 const flush = () => new Promise(resolve => setTimeout(resolve, 0))
 
@@ -63,11 +64,17 @@ function bundleFor(state, canvas = artifact) {
     files,
     derivable: true,
     artifact: canvas,
-    canvas: { headSha: artifact.pr.headSha, source: 'local', manifest: null },
+    canvas: {
+      headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
+      source: 'local',
+      manifest: null,
+    },
     skillCommand: '/pr-review-canvas 42',
     comments: {
       fetchedAt: NOW.toISOString(),
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
       reviewComments: comments,
       issueComments,
     },
@@ -96,6 +103,7 @@ function setup(opts = {}) {
   const ctx = {
     artifact: canvas,
     headSha: artifact.pr.headSha,
+    mergeBaseSha: artifact.pr.mergeBaseSha,
     files,
     patches,
     comments: threadComments,
@@ -283,6 +291,7 @@ function setup(opts = {}) {
     state,
     capabilities: opts.capabilities ?? { canComment: true, tokenKind: 'classic', login: 'octocat' },
     headSha: artifact.pr.headSha,
+    mergeBaseSha: artifact.pr.mergeBaseSha,
     api,
   })
   const wiring = wireReview(root, session, {
@@ -703,6 +712,7 @@ describe('attention points', () => {
           reason: 'Covered by the e2e suite.',
           comment: true,
           headSha: artifact.pr.headSha,
+          mergeBaseSha: artifact.pr.mergeBaseSha,
         },
       ],
     ])
@@ -723,7 +733,15 @@ describe('attention points', () => {
     click(root, 'section.layer li.finding[data-fingerprint="fp-1"] [data-act="point-unsettle"]')
     await flush()
     expect(calls).toEqual([
-      ['settled', { fingerprint: 'fp-1', settled: false, headSha: artifact.pr.headSha }],
+      [
+        'settled',
+        {
+          fingerprint: 'fp-1',
+          settled: false,
+          headSha: artifact.pr.headSha,
+          mergeBaseSha: artifact.pr.mergeBaseSha,
+        },
+      ],
     ])
     const card = layerCard(root, 'fp-1')
     expect(card?.getAttribute('data-status')).toBe('open')
@@ -830,6 +848,7 @@ describe('attention points', () => {
           reason: 'We keep it.',
           comment: false,
           headSha: artifact.pr.headSha,
+          mergeBaseSha: artifact.pr.mergeBaseSha,
         },
       ],
     ])
@@ -852,6 +871,7 @@ describe('attention points', () => {
             body: 'x',
             pointFingerprint: 'fp-1',
             headSha: artifact.pr.headSha,
+            mergeBaseSha: artifact.pr.mergeBaseSha,
             createdAt: NOW.toISOString(),
             updatedAt: NOW.toISOString(),
           },
@@ -909,6 +929,7 @@ describe('attention points', () => {
     setRenderContext({
       artifact,
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
       files,
       patches,
       comments,
@@ -930,6 +951,7 @@ describe('attention points', () => {
       state: BASE,
       capabilities: { canComment: true, tokenKind: 'classic', login: 'octocat' },
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
       api: {
         postComment: async (_pr, input) => {
           sent.push(input)
@@ -949,6 +971,7 @@ describe('attention points', () => {
         body: expect.stringContaining('Deleted file had no owner'),
         pointFingerprint: 'fp-3',
         headSha: artifact.pr.headSha,
+        mergeBaseSha: artifact.pr.mergeBaseSha,
       },
     ])
   })
@@ -968,6 +991,7 @@ describe('attention points', () => {
           body: expect.stringContaining('**Sum instead of product**'),
           pointFingerprint: 'fp-1',
           headSha: artifact.pr.headSha,
+          mergeBaseSha: artifact.pr.mergeBaseSha,
         },
       ],
     ])
@@ -1010,7 +1034,15 @@ describe('comment composers', () => {
     expect(calls).toEqual([
       [
         'comment',
-        { kind: 'inline', path: 'src/app.ts', line: 4, side: 'new', body: 'look here', headSha: HEAD },
+        {
+          kind: 'inline',
+          path: 'src/app.ts',
+          line: 4,
+          side: 'new',
+          body: 'look here',
+          headSha: HEAD,
+          mergeBaseSha: MERGE_BASE,
+        },
       ],
     ])
     expect(root.querySelector('tr.composer')).toBeNull()
@@ -1166,7 +1198,18 @@ describe('comment composers', () => {
     click(root, 'tr.composer [data-act="composer-post"]')
     await flush()
     expect(calls).toEqual([
-      ['comment', { kind: 'inline', path: 'src/app.ts', line: 3, side: 'old', body: 'why', headSha: HEAD }],
+      [
+        'comment',
+        {
+          kind: 'inline',
+          path: 'src/app.ts',
+          line: 3,
+          side: 'old',
+          body: 'why',
+          headSha: HEAD,
+          mergeBaseSha: MERGE_BASE,
+        },
+      ],
     ])
   })
 
@@ -1196,7 +1239,12 @@ describe('comment composers', () => {
     area.value = 'agreed'
     click(root, '.thread-full [data-act="composer-post"]')
     await flush()
-    expect(calls).toEqual([['comment', { kind: 'reply', inReplyToId: 1001, body: 'agreed', headSha: HEAD }]])
+    expect(calls).toEqual([
+      [
+        'comment',
+        { kind: 'reply', inReplyToId: 1001, body: 'agreed', headSha: HEAD, mergeBaseSha: MERGE_BASE },
+      ],
+    ])
     expect(root.querySelector('.thread-full .composer-box')).toBeNull()
     expect(
       [...root.querySelectorAll('tr.thread[data-thread="1001"] .cmt .prose')].at(-1)?.textContent
@@ -1213,7 +1261,9 @@ describe('comment composers', () => {
     area.value = 'looks fine'
     click(root, '.pr-composer-host [data-act="composer-post"]')
     await flush()
-    expect(calls).toEqual([['comment', { kind: 'issue', body: 'looks fine', headSha: HEAD }]])
+    expect(calls).toEqual([
+      ['comment', { kind: 'issue', body: 'looks fine', headSha: HEAD, mergeBaseSha: MERGE_BASE }],
+    ])
     expect([...root.querySelectorAll('.conversation > .cmt .prose')].at(-1)?.textContent).toContain(
       'looks fine'
     )
@@ -1237,7 +1287,16 @@ describe('what the page remembers after a reload', () => {
     const { root, session } = setup({
       capabilities: { canComment: false, tokenKind: 'classic', login: 'octocat', reason: 'no repo scope' },
     })
-    const ctx = { artifact, headSha: artifact.pr.headSha, files, patches, comments, state: BASE, now: NOW }
+    const ctx = {
+      artifact,
+      headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
+      files,
+      patches,
+      comments,
+      state: BASE,
+      now: NOW,
+    }
     const card = root.querySelector('article.file#file-src_new_name_ts')
     if (!(card instanceof HTMLElement)) {
       throw new Error('no card')
@@ -1749,6 +1808,7 @@ describe('capability gating and sign-off', () => {
   it('shows the generated body and posts the review', async () => {
     const preview = {
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
       body: 'Reviewed 1 of 1 layer.',
       unreviewed: [],
       pending: 0,
@@ -1764,7 +1824,12 @@ describe('capability gating and sign-off', () => {
     expect(dialog?.querySelector('.signoff-target')?.textContent).toContain('on commit aaaaaaa')
     click(root, '[data-act="signoff-post"]')
     await flush()
-    expect(calls).toEqual([['review', { event: 'APPROVE', body: 'Reviewed 1 of 1 layer.', headSha: HEAD }]])
+    expect(calls).toEqual([
+      [
+        'review',
+        { event: 'APPROVE', body: 'Reviewed 1 of 1 layer.', headSha: HEAD, mergeBaseSha: MERGE_BASE },
+      ],
+    ])
     // Posted with nothing to warn about: the dialog closes, and the toast links to the review.
     expect(dialog instanceof HTMLDialogElement && dialog.open).toBe(false)
     expect(root.querySelector('.toast')?.textContent).toBe('approved · see it on GitHub')
@@ -1808,6 +1873,7 @@ describe('capability gating and sign-off', () => {
     const { root, calls } = setup({
       fetchReviewBody: async () => ({
         headSha: artifact.pr.headSha,
+        mergeBaseSha: artifact.pr.mergeBaseSha,
         body: 'body',
         unreviewed: ['Run path'],
         pending: 0,
@@ -1822,7 +1888,7 @@ describe('capability gating and sign-off', () => {
     area.value = '   '
     click(root, '[data-act="signoff-post"]')
     await flush()
-    expect(calls).toEqual([['review', { event: 'REQUEST_CHANGES', headSha: HEAD }]])
+    expect(calls).toEqual([['review', { event: 'REQUEST_CHANGES', headSha: HEAD, mergeBaseSha: MERGE_BASE }]])
     expect(root.querySelector('.toast')?.textContent).toBe('changes requested · see it on GitHub')
   })
 
@@ -1843,6 +1909,7 @@ describe('capability gating and sign-off', () => {
       api: { postReview: () => Promise.reject(new Error('502 github is down')) },
       fetchReviewBody: async () => ({
         headSha: artifact.pr.headSha,
+        mergeBaseSha: artifact.pr.mergeBaseSha,
         body: 'body',
         unreviewed: ['Run path'],
         pending: 0,
@@ -1904,6 +1971,7 @@ describe('a page that lost the elements a command expects', () => {
     setRenderContext({
       artifact,
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
       files,
       patches,
       comments,
@@ -1924,6 +1992,7 @@ describe('a page that lost the elements a command expects', () => {
       state: BASE,
       capabilities: { canComment: true, tokenKind: 'classic', login: 'octocat' },
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
       api: {
         putReviewed: async (_pr, id, reviewed) => {
           calls.push(['reviewed', { id, reviewed }])
@@ -2197,6 +2266,7 @@ describe('the AI Chat commands', () => {
           side: 'new',
           body: 'Rename.',
           headSha: HEAD,
+          mergeBaseSha: MERGE_BASE,
           proposalFingerprint: 'proposal:45747567ecdc439b',
         },
       ],
@@ -2222,6 +2292,7 @@ describe('the AI Chat commands', () => {
           side: 'new',
           body: 'One line.',
           headSha: HEAD,
+          mergeBaseSha: MERGE_BASE,
           proposalFingerprint: 'proposal:ef576f5b6d27a0fa',
         },
       ],
@@ -2487,7 +2558,17 @@ describe('the pending review', () => {
     await flush()
 
     expect(calls).toEqual([
-      ['pending-add', { path: 'src/app.ts', line: 4, side: 'new', body: 'needs a guard', headSha: HEAD }],
+      [
+        'pending-add',
+        {
+          path: 'src/app.ts',
+          line: 4,
+          side: 'new',
+          body: 'needs a guard',
+          headSha: HEAD,
+          mergeBaseSha: MERGE_BASE,
+        },
+      ],
     ])
     expect(session.pending).toHaveLength(1)
     // The draft is on the diff, marked as not posted.
@@ -2543,6 +2624,7 @@ describe('the pending review', () => {
           startLine: 2,
           body: 'this whole block',
           headSha: HEAD,
+          mergeBaseSha: MERGE_BASE,
         },
       ],
     ])
@@ -2712,6 +2794,7 @@ describe('the pending review', () => {
     const { root, calls, session } = setup({
       fetchReviewBody: async () => ({
         headSha: artifact.pr.headSha,
+        mergeBaseSha: artifact.pr.mergeBaseSha,
         body: 'a look',
         unreviewed: [],
         pending: 1,
@@ -2736,7 +2819,10 @@ describe('the pending review', () => {
 
     click(root, '[data-act="signoff-post"]')
     await flush()
-    expect(calls.at(-1)).toEqual(['review', { event: 'COMMENT', body: 'a look', headSha: HEAD }])
+    expect(calls.at(-1)).toEqual([
+      'review',
+      { event: 'COMMENT', body: 'a look', headSha: HEAD, mergeBaseSha: MERGE_BASE },
+    ])
     expect(session.pending).toEqual([])
     expect(root.querySelector('tr.pending-row')).toBeNull()
     expect(root.querySelector('.pending-bar')).toBeNull()

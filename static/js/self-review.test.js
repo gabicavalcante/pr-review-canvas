@@ -150,6 +150,7 @@ describe('the commands', () => {
       state,
       capabilities: { canComment: true, tokenKind: 'classic', login: 'octocat' },
       headSha: artifact.pr.headSha,
+      mergeBaseSha: artifact.pr.mergeBaseSha,
       api,
     })
   const pointHtml = `<li><div><span class="tbtns"><button class="cmd" data-act="point-settle" data-fingerprint="${tests.fingerprint}">settle</button></span></div></li>`

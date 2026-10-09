@@ -67,8 +67,15 @@
 
 - Reloading the page shows the canvas as outdated after a push made since the last load, and after
   the pull request moved to another base branch. A canvas of the head itself is outdated when it
-  was generated against another merge base: it is shown with the diff it was generated from, and
-  the bar names both merge bases.
+  was generated against another merge base and the diff changed: it is shown with the diff it was
+  generated from, and the bar names both merge bases. A new base that leaves the diff identical
+  keeps the canvas, as a push with an identical diff does, unless `canvas.keepForIdenticalDiff`
+  is off.
+- After a move to another base, review marks and pending drafts follow the diff they were made
+  on: marks made on the old diff do not count for a canvas generated again on the new base, drafts
+  written on it are listed as written on an earlier diff and are refused on submit unless the diff
+  is unchanged, and a page drawn before the move cannot post or mark until it is reloaded.
+  `pr-review import` and a generation that finished after the move say so too.
 
 ## 0.8.0
 

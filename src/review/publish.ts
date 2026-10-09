@@ -95,11 +95,11 @@ async function readModel(canvasDir: string): Promise<{ raw: unknown } | { error:
 }
 
 /**
- * The current head of the target; a push during generation makes the prepared context stale. For
- * a pull request whose head moved, the head and base are fetched again, and a head whose diff is
- * identical to the prepared commit's still counts as that commit. For a local target the working
- * tree is snapshotted again, so an edit made while the agent worked is caught the same way a push
- * is.
+ * The current head of the target; a push, or a move to another base branch, during generation
+ * makes the prepared context stale. For a pull request whose head or base branch moved, the head
+ * and base are fetched again, and a diff identical to the prepared one still counts as it. For a
+ * local target the working tree is snapshotted again, so an edit made while the agent worked is
+ * caught the same way a push is.
  */
 async function currentHead(
   ctx: AppContext,
@@ -108,8 +108,11 @@ async function currentHead(
   if (context.target.kind === 'pr') {
     const { host, repo } = ctx.config
     const meta = await host.fetchPrMeta(ctx.gh, repo, context.target.number)
-    if (meta.headSha === context.headSha || !ctx.projectConfig.config.canvas.keepForIdenticalDiff) {
-      return { headSha: meta.headSha, moved: meta.headSha !== context.headSha }
+    if (meta.headSha === context.headSha && meta.baseRef === context.pr.baseRef) {
+      return { headSha: meta.headSha, moved: false }
+    }
+    if (meta.headSha !== context.headSha && !ctx.projectConfig.config.canvas.keepForIdenticalDiff) {
+      return { headSha: meta.headSha, moved: true }
     }
     const head = await fetchPrRefs(ctx.git, host, meta)
     return { headSha: head.headSha, moved: !(await standsForHead(ctx, head, context)) }
@@ -166,7 +169,7 @@ export async function validationInput(
   }
   return {
     files: context.files,
-    patches: (await ctx.derived.ensure(context.headSha, context.mergeBaseSha)).patches,
+    patches: (await ctx.derived.ensure(context)).patches,
     caps: context.caps,
     limits: context.limits,
     highRisk: context.highRisk,
@@ -237,7 +240,9 @@ export async function publish(
     if (head.moved) {
       throw new PublishError(
         'CANVAS_STALE',
-        `the target moved to ${head.headSha.slice(0, 7)} while this canvas was prepared for ${context.headSha.slice(0, 7)}`,
+        head.headSha === context.headSha
+          ? `the pull request moved to another base while this canvas was prepared for ${context.headSha.slice(0, 7)}`
+          : `the target moved to ${head.headSha.slice(0, 7)} while this canvas was prepared for ${context.headSha.slice(0, 7)}`,
         'run `pr-review prepare` again, or pass --allow-stale to publish for the old commit'
       )
     }
@@ -259,7 +264,7 @@ export async function publish(
   const artifact = normalize(result.output, {
     pr: context.pr,
     files: context.files,
-    patches: (await ctx.derived.ensure(context.headSha, context.mergeBaseSha)).patches,
+    patches: (await ctx.derived.ensure(context)).patches,
     highRisk: context.highRisk,
     caps: context.caps,
     generatedAt: now,

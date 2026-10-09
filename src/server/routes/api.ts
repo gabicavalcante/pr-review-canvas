@@ -210,15 +210,11 @@ export function apiRoutes(ctx: AppContext): Hono {
     const pr = await loader.currentTarget(key)
     const named = parseHeadShaQuery(c.req.query('headSha'))
     const headSha = named ?? pr.headSha
-    // A sha the page names is an outdated canvas, whose diff runs from the merge base it was
-    // generated against: the head's own canvas too, once the pull request moved to another base.
-    // Any other older canvas's diffs were written when that canvas was drawn.
-    const canvasBase =
-      named === undefined ? undefined : (await ctx.canvases.readManifest(named))?.mergeBaseSha
-    const derived = await ctx.derived.readOrBuild(
-      headSha,
-      canvasBase ?? (headSha === pr.headSha ? pr.mergeBaseSha : undefined)
-    )
+    // A sha the page names is the outdated canvas on screen, whose diff runs from the merge base
+    // it was generated against; the head's own canvas too, once the pull request moved to another
+    // base. Otherwise it is the target's diff.
+    const diff = named === undefined ? pr : await ctx.canvases.readManifest(named)
+    const derived = diff === null ? null : await ctx.derived.readOrBuild(diff)
     if (derived === null) {
       throw new AppError(
         'NOT_FOUND',
@@ -248,13 +244,7 @@ export function apiRoutes(ctx: AppContext): Hono {
       throw new AppError('BAD_REQUEST', `request between 1 and ${CONTEXT_MAX_LINES} lines`, 400)
     }
     const pr = await loader.currentTarget(key)
-    const lines = await ctx.derived.readLines(
-      pr.headSha,
-      q.side === 'new' ? 'head' : 'base',
-      q.path,
-      q.from,
-      q.to
-    )
+    const lines = await ctx.derived.readLines(pr, q.side === 'new' ? 'head' : 'base', q.path, q.from, q.to)
     if (lines === null) {
       throw new AppError('NOT_FOUND', `${q.path} is not materialized for this head`, 404)
     }

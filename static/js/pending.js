@@ -5,6 +5,7 @@
 /** @typedef {import('./contract-types.js').PendingComment} PendingComment */
 /** @typedef {import('./contract-types.js').PrState} PrState */
 /** @typedef {import('./contract-types.js').Side} Side */
+/** The diff on screen: its commit, and the merge base it runs from. @typedef {{ headSha: string, mergeBaseSha: string }} DiffOnScreen */
 import { esc, timeAgo } from './dom.js'
 import { hostLabel } from './host.js'
 import { renderMarkdown } from './markdown.js'
@@ -102,9 +103,9 @@ export function pendingRowHtml(drafts, now) {
 /**
  * The bar that says a review is being written. It is drawn only while something is waiting, opens
  * the list of the drafts in the side pane, and carries the two ways out: submit the review, or
- * throw the drafts away. The drafts of earlier commits are only counted here; the list shows them.
+ * throw the drafts away. The drafts of earlier diffs are only counted here; the list shows them.
  * @param {number} count
- * @param {number} [earlier] how many of them were written on an earlier commit
+ * @param {number} [earlier] how many of them were written on an earlier diff, of another commit or base
  */
 export function pendingBarHtml(count, earlier = 0) {
   if (count === 0) {
@@ -114,7 +115,7 @@ export function pendingBarHtml(count, earlier = 0) {
     `<div class="pending-bar" id="${PENDING_BAR_ID}" role="status">` +
     `<span class="pending-mark" aria-hidden="true"></span>` +
     `<span class="pending-text"><b>${esc(pendingLabel(count))}</b> waiting in your review` +
-    `${earlier === 0 ? '' : `, ${earlier} written on an earlier commit`}. ` +
+    `${earlier === 0 ? '' : `, ${earlier} written on an earlier diff`}. ` +
     `Nothing is on ${esc(hostLabel())} until you submit it.</span>` +
     '<span class="pending-actions">' +
     '<button class="cmd" type="button" data-act="show-review">see the list</button>' +
@@ -125,17 +126,31 @@ export function pendingBarHtml(count, earlier = 0) {
 }
 
 /**
- * The drafts of the commit on screen and the ones written on an earlier commit. Without a commit to
- * compare with, every draft is current.
+ * Whether a draft was written on the diff `on`: its commit, diffed from the same merge base. A draft
+ * of an older tool version names no merge base and reads as written on the current one, as the
+ * server reads it.
+ * @param {PendingComment} draft
+ * @param {DiffOnScreen} on
+ */
+export function writtenOn(draft, on) {
+  return (
+    draft.headSha === on.headSha &&
+    (draft.mergeBaseSha === undefined || draft.mergeBaseSha === on.mergeBaseSha)
+  )
+}
+
+/**
+ * The drafts of the diff on screen and the ones written on an earlier diff, of another commit or
+ * another base. Without a diff to compare with, every draft is current.
  * @param {PrState | null | undefined} state
- * @param {string} [headSha]
+ * @param {DiffOnScreen} [on]
  * @returns {{ current: ReadonlyArray<PendingComment>, earlier: ReadonlyArray<PendingComment> }}
  */
-export function draftsByCommit(state, headSha) {
+export function draftsByCommit(state, on) {
   const all = pendingComments(state)
-  return headSha === undefined
+  return on === undefined
     ? { current: all, earlier: [] }
-    : { current: all.filter(p => p.headSha === headSha), earlier: all.filter(p => p.headSha !== headSha) }
+    : { current: all.filter(p => writtenOn(p, on)), earlier: all.filter(p => !writtenOn(p, on)) }
 }
 
 /**
@@ -143,14 +158,14 @@ export function draftsByCommit(state, headSha) {
  * with the last one. The host element is where the bar lives; it is emptied when nothing waits.
  * @param {ParentNode} root
  * @param {PrState} state
- * @param {string} [headSha]
+ * @param {DiffOnScreen} [on]
  * @returns {number} how many drafts are waiting
  */
-export function refreshPendingBar(root, state, headSha) {
+export function refreshPendingBar(root, state, on) {
   const count = pendingCount(state)
   const host = root.querySelector('.pending-bar-host')
   if (host !== null) {
-    const earlier = draftsByCommit(state, headSha).earlier.length
+    const earlier = draftsByCommit(state, on).earlier.length
     const signature = JSON.stringify([count, earlier])
     if (host.getAttribute('data-pending-state') !== signature) {
       host.innerHTML = pendingBarHtml(count, earlier)

@@ -508,6 +508,34 @@ describe('publish', () => {
     expect(result.headSha).toBe(HEAD_SHA)
   })
 
+  it('refuses a canvas whose pull request moved to another base while it was prepared, unless the diff is identical', async () => {
+    const canvasDir = await prepared()
+    await writeModel(canvasDir, artifactToModelOutput(syntheticArtifact()))
+    // Each base has a merge base of its own: one diff per merge base, as git would give.
+    const retarget = (release: string, diff: string) => {
+      Object.assign(clone.options.refs ?? {}, { 'refs/heads/release': release })
+      moveFakeHead(clone, {
+        headRef: 'pull/42/head',
+        baseRef: 'refs/pr/42/base',
+        headSha: HEAD_SHA,
+        mergeBaseSha: release,
+        diff,
+      })
+      t.ctx.gh = createFakeGh({
+        routes: {
+          'repos/acme/widgets/pulls/42': ghJson({ ...GH_PULL, base: { ...GH_PULL.base, ref: 'release' } }),
+        },
+      })
+    }
+    retarget('9'.repeat(40), SYNTHETIC_DIFF_MOVED_BY_BASE)
+    await expect(publish(t.ctx, canvasDir, OPTS)).rejects.toMatchObject({
+      code: 'CANVAS_STALE',
+      message: `the pull request moved to another base while this canvas was prepared for ${HEAD_SHA.slice(0, 7)}`,
+    })
+    retarget('8'.repeat(40), SYNTHETIC_DIFF)
+    expect((await publish(t.ctx, canvasDir, OPTS)).status).toBe('published')
+  })
+
   it('refuses a canvas whose PR head moved unless --allow-stale, and checks refs targets against the ref', async () => {
     const canvasDir = await prepared()
     await writeModel(canvasDir, artifactToModelOutput(syntheticArtifact()))

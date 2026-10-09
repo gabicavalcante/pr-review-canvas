@@ -161,6 +161,7 @@ describe('canvas-store', () => {
 })
 
 describe('derived-store', () => {
+  const DIFF = { headSha: HEAD_SHA, mergeBaseSha: BASE_SHA }
   const git = () =>
     createFakeGit({
       refs: { head: HEAD_SHA, base: BASE_SHA },
@@ -171,10 +172,10 @@ describe('derived-store', () => {
   it('builds derived/ from git once and serves it from disk after', async () => {
     const g = git()
     const store = createDerivedStore(createCanvasStore(dir, createFakeGit(), null), g, now)
-    expect(await store.derivable(HEAD_SHA, BASE_SHA)).toBe(true)
-    expect(await store.derivable(HEAD_SHA, 'c'.repeat(40))).toBe(false)
-    expect(await store.read(HEAD_SHA)).toBeNull()
-    const first = await store.ensure(HEAD_SHA, BASE_SHA)
+    expect(await store.derivable({ headSha: HEAD_SHA, mergeBaseSha: BASE_SHA })).toBe(true)
+    expect(await store.derivable({ headSha: HEAD_SHA, mergeBaseSha: 'c'.repeat(40) })).toBe(false)
+    expect(await store.read(DIFF)).toBeNull()
+    const first = await store.ensure(DIFF)
     expect(first.files.map(f => f.key)).toEqual([
       'src_app_ts',
       'src_new_ts',
@@ -185,53 +186,59 @@ describe('derived-store', () => {
       'src_app_test_ts',
     ])
     expect(Object.keys(first.patches)).toEqual(first.files.map(f => f.key))
-    const derived = store.derivedDir(HEAD_SHA)
+    const derived = store.derivedDir(DIFF)
     expect(
       (await readFile(path.join(derived, 'patches', 'src_app_ts.diff'), 'utf8')).split('\n').slice(0, 2)
     ).toEqual(['### hunk src_app_ts#1', '@@ -1,4 +1,5 @@'])
     expect((await stat(path.join(derived, 'head', 'src', 'app.ts'))).isFile()).toBe(true)
     expect((await stat(path.join(derived, 'base', 'src', 'gone.ts'))).isFile()).toBe(true)
     const diffCalls = g.calls.filter(c => c[0] === 'diff').length
-    const second = await store.ensure(HEAD_SHA, BASE_SHA)
+    const second = await store.ensure(DIFF)
     expect(second).toEqual(first)
     expect(g.calls.filter(c => c[0] === 'diff').length).toBe(diffCalls)
-    expect(await store.read(HEAD_SHA)).toEqual(first)
+    expect(await store.read(DIFF)).toEqual(first)
     await rm(path.join(derived, 'files.json'))
-    expect(await store.read(HEAD_SHA)).toBeNull()
-    expect(await store.ensure(HEAD_SHA, BASE_SHA)).toEqual(first)
+    expect(await store.read(DIFF)).toBeNull()
+    expect(await store.ensure(DIFF)).toEqual(first)
   })
 
-  it('rebuilds when the merge base changed', async () => {
+  it('keeps the diff from each merge base apart, so building one never replaces the other', async () => {
     const g = git()
+    const other = { headSha: HEAD_SHA, mergeBaseSha: 'c'.repeat(40) }
     g.options.diffs = {
       ...g.options.diffs,
-      [`${'c'.repeat(40)}..${HEAD_SHA}`]: SYNTHETIC_DIFF.split('diff --git a/src/new.ts')[0] ?? '',
+      [`${other.mergeBaseSha}..${HEAD_SHA}`]: SYNTHETIC_DIFF.split('diff --git a/src/new.ts')[0] ?? '',
     }
     const store = createDerivedStore(createCanvasStore(dir, createFakeGit(), null), g, now)
-    await store.ensure(HEAD_SHA, BASE_SHA)
-    const rebuilt = await store.ensure(HEAD_SHA, 'c'.repeat(40))
+    const first = await store.ensure(DIFF)
+    const rebuilt = await store.ensure(other)
     expect(rebuilt.files.map(f => f.key)).toEqual(['src_app_ts'])
+    expect(store.derivedDir(other)).not.toBe(store.derivedDir(DIFF))
+    // The first merge base's diff is still on disk, untouched by the second build.
+    expect(await store.read(DIFF)).toEqual(first)
+    expect(await store.read(other)).toEqual(rebuilt)
+    expect(() => store.derivedDir({ headSha: HEAD_SHA, mergeBaseSha: '../x' })).toThrow('not a commit sha')
   })
 
   it('reads lines from materialized files and refuses traversal', async () => {
     const store = createDerivedStore(createCanvasStore(dir, createFakeGit(), null), git(), now)
-    await store.ensure(HEAD_SHA, BASE_SHA)
-    expect(await store.readLines(HEAD_SHA, 'head', 'src/app.ts', 3, 4)).toEqual([
+    await store.ensure(DIFF)
+    expect(await store.readLines(DIFF, 'head', 'src/app.ts', 3, 4)).toEqual([
       'export function run() {',
       '  return a() + b()',
     ])
-    expect(await store.readLines(HEAD_SHA, 'base', 'src/app.ts', 1, 99)).toEqual([
+    expect(await store.readLines(DIFF, 'base', 'src/app.ts', 1, 99)).toEqual([
       "import { a } from './a'",
       'export function run() {',
       '  return a()',
       '}',
     ])
-    expect(await store.readLines(HEAD_SHA, 'base', 'src/gone.ts', 1, 5)).toEqual([
+    expect(await store.readLines(DIFF, 'base', 'src/gone.ts', 1, 5)).toEqual([
       'export const old = 1',
       '// bye',
     ])
-    expect(await store.readLines(HEAD_SHA, 'head', 'src/missing.ts', 1, 2)).toBeNull()
-    expect(await store.readLines(HEAD_SHA, 'head', '../../package.json', 1, 2)).toBeNull()
+    expect(await store.readLines(DIFF, 'head', 'src/missing.ts', 1, 2)).toBeNull()
+    expect(await store.readLines(DIFF, 'head', '../../package.json', 1, 2)).toBeNull()
   })
 })
 

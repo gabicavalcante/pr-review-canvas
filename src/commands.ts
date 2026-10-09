@@ -302,12 +302,7 @@ export async function runValidate(ctx: AppContext, argv: string[], io: CliIo): P
   }
   const fixed =
     values.fix === true
-      ? await fixModel(
-          path.resolve(file),
-          text,
-          context,
-          (await ctx.derived.ensure(context.headSha, context.mergeBaseSha)).patches
-        )
+      ? await fixModel(path.resolve(file), text, context, (await ctx.derived.ensure(context)).patches)
       : { text, trims: [], folds: [] }
   const report = await validateFile(ctx, parseModelText(fixed.text, path.basename(file)), context)
   if (values.human !== true) {
@@ -583,13 +578,14 @@ export function describeImport(result: ImportResult): string {
   if (result.status === 'ready') {
     return `Imported the canvas for ${canvas}.`
   }
+  if (result.relation === 'other-base') {
+    return `Imported the canvas for ${canvas}, diffed from ${shortSha(result.canvasMergeBaseSha)}, but the pull request changed its base and the diff now runs from ${shortSha(result.currentMergeBaseSha)}. The canvas is stale.`
+  }
   const head = shortSha(result.currentHeadSha)
   const behind =
-    result.relation === 'ancestor' && result.commitsBehind !== undefined
+    result.relation === 'ancestor'
       ? `, ${plural(result.commitsBehind, 'commit')} ahead of it`
-      : result.relation === 'unrelated'
-        ? ', which does not contain it'
-        : ''
+      : ', which does not contain it'
   return `Imported the canvas for ${canvas}, but the head is now ${head}${behind}. The canvas is stale.`
 }
 

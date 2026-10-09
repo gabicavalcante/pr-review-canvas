@@ -6,6 +6,7 @@ import { refreshReviewPanel, reviewPanelHtml } from './review-panel.js'
 
 const artifact = syntheticArtifact()
 const HEAD = 'a'.repeat(40)
+const ON = { headSha: HEAD, mergeBaseSha: 'b'.repeat(40) }
 const NOW = new Date('2026-09-10T12:00:00.000Z')
 const BASE = emptyState(NOW.toISOString())
 
@@ -31,7 +32,7 @@ afterEach(() => document.body.replaceChildren())
 
 describe('the review tab', () => {
   it('says how to start a review while nothing waits', () => {
-    document.body.innerHTML = reviewPanelHtml(BASE, { headSha: HEAD, points: artifact.points, now: NOW })
+    document.body.innerHTML = reviewPanelHtml(BASE, { on: ON, points: artifact.points, now: NOW })
     expect(document.querySelector('.review-empty')?.textContent).toContain('add to review')
     expect(document.querySelector('[data-act="pending-finish"]')).toBeNull()
   })
@@ -54,7 +55,7 @@ describe('the review tab', () => {
         draft({ id: 'd5', line: 8, pointFingerprint: 'fp-1', proposalFingerprint: 'y' }),
       ],
     }
-    document.body.innerHTML = reviewPanelHtml(state, { headSha: HEAD, points: artifact.points, now: NOW })
+    document.body.innerHTML = reviewPanelHtml(state, { on: ON, points: artifact.points, now: NOW })
     expect(document.querySelector('.review-head')?.textContent).toContain('5 pending comments')
     expect(document.querySelector('[data-act="pending-finish"]')?.hasAttribute('data-needs-post')).toBe(true)
     expect([...document.querySelectorAll('.review-path')].map(h => h.textContent)).toEqual([
@@ -81,12 +82,19 @@ describe('the review tab', () => {
 
   it('keeps drafts of earlier commits apart, to copy or delete', () => {
     const state = { ...BASE, pending: [draft({ id: 'old', headSha: 'b'.repeat(40) })] }
-    document.body.innerHTML = reviewPanelHtml(state, { headSha: HEAD, points: artifact.points, now: NOW })
+    document.body.innerHTML = reviewPanelHtml(state, { on: ON, points: artifact.points, now: NOW })
     const old = document.querySelector('.review-draft.earlier')
     expect(old?.textContent).toContain('commit bbbbbbb')
+    expect(old?.textContent).not.toContain(' from ')
     expect(old?.querySelector('[data-copy]')?.getAttribute('data-copy')).toBe('Mind the guard.')
     expect(old?.querySelector('[data-act="pending-delete"]')).not.toBeNull()
     expect(old?.querySelector('[data-act="pending-edit"]')).toBeNull()
+    // A draft of the same commit written from another merge base is an earlier diff too, and says so.
+    const rebased = { ...BASE, pending: [draft({ id: 'rebased', mergeBaseSha: 'c'.repeat(40) })] }
+    document.body.innerHTML = reviewPanelHtml(rebased, { on: ON, points: artifact.points, now: NOW })
+    expect(document.querySelector('.review-draft.earlier')?.textContent).toContain(
+      'commit aaaaaaa from ccccccc'
+    )
     // Without a commit to compare with, every draft is current.
     document.body.innerHTML = reviewPanelHtml(state, { points: artifact.points, now: NOW })
     expect(document.querySelector('.review-draft.earlier')).toBeNull()
@@ -96,7 +104,7 @@ describe('the review tab', () => {
     document.body.innerHTML =
       '<span class="review-count" data-empty>0</span><button class="review-launcher"></button>' +
       '<section id="review-panel"></section>'
-    const ctx = { headSha: HEAD, points: artifact.points }
+    const ctx = { on: ON, points: artifact.points }
     const state = { ...BASE, pending: [draft({})] }
     refreshReviewPanel(document, state, ctx)
     const count = document.querySelector('.review-count')
@@ -119,7 +127,7 @@ describe('the review tab', () => {
 
   it('keeps the row of a draft being edited while other drafts come and go', () => {
     document.body.innerHTML = '<section id="review-panel"></section>'
-    const ctx = { headSha: HEAD, points: artifact.points }
+    const ctx = { on: ON, points: artifact.points }
     // Two drafts with the same text on the same commit are still two rows.
     const first = draft({ id: 'd1' })
     const twin = draft({ id: 'd2' })
@@ -139,7 +147,7 @@ describe('the review tab', () => {
 
   it('gives the focus and the selection back to a draft being edited when another draft changes', () => {
     document.body.innerHTML = '<section id="review-panel"></section>'
-    const ctx = { headSha: HEAD, points: artifact.points }
+    const ctx = { on: ON, points: artifact.points }
     const first = draft({ id: 'd1' })
     refreshReviewPanel(document, { ...BASE, pending: [first] }, ctx)
     const row = document.querySelector('.review-draft[data-pending-id="d1"]')
@@ -163,7 +171,7 @@ describe('the review tab', () => {
 
   it('updates the counts on a page without the tab', () => {
     document.body.innerHTML = '<span class="review-count">0</span>'
-    refreshReviewPanel(document, { ...BASE, pending: [draft({})] }, { points: [] })
+    refreshReviewPanel(document, { ...BASE, pending: [draft({})] }, { on: ON, points: [] })
     expect(document.querySelector('.review-count')?.textContent).toBe('1')
   })
 })

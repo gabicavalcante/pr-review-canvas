@@ -23,18 +23,20 @@ import { collapsesAt, DEFAULT_FOLD_LEVEL, hiddenLines } from './fold-levels.js'
 import { hunkForLine } from './hunks.js'
 import { fileAnchorId, layerAnchorId, reviewedId, sanitizeKey } from './keys.js'
 import { renderMarkdown } from './markdown.js'
-import { pendingForPath } from './pending.js'
+import { pendingForPath, writtenOn } from './pending.js'
 import { openPoints, pointCardHtml, postedUrls } from './points.js'
 import { filesReviewed, layerProgress } from './progress.js'
 import { foldCountText } from './reading-level.js'
 import { anchorKey, buildThreads } from './threads.js'
 
 /**
+ * `headSha` and `mergeBaseSha` are the diff on screen, which the drafts drawn on it belong to.
  * @typedef {{
  *   artifact: ReviewArtifact,
  *   files: ReadonlyArray<FileEntry>,
  *   patches: Record<string, string> | null,
  *   headSha: string,
+ *   mergeBaseSha: string,
  *   comments: ReadonlyArray<ReviewComment>,
  *   state: PrState,
  *   now: Date,
@@ -281,7 +283,7 @@ export function cardKeepsOpen(lf, layerId, artifact, commentPaths) {
 /**
  * What the counters and the discussion rule read of the page: the canvas, its diff, the comments,
  * and the pending drafts in the state, which belong to `headSha`.
- * @typedef {Pick<RenderContext, 'artifact' | 'files' | 'comments' | 'state' | 'headSha'>} CountContext
+ * @typedef {Pick<RenderContext, 'artifact' | 'files' | 'comments' | 'state' | 'headSha' | 'mergeBaseSha'>} CountContext
  * @typedef {import('./reading-level.js').HiddenCounts} HiddenCounts
  */
 
@@ -486,7 +488,7 @@ export function elsewhereHtml(lf, entry, layer, hunkIndex) {
  * @param {ReviewArtifact} artifact
  * @param {ReadonlyArray<FileEntry>} files
  * @param {PrState} state
- * @param {{ hunkIndex: Map<string, { layer: Layer, index: number }>, paths: ReadonlySet<string>, firstCardFor: Set<string>, state?: PrState, posted?: ReadonlyMap<string, string>, comments: ReadonlyArray<ReviewComment>, headSha: string }} ctx
+ * @param {{ hunkIndex: Map<string, { layer: Layer, index: number }>, paths: ReadonlySet<string>, firstCardFor: Set<string>, state?: PrState, posted?: ReadonlyMap<string, string>, comments: ReadonlyArray<ReviewComment>, headSha: string, mergeBaseSha: string }} ctx
  * @returns {string}
  */
 export function renderLayerSection(layer, index, artifact, files, state, ctx) {
@@ -529,7 +531,7 @@ export function renderLayerSection(layer, index, artifact, files, state, ctx) {
     `<div class="body"><div class="rationale prose">${renderMarkdown(layer.rationale, { paths: ctx.paths, diagrams: true })}</div>${layerDiagramHtml(layer)}${judgmentHtml(layer, ctx.paths)}</div>` +
     testMapHtml(layer, ctx.paths) +
     layerPointsHtml(layer, artifact.points, ctx.paths, state, ctx.posted) +
-    `<h3 class="lbl sub">Files · ${layer.files.length}<span class="fold-count" data-layer="${esc(layer.id)}">${esc(foldCountText(layerHiddenLines(layer, { artifact, files, comments: ctx.comments, state, headSha: ctx.headSha }, foldLevel)))}</span></h3><div class="files">${cards}</div>` +
+    `<h3 class="lbl sub">Files · ${layer.files.length}<span class="fold-count" data-layer="${esc(layer.id)}">${esc(foldCountText(layerHiddenLines(layer, { artifact, files, comments: ctx.comments, state, headSha: ctx.headSha, mergeBaseSha: ctx.mergeBaseSha }, foldLevel)))}</span></h3><div class="files">${cards}</div>` +
     `<div class="layer-end"><button class="cmd" type="button" data-act="mark-layer" data-reviewed-id="${esc(layerReviewedId)}">mark layer as reviewed</button></div>` +
     '</div></section></pr-layer>'
   )
@@ -541,9 +543,9 @@ export function renderLayerSection(layer, index, artifact, files, state, ctx) {
  * @param {ReadonlyArray<FileEntry>} files
  * @param {PrState} state
  * @param {ReadonlyArray<ReviewComment>} [comments] so a point that was posted says so
- * @param {string} [headSha] the commit the page's drafts belong to, as in the render context
+ * @param {import('./pending.js').DiffOnScreen} [on] the diff the page's drafts belong to, as in the render context
  */
-export function renderLayers(artifact, files, state, comments = [], headSha = artifact.pr.headSha) {
+export function renderLayers(artifact, files, state, comments = [], on = artifact.pr) {
   const ctx = {
     hunkIndex: hunkLayerIndex(artifact),
     paths: pathSet(files),
@@ -551,7 +553,8 @@ export function renderLayers(artifact, files, state, comments = [], headSha = ar
     state,
     posted: postedUrls(state, comments),
     comments,
-    headSha,
+    headSha: on.headSha,
+    mergeBaseSha: on.mergeBaseSha,
   }
   return artifact.layers.map((layer, i) => renderLayerSection(layer, i, artifact, files, state, ctx)).join('')
 }
@@ -674,7 +677,7 @@ function decorateCard(card, ctx, at) {
  */
 function draftsForCard(ctx, entry, hunkIds) {
   return pendingForPath(ctx.state, entry.path).filter(
-    p => p.headSha === ctx.headSha && hunkIds.has(hunkForLine(entry.hunks, p.side, p.line)?.id ?? '')
+    p => writtenOn(p, ctx) && hunkIds.has(hunkForLine(entry.hunks, p.side, p.line)?.id ?? '')
   )
 }
 

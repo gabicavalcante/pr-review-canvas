@@ -173,8 +173,8 @@ export function staleSummary(stale, local) {
     return `The canvas is for ${canvas}; your work has moved on to ${head} since it was generated.`
   }
   if (stale.relation === 'other-base') {
-    const from = (stale.canvasMergeBaseSha ?? '').slice(0, 7)
-    const now = (stale.currentMergeBaseSha ?? '').slice(0, 7)
+    const from = stale.canvasMergeBaseSha.slice(0, 7)
+    const now = stale.currentMergeBaseSha.slice(0, 7)
     return `The canvas is for ${canvas} diffed from ${from}; the pull request changed its base, and the diff now runs from ${now}.`
   }
   if (stale.relation === 'unrelated') {

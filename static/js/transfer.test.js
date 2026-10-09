@@ -284,9 +284,6 @@ describe('stale screen', () => {
     expect(
       staleSummary({ canvasHeadSha: OLD, currentHeadSha: HEAD, relation: 'ancestor', commitsBehind: 4 })
     ).toBe('The canvas is for eeeeeee, 4 commits behind the head aaaaaaa.')
-    expect(staleSummary({ canvasHeadSha: OLD, currentHeadSha: HEAD, relation: 'ancestor' })).toContain(
-      '0 commits'
-    )
     expect(staleSummary({ canvasHeadSha: OLD, currentHeadSha: HEAD, relation: 'unrelated' })).toBe(
       'The canvas is for eeeeeee, which is not in this branch any more; the head is aaaaaaa.'
     )

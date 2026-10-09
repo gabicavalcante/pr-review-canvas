@@ -3,7 +3,7 @@
 import { emptyState, PrStateSchema } from '../contract/state.js'
 import { makeTestContext, type TestContext } from '../testing/fakes.js'
 import { readJson } from './atomic-json.js'
-import { isReviewedId } from './state-store.js'
+import { draftDiff, isReviewedId, marksOn } from './state-store.js'
 
 describe('state store', () => {
   let t: TestContext
@@ -35,16 +35,51 @@ describe('state store', () => {
     expect(fileOff.reviewed).toEqual({})
   })
 
-  it('drops the marks of another commit the first time the head moves', async () => {
-    const head = 'a'.repeat(40)
-    const next = 'b'.repeat(40)
-    const first = await t.ctx.state.setReviewed(42, 'layer:layer-1', true, { canvasSha: head })
-    expect(first).toMatchObject({ reviewed: { 'layer:layer-1': true }, reviewedCanvasSha: head })
-    const moved = await t.ctx.state.setReviewed(42, 'layer:layer-2', true, { canvasSha: next })
-    expect(moved).toMatchObject({ reviewed: { 'layer:layer-2': true }, reviewedCanvasSha: next })
-    // A state written before this field existed keeps its marks and adopts the head.
-    const same = await t.ctx.state.setReviewed(42, 'layer:layer-3', true, { canvasSha: next })
+  it('drops the marks of another canvas diff the first time the head or its base moves', async () => {
+    const base = 'c'.repeat(40)
+    const head = { headSha: 'a'.repeat(40), mergeBaseSha: base }
+    const next = { headSha: 'b'.repeat(40), mergeBaseSha: base }
+    const first = await t.ctx.state.setReviewed(42, 'layer:layer-1', true, { canvas: head })
+    expect(first).toMatchObject({
+      reviewed: { 'layer:layer-1': true },
+      reviewedCanvasSha: head.headSha,
+      reviewedMergeBaseSha: base,
+    })
+    const moved = await t.ctx.state.setReviewed(42, 'layer:layer-2', true, { canvas: next })
+    expect(moved).toMatchObject({ reviewed: { 'layer:layer-2': true }, reviewedCanvasSha: next.headSha })
+    const same = await t.ctx.state.setReviewed(42, 'layer:layer-3', true, { canvas: next })
     expect(same.reviewed).toEqual({ 'layer:layer-2': true, 'layer:layer-3': true })
+    // The same commit's canvas generated again on another base describes another diff.
+    const rebased = { headSha: next.headSha, mergeBaseSha: 'd'.repeat(40) }
+    const again = await t.ctx.state.setReviewed(42, 'layer:layer-4', true, { canvas: rebased })
+    expect(again).toMatchObject({
+      reviewed: { 'layer:layer-4': true },
+      reviewedMergeBaseSha: rebased.mergeBaseSha,
+    })
+  })
+
+  it('reads a draft from before the merge base was recorded as written on the current base', () => {
+    const current = { headSha: 'a'.repeat(40), mergeBaseSha: 'c'.repeat(40) }
+    const draft = {
+      id: 'd1',
+      path: 'a.ts',
+      line: 1,
+      side: 'new' as const,
+      body: 'x',
+      headSha: current.headSha,
+      createdAt: '',
+      updatedAt: '',
+    }
+    expect(draftDiff(draft, current)).toEqual(current)
+    expect(draftDiff({ ...draft, mergeBaseSha: 'd'.repeat(40) }, current).mergeBaseSha).toBe('d'.repeat(40))
+  })
+
+  it('reads marks from before the merge base was recorded as made on the canvas diff', () => {
+    const canvas = { headSha: 'a'.repeat(40), mergeBaseSha: 'c'.repeat(40) }
+    const legacy = { ...emptyState('2026-09-10T12:00:00.000Z'), reviewedCanvasSha: canvas.headSha }
+    expect(marksOn(legacy, canvas)).toBe(true)
+    expect(marksOn({ ...legacy, reviewedMergeBaseSha: 'd'.repeat(40) }, canvas)).toBe(false)
+    expect(marksOn({ ...legacy, reviewedCanvasSha: 'b'.repeat(40) }, canvas)).toBe(false)
   })
 
   it('dismisses a point with a reason and restores it', async () => {
@@ -108,7 +143,9 @@ describe('state store', () => {
     expect(read.reviewedCanvasSha).toBeUndefined()
     // Everything that is not a mark survives the upgrade.
     expect(read.dismissed).toEqual({ 'fp-1': { at: '2026-09-01T00:00:00.000Z' } })
-    const after = await t.ctx.state.setReviewed(42, 'layer:run-path', true, { canvasSha: canvas })
+    const after = await t.ctx.state.setReviewed(42, 'layer:run-path', true, {
+      canvas: { headSha: canvas, mergeBaseSha: 'c'.repeat(40) },
+    })
     expect(after.reviewed).toEqual({ 'layer:run-path': true })
     const written = JSON.parse(await readFile(`${t.ctx.prs.prDir(42)}/state.json`, 'utf8'))
     expect(written.version).toBe(2)
@@ -147,12 +184,12 @@ describe('state store', () => {
     const first = await t.ctx.state.addPending(
       42,
       { path: 'src/app.ts', line: 4, side: 'new', body: 'one' },
-      'a'.repeat(40)
+      { headSha: 'a'.repeat(40), mergeBaseSha: 'b'.repeat(40) }
     )
     const both = await t.ctx.state.addPending(
       42,
       { path: 'src/other.ts', line: 9, side: 'old', startLine: 7, body: 'two' },
-      'a'.repeat(40)
+      { headSha: 'a'.repeat(40), mergeBaseSha: 'b'.repeat(40) }
     )
     expect(first.pending.map(p => p.body)).toEqual(['one'])
     expect(both.pending.map(p => p.body)).toEqual(['one', 'two'])
@@ -162,6 +199,7 @@ describe('state store', () => {
       side: 'old',
       startLine: 7,
       headSha: 'a'.repeat(40),
+      mergeBaseSha: 'b'.repeat(40),
     })
     // Every draft is told apart from the others, which is all its id has to do.
     expect(new Set(both.pending.map(p => p.id)).size).toBe(2)
@@ -171,12 +209,12 @@ describe('state store', () => {
     const added = await t.ctx.state.addPending(
       42,
       { path: 'src/app.ts', line: 4, side: 'new', body: 'one' },
-      'a'.repeat(40)
+      { headSha: 'a'.repeat(40), mergeBaseSha: 'b'.repeat(40) }
     )
     await t.ctx.state.addPending(
       42,
       { path: 'src/app.ts', line: 5, side: 'new', body: 'two' },
-      'a'.repeat(40)
+      { headSha: 'a'.repeat(40), mergeBaseSha: 'b'.repeat(40) }
     )
     const id = added.pending[0]?.id ?? ''
     const edited = await t.ctx.state.editPending(42, id, 'one, revised')
@@ -189,7 +227,7 @@ describe('state store', () => {
     const before = await t.ctx.state.addPending(
       42,
       { path: 'src/app.ts', line: 4, side: 'new', body: 'one' },
-      'a'.repeat(40)
+      { headSha: 'a'.repeat(40), mergeBaseSha: 'b'.repeat(40) }
     )
     const after = await t.ctx.state.editPending(42, 'nope', 'x')
     expect(after.pending).toEqual(before.pending)
@@ -199,12 +237,12 @@ describe('state store', () => {
     const added = await t.ctx.state.addPending(
       42,
       { path: 'src/app.ts', line: 4, side: 'new', body: 'one' },
-      'a'.repeat(40)
+      { headSha: 'a'.repeat(40), mergeBaseSha: 'b'.repeat(40) }
     )
     await t.ctx.state.addPending(
       42,
       { path: 'src/app.ts', line: 5, side: 'new', body: 'two' },
-      'a'.repeat(40)
+      { headSha: 'a'.repeat(40), mergeBaseSha: 'b'.repeat(40) }
     )
     const dropped = await t.ctx.state.removePending(42, added.pending[0]?.id ?? '')
     expect(dropped.pending.map(p => p.body)).toEqual(['two'])
