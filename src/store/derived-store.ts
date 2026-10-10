@@ -1,3 +1,4 @@
+import { mkdir, rename } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 import { type FileEntry, FileEntrySchema } from '../contract/review-artifact.js'
@@ -59,14 +60,41 @@ export function createDerivedStore(canvases: CanvasStore, git: Git, now: () => D
     return path.join(canvases.canvasDir(diff.headSha), 'derived', diff.mergeBaseSha)
   }
 
-  const read = async (diff: DiffedCommit): Promise<Derived | null> => {
+  /**
+   * Earlier tool versions kept one diff per commit directly in `derived/`, its merge base named in
+   * its meta.json. The first time that diff is asked for, its files move into the merge base's
+   * own folder, so a canvas whose commits this clone no longer has keeps the diff it was read
+   * with. meta.json moves last: an adoption cut short finishes on the next ask.
+   */
+  const adoptLegacy = async (diff: DiffedCommit): Promise<void> => {
+    const legacy = path.join(canvases.canvasDir(diff.headSha), 'derived')
+    const meta = await readJson(path.join(legacy, 'meta.json'), DerivedMetaSchema)
+    if (meta === null || meta.mergeBaseSha !== diff.mergeBaseSha) {
+      return
+    }
     const dir = derivedDir(diff)
+    await mkdir(dir, { recursive: true })
+    for (const entry of ['files.json', 'patches.json', 'patches', 'head', 'base', 'meta.json']) {
+      await rename(path.join(legacy, entry), path.join(dir, entry)).catch((err: NodeJS.ErrnoException) => {
+        if (err.code !== 'ENOENT') throw err
+      })
+    }
+  }
+
+  const readDir = async (dir: string): Promise<Derived | null> => {
     const files = await readJson(path.join(dir, 'files.json'), FilesSchema)
     const patches = await readJson(path.join(dir, 'patches.json'), PatchesSchema)
-    if (files === null || patches === null) {
-      return null
+    return files === null || patches === null ? null : { files, patches }
+  }
+
+  const read = async (diff: DiffedCommit): Promise<Derived | null> => {
+    const dir = derivedDir(diff)
+    const stored = await readDir(dir)
+    if (stored !== null) {
+      return stored
     }
-    return { files, patches }
+    await adoptLegacy(diff)
+    return readDir(dir)
   }
 
   const derivable = async (diff: DiffedCommit): Promise<boolean> =>
@@ -76,8 +104,14 @@ export function createDerivedStore(canvases: CanvasStore, git: Git, now: () => D
     const { headSha, mergeBaseSha } = diff
     const dir = derivedDir(diff)
     // meta.json is written last, so a directory a build left half-written is built again.
-    if ((await readJson(path.join(dir, 'meta.json'), DerivedMetaSchema)) !== null) {
-      const cached = await read(diff)
+    const complete = async () => (await readJson(path.join(dir, 'meta.json'), DerivedMetaSchema)) !== null
+    let built = await complete()
+    if (!built) {
+      await adoptLegacy(diff)
+      built = await complete()
+    }
+    if (built) {
+      const cached = await readDir(dir)
       if (cached !== null) {
         return cached
       }

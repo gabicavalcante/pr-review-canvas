@@ -11,7 +11,6 @@ import {
   pendingRange,
   pendingRowHtml,
   refreshPendingBar,
-  writtenOn,
 } from './pending.js'
 
 const NOW = new Date('2026-09-10T12:00:00.000Z')
@@ -154,7 +153,6 @@ describe('refreshPendingBar', () => {
     // A draft of an older tool version names no merge base, so it counts for the current one.
     expect(split.current.map(d => d.id)).toEqual([draft().id])
     expect(split.earlier.map(d => d.id)).toEqual(['p2', 'p3'])
-    expect(writtenOn(rebased, { headSha: rebased.headSha, mergeBaseSha: 'c'.repeat(40) })).toBe(true)
     expect(draftsByCommit(state).earlier).toEqual([])
   })
 

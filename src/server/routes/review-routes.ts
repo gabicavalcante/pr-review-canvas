@@ -20,7 +20,8 @@ import { lookupCanvas, samePatches } from '../../review/carry-over.js'
 import { marksForCanvas } from '../../review/carry-marks.js'
 import { buildReviewBody, reviewedDiff, stateForCanvas, unreviewedLayers } from '../../review/review-body.js'
 import { isLocalKey, keyLabel, type ReviewKey } from '../../contract/review-key.js'
-import { draftDiff, isReviewedId, marksOn } from '../../store/state-store.js'
+import { isReviewedId } from '../../store/state-store.js'
+import { draftDiff, marksOn, sameDiff } from '../../../static/js/diff-identity.js'
 import type { Derived, DiffedCommit } from '../../store/derived-store.js'
 import { LOCAL_CAPABILITIES, type PrLoader } from '../bundle.js'
 import type { AppContext } from '../context.js'
@@ -420,7 +421,7 @@ export function reviewRoutes(ctx: AppContext, loader: PrLoader): Hono {
       pending.map(p => draftDiff(p, pr)).map(d => [`${d.headSha}..${d.mergeBaseSha}`, d])
     )
     for (const other of written.values()) {
-      if (other.headSha === pr.headSha && other.mergeBaseSha === pr.mergeBaseSha) continue
+      if (sameDiff(other, pr)) continue
       const original = await ctx.derived.readOrBuild(other)
       if (
         !ctx.projectConfig.config.canvas.keepForIdenticalDiff ||

@@ -5,7 +5,8 @@
 /** @typedef {import('./contract-types.js').PendingComment} PendingComment */
 /** @typedef {import('./contract-types.js').PrState} PrState */
 /** @typedef {import('./contract-types.js').Side} Side */
-/** The diff on screen: its commit, and the merge base it runs from. @typedef {{ headSha: string, mergeBaseSha: string }} DiffOnScreen */
+/** The diff on screen: its commit, and the merge base it runs from. @typedef {import('./diff-identity.js').Diff} DiffOnScreen */
+import { writtenOn } from './diff-identity.js'
 import { esc, timeAgo } from './dom.js'
 import { hostLabel } from './host.js'
 import { renderMarkdown } from './markdown.js'
@@ -122,20 +123,6 @@ export function pendingBarHtml(count, earlier = 0) {
     '<button class="cmd fill" type="button" data-act="pending-finish" data-needs-post>finish your review</button>' +
     '<button class="cmd" type="button" data-act="pending-discard">discard</button>' +
     '</span></div>'
-  )
-}
-
-/**
- * Whether a draft was written on the diff `on`: its commit, diffed from the same merge base. A draft
- * of an older tool version names no merge base and reads as written on the current one, as the
- * server reads it.
- * @param {PendingComment} draft
- * @param {DiffOnScreen} on
- */
-export function writtenOn(draft, on) {
-  return (
-    draft.headSha === on.headSha &&
-    (draft.mergeBaseSha === undefined || draft.mergeBaseSha === on.mergeBaseSha)
   )
 }
 

@@ -3,7 +3,7 @@
 import { emptyState, PrStateSchema } from '../contract/state.js'
 import { makeTestContext, type TestContext } from '../testing/fakes.js'
 import { readJson } from './atomic-json.js'
-import { draftDiff, isReviewedId, marksOn } from './state-store.js'
+import { isReviewedId } from './state-store.js'
 
 describe('state store', () => {
   let t: TestContext
@@ -56,30 +56,6 @@ describe('state store', () => {
       reviewed: { 'layer:layer-4': true },
       reviewedMergeBaseSha: rebased.mergeBaseSha,
     })
-  })
-
-  it('reads a draft from before the merge base was recorded as written on the current base', () => {
-    const current = { headSha: 'a'.repeat(40), mergeBaseSha: 'c'.repeat(40) }
-    const draft = {
-      id: 'd1',
-      path: 'a.ts',
-      line: 1,
-      side: 'new' as const,
-      body: 'x',
-      headSha: current.headSha,
-      createdAt: '',
-      updatedAt: '',
-    }
-    expect(draftDiff(draft, current)).toEqual(current)
-    expect(draftDiff({ ...draft, mergeBaseSha: 'd'.repeat(40) }, current).mergeBaseSha).toBe('d'.repeat(40))
-  })
-
-  it('reads marks from before the merge base was recorded as made on the canvas diff', () => {
-    const canvas = { headSha: 'a'.repeat(40), mergeBaseSha: 'c'.repeat(40) }
-    const legacy = { ...emptyState('2026-09-10T12:00:00.000Z'), reviewedCanvasSha: canvas.headSha }
-    expect(marksOn(legacy, canvas)).toBe(true)
-    expect(marksOn({ ...legacy, reviewedMergeBaseSha: 'd'.repeat(40) }, canvas)).toBe(false)
-    expect(marksOn({ ...legacy, reviewedCanvasSha: 'b'.repeat(40) }, canvas)).toBe(false)
   })
 
   it('dismisses a point with a reason and restores it', async () => {

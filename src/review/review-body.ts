@@ -6,7 +6,7 @@ import type { CanvasManifest } from '../contract/canvas-manifest.js'
 import type { PrState } from '../contract/state.js'
 import type { CanvasLookup } from '../store/canvas-store.js'
 import type { DiffedCommit } from '../store/derived-store.js'
-import { marksOn } from '../store/state-store.js'
+import { marksOn } from '../../static/js/diff-identity.js'
 
 export const REVIEW_BODY_FOOTER = 'Reviewed with the pr-review canvas (localhost).'
 

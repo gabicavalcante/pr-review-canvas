@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { z } from 'zod'
 import type { CanvasManifest } from '../contract/canvas-manifest.js'
@@ -200,6 +200,33 @@ describe('derived-store', () => {
     await rm(path.join(derived, 'files.json'))
     expect(await store.read(DIFF)).toBeNull()
     expect(await store.ensure(DIFF)).toEqual(first)
+  })
+
+  it('adopts the diff an earlier version kept directly in derived/, when the merge base is the one asked for', async () => {
+    const built = createDerivedStore(createCanvasStore(dir, createFakeGit(), null), git(), now)
+    const first = await built.ensure(DIFF)
+    const legacy = path.dirname(built.derivedDir(DIFF))
+    /** Moves the diff back to the layout earlier versions wrote: the same files, directly in derived/. */
+    const toLegacy = async () => {
+      for (const entry of await readdir(built.derivedDir(DIFF))) {
+        await rename(path.join(built.derivedDir(DIFF), entry), path.join(legacy, entry))
+      }
+      await rm(built.derivedDir(DIFF), { recursive: true })
+    }
+    await toLegacy()
+    // The commits are gone from this clone, so the stored copy is the only diff there is.
+    const store = createDerivedStore(createCanvasStore(dir, createFakeGit(), null), createFakeGit(), now)
+    expect(await store.readOrBuild({ ...DIFF, mergeBaseSha: 'c'.repeat(40) })).toBeNull()
+    expect(await store.readOrBuild(DIFF)).toEqual(first)
+    expect(await store.readLines(DIFF, 'head', 'src/app.ts', 3, 3)).toEqual(['export function run() {'])
+    expect(await readdir(legacy)).toEqual([BASE_SHA])
+    // A diff the clone can build adopts it the same way, without building it again.
+    await toLegacy()
+    const g = git()
+    const again = createDerivedStore(createCanvasStore(dir, createFakeGit(), null), g, now)
+    expect(await again.ensure(DIFF)).toEqual(first)
+    expect(g.calls.filter(c => c[0] === 'diff')).toEqual([])
+    expect(await readdir(legacy)).toEqual([BASE_SHA])
   })
 
   it('keeps the diff from each merge base apart, so building one never replaces the other', async () => {

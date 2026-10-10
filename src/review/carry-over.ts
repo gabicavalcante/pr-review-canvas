@@ -4,6 +4,7 @@ import type { CarriedOverInfo, StaleRelation } from '../contract/api.js'
 import type { Pr } from '../contract/review-artifact.js'
 import type { AppContext } from '../server/context.js'
 import { type CanvasLookup, relateToHead } from '../store/canvas-store.js'
+import { sameDiff } from '../../static/js/diff-identity.js'
 import type { Derived, DiffedCommit } from '../store/derived-store.js'
 
 export type { DiffedCommit } from '../store/derived-store.js'
@@ -22,7 +23,7 @@ export async function standsForHead(
   pr: DiffedCommit,
   commit: DiffedCommit
 ): Promise<boolean> {
-  if (commit.headSha === pr.headSha && commit.mergeBaseSha === pr.mergeBaseSha) {
+  if (sameDiff(commit, pr)) {
     return true
   }
   if (!ctx.projectConfig.config.canvas.keepForIdenticalDiff) {

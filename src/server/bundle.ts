@@ -79,8 +79,9 @@ export async function runDiscovery(
 /**
  * Live PR meta and comments. The first request for a PR in this process always asks GitHub;
  * later ones answer from `prs/<n>/` unless `refresh` is set, so polling stays cheap. Opening or
- * reloading the page still asks for the PR's head and base, one call, and reads everything again
- * when either moved, so a push or a new base made since the last load shows the canvas as outdated.
+ * reloading the page still asks for the PR's head and base branch, one call, and reads everything
+ * again when either changed, so a push, or a move to another base branch, made since the last load
+ * shows the canvas as outdated. A base branch rewritten under the same name is read on Refresh.
  */
 export function createPrLoader(ctx: AppContext) {
   const refreshed = new Set<number>()
@@ -153,7 +154,9 @@ export function createPrLoader(ctx: AppContext) {
       const cached = opts.refresh ? null : await readCached(number)
       if (cached !== null && opts.poll === true) return cached
       const meta = await fetchMeta(number)
-      // A pull request moved to another base reviews another diff of the same head.
+      // A pull request moved to another base branch reviews another diff of the same head. Settled
+      // 2026-10-09: a base rewritten under the same name waits for Refresh, rather than a git fetch
+      // on every load.
       if (cached !== null && meta.headSha === cached.pr.headSha && meta.baseRef === cached.pr.baseRef) {
         return cached
       }

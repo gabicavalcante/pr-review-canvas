@@ -10,6 +10,7 @@
 /** @typedef {import('./contract-types.js').ReviewArtifact} ReviewArtifact */
 /** @typedef {import('./contract-types.js').ReviewSummary} ReviewSummary */
 /** @typedef {import('./contract-types.js').ReviewComment} ReviewComment */
+import { marksOn } from './diff-identity.js'
 import {
   addPending,
   deletePending,
@@ -109,7 +110,7 @@ export function createReviewSession(options) {
    * The canvas diff the marks on this page are keyed to, which the server keys every mark write to:
    * its commit, and the merge base it runs from.
    */
-  const marksOn = {
+  const marksCanvas = {
     headSha: options.canvasSha ?? options.headSha,
     mergeBaseSha: options.canvasMergeBaseSha ?? options.mergeBaseSha,
   }
@@ -167,17 +168,14 @@ export function createReviewSession(options) {
     if (inFlight > 0 || newestState === null) {
       return
     }
-    const next =
-      newestState.reviewedCanvasSha === marksOn.headSha &&
-      (newestState.reviewedMergeBaseSha === undefined ||
-        newestState.reviewedMergeBaseSha === marksOn.mergeBaseSha)
-        ? newestState
-        : {
-            ...newestState,
-            reviewed: state.reviewed,
-            reviewedCanvasSha: state.reviewedCanvasSha,
-            reviewedMergeBaseSha: state.reviewedMergeBaseSha,
-          }
+    const next = marksOn(newestState, marksCanvas)
+      ? newestState
+      : {
+          ...newestState,
+          reviewed: state.reviewed,
+          reviewedCanvasSha: state.reviewedCanvasSha,
+          reviewedMergeBaseSha: state.reviewedMergeBaseSha,
+        }
     newestState = null
     newestRev = 0
     if ((next.rev ?? 0) >= takenRev) {

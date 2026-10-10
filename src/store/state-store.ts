@@ -3,6 +3,7 @@ import type { ReviewKey } from '../contract/review-key.js'
 import { emptyState, type PrState, PrStateSchema } from '../contract/state.js'
 import type { AddPendingInput, PendingComment } from '../contract/pending.js'
 import { readJsonOrDefault, writeJsonAtomic } from './atomic-json.js'
+import { marksOn } from '../../static/js/diff-identity.js'
 import type { DiffedCommit } from './derived-store.js'
 import type { PrStore } from './pr-store.js'
 
@@ -52,25 +53,6 @@ export interface SetReviewedOptions {
   canvas?: DiffedCommit | undefined
   /** Marks that follow `canvasSha` from the canvas it was generated from; used on the first write. */
   carried?: Readonly<Record<string, true>> | undefined
-}
-
-/**
- * Whether the stored marks were made on this canvas diff. Marks from before the merge base was
- * recorded count for the canvas's diff, whichever it is.
- */
-export function marksOn(state: PrState, canvas: DiffedCommit): boolean {
-  return (
-    state.reviewedCanvasSha === canvas.headSha &&
-    (state.reviewedMergeBaseSha === undefined || state.reviewedMergeBaseSha === canvas.mergeBaseSha)
-  )
-}
-
-/**
- * The diff a draft was written on. Drafts from before the merge base was recorded read as written
- * on the pull request's current base.
- */
-export function draftDiff(draft: PendingComment, current: DiffedCommit): DiffedCommit {
-  return { headSha: draft.headSha, mergeBaseSha: draft.mergeBaseSha ?? current.mergeBaseSha }
 }
 
 /** `layer:<id>` or `layer:<id>/file:<key>`, with the ids and keys the artifact uses. */

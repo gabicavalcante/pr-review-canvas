@@ -7,7 +7,7 @@ import type { ReviewArtifact } from '../contract/review-artifact.js'
 import type { PrState } from '../contract/state.js'
 import type { AppContext } from '../server/context.js'
 import type { DiffedCommit } from '../store/derived-store.js'
-import { marksOn } from '../store/state-store.js'
+import { marksOn } from '../../static/js/diff-identity.js'
 import { fileDelta } from './incremental.js'
 
 function samePaths(a: readonly string[], b: readonly string[]): boolean {
