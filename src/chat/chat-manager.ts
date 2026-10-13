@@ -1,6 +1,8 @@
 // One turn at a time per pull request: build the prompt, run the agent, stream what it says,
 // and keep the transcript. The lock is what makes `CHAT_BUSY` a real answer rather than two
 // agents writing into one thread.
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import type { AgentRunner } from '../acpx/acpx.js'
 import { latestModel } from '../acpx/models.js'
 import type { ChatContext, ChatEvent, ChatThreadsResponse, ChatTurn } from '../contract/chat.js'
@@ -20,6 +22,83 @@ import {
   threadName,
   threadTitle,
 } from './threads.js'
+
+/**
+ * SPIKE (author writes): with `PR_REVIEW_SPIKE_AUTHOR_WRITES=1`, the owner's self-review of a branch
+ * gets a chat that edits and commits in their own checkout. Read once, at start.
+ */
+const AUTHOR_WRITES_SPIKE = process.env['PR_REVIEW_SPIKE_AUTHOR_WRITES'] === '1'
+
+const execFileAsync = promisify(execFile)
+
+/** SPIKE (author writes): git's output, trimmed, or null when git fails. */
+async function gitOut(repoRoot: string, args: string[]): Promise<string | null> {
+  const out = await execFileAsync('git', args, { cwd: repoRoot }).catch(() => null)
+  return out === null ? null : out.stdout.trim()
+}
+
+/**
+ * SPIKE (author writes): how a turn reads and changes code. `owner` runs in the author's checkout,
+ * and `writes` says whether this turn may also change it; `reason` says why not.
+ */
+type AuthorMode =
+  | { kind: 'off' }
+  | { kind: 'owner'; writes: true }
+  | { kind: 'owner'; writes: false; reason: string }
+
+/**
+ * SPIKE (author writes): the owner's self-review is a branch canvas only. An uncommitted canvas is
+ * the author's work in progress, which an agent's edits would mix into; a pull request canvas is
+ * what reviewers read. On a branch canvas, the checkout must be at the canvas's commit, so a commit
+ * lands on top of what the canvas shows, and the reader must have written that commit, since
+ * `readerResolves` treats every local review as the reader's. A turn that passes reads the author's
+ * checkout, so its session stays put; it writes only while no tracked file has a pending change, so
+ * a commit carries the agent's change and nothing of the author's.
+ */
+async function authorMode(target: ChatTarget, repoRoot: string): Promise<AuthorMode> {
+  if (!AUTHOR_WRITES_SPIKE || !target.readerResolves || target.key !== 'branch') {
+    return { kind: 'off' }
+  }
+  const [head, reader, headAuthor, pending] = await Promise.all([
+    gitOut(repoRoot, ['rev-parse', 'HEAD']),
+    gitOut(repoRoot, ['config', 'user.email']),
+    gitOut(repoRoot, ['log', '-1', '--format=%ae', 'HEAD']),
+    gitOut(repoRoot, ['status', '--porcelain', '--untracked-files=no']),
+  ])
+  const owner = reader !== null && reader !== '' && reader.toLowerCase() === headAuthor?.toLowerCase()
+  if (head !== target.headSha || !owner) {
+    return { kind: 'off' }
+  }
+  if (pending !== '') {
+    return {
+      kind: 'owner',
+      writes: false,
+      reason:
+        pending === null
+          ? 'git could not say whether the checkout has pending changes'
+          : 'the checkout has changes to tracked files that are not committed; the author commits or stashes them first',
+    }
+  }
+  return { kind: 'owner', writes: true }
+}
+
+/** SPIKE (author writes): the seed section that lifts the read-only rule for the owner. */
+const AUTHOR_WRITES_SEED = [
+  '## Changing the code',
+  '',
+  'This section replaces the rule above that you only read. The reader is the author, reviewing',
+  'their own branch, and your working directory is their checkout. When they ask for a change, or',
+  'agree to one you proposed, make it, run the tests that cover it, and say what you ran. Then',
+  'commit it on the current branch as an ordinary commit, staging only the files you changed by',
+  'their paths. The subject says what the code does differently now; the body says why, in the',
+  'project’s words, and records the decision the author took with today’s date. End your answer',
+  'with the commit’s short sha.',
+  '',
+  'A question gets an answer, not an edit. Never push, switch branches, reset, rebase, amend, or',
+  'use `--fixup`: the change goes on top of the commit the canvas shows. Pushing is blocked here',
+  'and will fail. A turn may say that changing the code is off for now, and why; then only read,',
+  'and tell the author what to do first.',
+].join('\n')
 
 export class ChatBusyError extends Error {
   constructor() {
@@ -297,7 +376,12 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
       patches: target.patches,
       readLines: target.readLines,
     })
-    const code = yield* prepareCode(target, settings, slot)
+    const mode = await authorMode(target, deps.repoRoot)
+    const writes = mode.kind === 'owner' && mode.writes
+    const code: CodeSource =
+      mode.kind === 'owner'
+        ? { kind: 'working-tree', cwd: deps.repoRoot }
+        : yield* prepareCode(target, settings, slot)
     const { cwd } = code
     // Saved on the answer, so the warning is still there when the thread is opened again.
     const fallback: Pick<ChatTurn, 'fallback'> =
@@ -311,9 +395,13 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     const seed = seeded
       ? `${renderSeed(await deps.loadSeedTemplate(), target.artifact, seedPaths(deps, target, code), {
           readerResolves: target.readerResolves,
-        })}\n\n`
+        })}\n\n${mode.kind === 'owner' ? `${AUTHOR_WRITES_SEED}\n\n` : ''}`
       : ''
-    const prompt = `${seed}${contextBlock}\n\n## Question\n\n${input.message}\n`
+    const writesOff =
+      mode.kind === 'owner' && !mode.writes
+        ? `\n\nChanging the code is off for this turn: ${mode.reason}.`
+        : ''
+    const prompt = `${seed}${contextBlock}${writesOff}\n\n## Question\n\n${input.message}\n`
 
     if (!sameSession) {
       await deps.runner.ensureSession({
@@ -359,6 +447,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
       timeoutSec: settings.chatTimeoutSec,
       model,
       maxTurns: settings.maxTurns ?? undefined,
+      writes,
       // The runner scrubs the line before it gets here; this only writes it down.
       onRawLine: line => {
         void deps.transcripts.appendEvent(target.key, thread.name, line).catch(() => undefined)

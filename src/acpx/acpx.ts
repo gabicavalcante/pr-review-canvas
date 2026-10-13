@@ -42,6 +42,11 @@ export interface AgentRunOptions {
   model?: string | undefined
   maxTurns?: number | undefined
   /**
+   * SPIKE (author writes): approve every tool so the agent can edit and commit, with pushes
+   * blocked through `PUSH_GUARD_ENV`. Only the author's chat sets it.
+   */
+  writes?: boolean | undefined
+  /**
    * Every acpx line the raw event log may keep. The scrubbing happens here rather than in the
    * caller, so no caller can write a file's content to disk by mistake.
    */
@@ -105,8 +110,43 @@ export function commonAcpxArgs(cwd: string, timeoutSec: number): string[] {
   ]
 }
 
+/**
+ * SPIKE (author writes): the flags of a turn that may edit and commit. Everything the read-only
+ * flags deny is approved instead, and the agent keeps its terminal.
+ */
+export function writeAcpxArgs(cwd: string, timeoutSec: number): string[] {
+  return [
+    '--cwd',
+    cwd,
+    '--format',
+    'json',
+    '--json-strict',
+    '--suppress-reads',
+    '--approve-all',
+    '--timeout',
+    String(timeoutSec),
+  ]
+}
+
+/**
+ * SPIKE (author writes): git config, passed through the environment so every git the agent runs
+ * inherits it, that rewrites each push URL to a helper that does not exist. Fetches are untouched.
+ * The acpx `--policy` rules cannot do this: they match a command's whole title or its first word.
+ */
+const PUSH_GUARD_PREFIXES = ['https://', 'http://', 'git@', 'ssh://', 'git://', 'file://']
+export const PUSH_GUARD_ENV: Readonly<Record<string, string>> = Object.fromEntries([
+  ['GIT_CONFIG_COUNT', String(PUSH_GUARD_PREFIXES.length)],
+  ...PUSH_GUARD_PREFIXES.flatMap((prefix, i) => [
+    [`GIT_CONFIG_KEY_${i}`, 'url.pr-review-push-blocked:///.pushInsteadOf'],
+    [`GIT_CONFIG_VALUE_${i}`, prefix],
+  ]),
+])
+
 export function buildPromptArgs(options: AgentRunOptions): string[] {
-  const args = commonAcpxArgs(options.cwd, options.timeoutSec)
+  const args =
+    options.writes === true
+      ? writeAcpxArgs(options.cwd, options.timeoutSec)
+      : commonAcpxArgs(options.cwd, options.timeoutSec)
   if (options.model !== undefined && options.model !== '') {
     args.push('--model', options.model)
   }
@@ -476,7 +516,7 @@ function startRun(
   try {
     child = spawnImpl(bin, buildPromptArgs(options), {
       cwd: options.cwd,
-      env,
+      env: options.writes === true ? { ...env, ...PUSH_GUARD_ENV } : env,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
   } catch {
