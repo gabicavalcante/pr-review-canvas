@@ -58,6 +58,12 @@ export const PrStateSchema = z.preprocess(
      * untouched. Absent in state files of older tool versions.
      */
     reviewedCanvasSha: z.string().optional(),
+    /**
+     * The merge base that canvas's diff ran from. A canvas generated again for its commit after the
+     * pull request moved to another base describes another diff, so the marks start again. Absent
+     * in state files of older tool versions, whose marks count for the canvas's diff, whichever it is.
+     */
+    reviewedMergeBaseSha: z.string().optional(),
     hiddenThreads: z.record(z.string(), z.object({ at: z.string() })),
     posted: z.array(
       z.object({

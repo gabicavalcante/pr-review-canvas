@@ -167,7 +167,7 @@ async function resolveBasis(
   if (artifact === null || manifest === null) {
     return null
   }
-  const basis = await ctx.derived.readOrBuild(sha, manifest.mergeBaseSha)
+  const basis = await ctx.derived.readOrBuild(manifest)
   if (basis === null) {
     return null
   }
@@ -176,8 +176,8 @@ async function resolveBasis(
     ctx.derived,
     artifact.points,
     files,
-    { sha, derived: basis },
-    { sha: pr.headSha, derived: head }
+    { diff: manifest, derived: basis },
+    { diff: pr, derived: head }
   )
   const modelJsonPath = path.join(ctx.canvases.canvasDir(pr.headSha), 'basis-model.json')
   await writeJsonAtomic(modelJsonPath, artifactToModelOutput(artifact))
@@ -239,14 +239,14 @@ export async function prepare(
   }
 
   opts.log('collect-diffs')
-  const derived = await ctx.derived.ensure(pr.headSha, pr.mergeBaseSha)
+  const derived = await ctx.derived.ensure(pr)
   const additions = derived.files.reduce((n, f) => n + f.additions, 0)
   const deletions = derived.files.reduce((n, f) => n + f.deletions, 0)
   // A pull request's counts are the forge's; anything else is counted from the diff itself. The
   // page derives its own from the files it shows, so this is only what the canvas records.
   const fullPr: Pr =
     target.kind === 'pr' ? pr : { ...pr, additions, deletions, changedFiles: derived.files.length }
-  const derivedDir = ctx.derived.derivedDir(pr.headSha)
+  const derivedDir = ctx.derived.derivedDir(pr)
   const config = ctx.projectConfig.config
 
   opts.log('prompt')

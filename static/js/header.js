@@ -120,7 +120,7 @@ export function renderHeader(bundle, opts) {
   const refreshTitle = local
     ? 'Snapshot the working tree again and redraw'
     : `Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}`
-  const progress = ready ? progressHtml(artifact, bundle.state, pr.headSha) : ''
+  const progress = ready ? progressHtml(artifact, bundle.state, pr) : ''
   const level = getFoldLevel()
   const reading = ready
     ? foldLevelControlHtml(
@@ -132,6 +132,7 @@ export function renderHeader(bundle, opts) {
             comments: bundle.comments.reviewComments,
             state: bundle.state,
             headSha: pr.headSha,
+            mergeBaseSha: pr.mergeBaseSha,
           },
           level
         )
@@ -165,8 +166,9 @@ export function renderHeader(bundle, opts) {
  * change set was read in full.
  * @param {import('./contract-types.js').ReviewArtifact} artifact
  * @param {import('./contract-types.js').PrState} state
+ * @param {import('./pending.js').DiffOnScreen} [on] the diff the page's drafts belong to
  */
-export function progressHtml(artifact, state, headSha = artifact.pr.headSha) {
+export function progressHtml(artifact, state, on = artifact.pr) {
   const p = progressSummary(artifact, state)
   const blocked = approveBlockedReason(artifact, state)
   const approveTitle = `Write and preview an approving review on ${esc(hostLabel())}`
@@ -179,7 +181,7 @@ export function progressHtml(artifact, state, headSha = artifact.pr.headSha) {
     `<span class="ptext">${p.done} of ${p.total} layers reviewed</span></div>` +
     `<div class="pending-bar-host${pendingCount(state) > 0 ? ' has-pending' : ''}">${pendingBarHtml(
       pendingCount(state),
-      draftsByCommit(state, headSha).earlier.length
+      draftsByCommit(state, on).earlier.length
     )}</div>` +
     `<div class="signoff">${approve}` +
     `<button class="cmd" type="button" id="request-changes" data-tooltip="Write and preview a review requesting changes on ${esc(hostLabel())}" title="Write and preview a review requesting changes on ${esc(hostLabel())}" data-act="signoff" data-event="REQUEST_CHANGES" data-needs-post>request changes</button>` +
