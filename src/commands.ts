@@ -259,6 +259,8 @@ async function validateFile(
   const result = validateModelOutput(input, {
     ...(await validationInput(ctx, context, input)),
     storedArtifact: artifact.success,
+    // A stored canvas was held to its settled decisions when it was published.
+    ...(artifact.success ? { decisions: undefined } : {}),
   })
   return { ok: result.ok, errors: result.errors }
 }

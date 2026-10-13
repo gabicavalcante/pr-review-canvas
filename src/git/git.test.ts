@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process'
 import { access, chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { makeTempDir } from '../testing/fakes.js'
+import { execGitAsRepoConfig, makeTempDir } from '../testing/fakes.js'
 import { envWithoutRepo, REPO_ENV_VARS } from './environment.mjs'
 import {
   CANVAS_ANCHOR_PREFIX,
@@ -215,6 +215,83 @@ describe('createGit (real adapter)', () => {
     await g(repo.dir, 'checkout', '-q', '--detach')
     expect(await git.currentBranch()).toBeNull()
     await g(repo.dir, 'checkout', '-q', 'main')
+  })
+
+  it('reads the email this clone commits as, the environment over the config, and none when git has none', async () => {
+    expect(await createGit(repo.dir, execGitAsRepoConfig).authorEmail()).toBe('test@example.com')
+    const fromEnv = execGitIn({ ...process.env, GIT_AUTHOR_EMAIL: 'env@example.com' })
+    expect(await createGit(repo.dir, fromEnv).authorEmail()).toBe('env@example.com')
+    const failed: GitExec = async () => ({ code: 1, stdout: Buffer.alloc(0), stderr: '' })
+    expect(await createGit('/tmp', failed).authorEmail()).toBeNull()
+    const unnamed: GitExec = async () => ({ code: 0, stdout: Buffer.from('Test <> 1 +0000'), stderr: '' })
+    expect(await createGit('/tmp', unnamed).authorEmail()).toBeNull()
+  })
+
+  it('reads one trailer of the commits in a range, oldest first, unfolded and one value per line', async () => {
+    const dir = await makeTempDir('pr-review-git-trailers-')
+    const inRepo = async (cwd: string, ...args: string[]): Promise<string> => {
+      const r = await execGitAsRepoConfig(cwd, args)
+      if (r.code !== 0) {
+        throw new GitError(args, r.stderr, r.code)
+      }
+      return r.stdout.toString('utf8').trim()
+    }
+    try {
+      await inRepo(dir, 'init', '-q', '-b', 'main')
+      await inRepo(dir, 'config', 'user.email', 'test@example.com')
+      await inRepo(dir, 'config', 'user.name', 'Test')
+      await inRepo(dir, 'commit', '-q', '--allow-empty', '-m', 'base')
+      const base = await inRepo(dir, 'rev-parse', 'HEAD')
+      await inRepo(
+        dir,
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'first',
+        '-m',
+        'Body.',
+        '-m',
+        'Settled-decision: a.ts:1 one\nSettled-decision: b.ts:2 two that\n  goes on\nReviewed-by: Someone'
+      )
+      const first = await inRepo(dir, 'rev-parse', 'HEAD')
+      await inRepo(dir, 'commit', '-q', '--allow-empty', '-m', 'none', '-m', 'Reviewed-by: Someone')
+      await inRepo(
+        dir,
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'second',
+        '-m',
+        'Settled-decision: c.ts:3:old three'
+      )
+      const second = await inRepo(dir, 'rev-parse', 'HEAD')
+      const trailers = await createGit(dir, execGitAsRepoConfig).commitTrailers(
+        base,
+        'HEAD',
+        'Settled-decision'
+      )
+      expect(trailers).toEqual([
+        {
+          sha: first,
+          authorEmail: 'test@example.com',
+          date: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
+          values: ['a.ts:1 one', 'b.ts:2 two that goes on'],
+        },
+        {
+          sha: second,
+          authorEmail: 'test@example.com',
+          date: expect.any(String),
+          values: ['c.ts:3:old three'],
+        },
+      ])
+      expect(
+        await createGit(dir, execGitAsRepoConfig).commitTrailers(second, 'HEAD', 'Settled-decision')
+      ).toEqual([])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 
   it('snapshots the working tree, untracked files included, without touching the real index', async () => {

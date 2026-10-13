@@ -268,6 +268,9 @@ author: the reason is theirs to give.
   row. Optional `title` uses the point-title cap; otherwise the title is shortened at a word
   boundary. Carried entries retain their published title, audience, and anchor. Follow the
   printed carried coordinates when the anchor moves, so author resolutions keep their identity.
+- Each settled decision the prompt lists in this diff gets exactly one point on its line, with
+  `settledDecision` set to the decision's id; publish resolves it with the author's reason. A
+  decision the prompt lists as not in this diff gets no point.
 - A test of code outside the diff goes at the end of the most relevant real layer.
 - Folds on a collapsed file take effect when the reader opens that file. Folding thresholds count
   diff rows in assigned chunks, including context, using the longer side of each chunk.

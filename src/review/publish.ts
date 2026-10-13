@@ -14,7 +14,7 @@ import type { AppContext } from '../server/context.js'
 import { readJson, readText } from '../store/atomic-json.js'
 import { standsForHead } from './carry-over.js'
 import { normalize } from './normalize.js'
-import { carriedSettlements } from './self-review.js'
+import { carriedSettlements, decisionSettlements } from './self-review.js'
 import { coveredTestPaths, type ValidationInput, validateModelOutput } from './validate.js'
 
 export interface PublishOptions {
@@ -172,6 +172,7 @@ export async function validationInput(
     highRisk: context.highRisk,
     headPaths,
     testPatterns: context.tests.patterns,
+    decisions: context.decisions,
   }
 }
 
@@ -267,7 +268,11 @@ export async function publish(
     testPatterns: context.tests.patterns,
     basisCanvasSha: context.basis?.canvasSha,
   })
-  const settled = await settlementsToKeep(ctx, context, artifact)
+  // A resolution the author already wrote on a canvas stands over the decision's own words.
+  const settled = {
+    ...decisionSettlements(artifact, context.decisions),
+    ...(await settlementsToKeep(ctx, context, artifact)),
+  }
   if (Object.keys(settled).length > 0) {
     artifact.settled = settled
   }

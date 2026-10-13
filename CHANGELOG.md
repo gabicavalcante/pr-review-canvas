@@ -27,6 +27,19 @@
 - Hover the totals of the rail and the header for the split between code and tests, as in
   `code +3 −2 · tests +2 −1`.
 
+### Settled decisions
+
+- A question the author already answered is recorded in the commit that carries the answer, as a
+  `Settled-decision: <path>:<line> <decision and reason>` trailer, and the canvas shows it as a
+  resolved attention point with that reason instead of asking it again. `prepare` reads the
+  trailers of the author's own commits, carries a decision to its line at the head when later
+  commits only moved it, and keeps one whose line changed as context the generator does not reopen.
+- Publish refuses a canvas that leaves a decision in the diff without its point, records one twice,
+  or anchors it off its line (`DECISION_MISSING`, `DECISION_DUPLICATE`, `DECISION_UNKNOWN`,
+  `DECISION_OFF_ANCHOR`). A reason the author wrote on the canvas stands over the trailer's.
+- The review loop skill writes a trailer for each decision its gate asks, and its Claude and Codex
+  copies are the same again.
+
 ## 0.8.0
 
 Changes since 0.7.0.

@@ -43,12 +43,31 @@ export interface Git {
   /** `git config user.name`, the person this clone commits as; null when it is unset. */
   configuredUser(): Promise<string | null>
   /**
+   * The email this clone commits as, from `git var GIT_AUTHOR_IDENT`: the environment's
+   * `GIT_AUTHOR_EMAIL` when set, else the config. Null when git has no identity to give.
+   */
+  authorEmail(): Promise<string | null>
+  /**
+   * The commits of `from..to` whose message carries the trailer `key`, oldest first, with each
+   * value of it. Continuation lines are unfolded, so a value is always one line.
+   */
+  commitTrailers(from: string, to: string, key: string): Promise<CommitTrailers[]>
+  /**
    * A commit that holds the working tree as it is right now, or null when it matches HEAD.
    * Nothing the user staged is touched: the snapshot is built in an index of this tool's own.
    */
   snapshotWorktree(): Promise<string | null>
   /** Keeps `sha` reachable for good, whatever the working tree does next. */
   anchorCommit(sha: string): Promise<void>
+}
+
+/** One commit's values of one trailer, with who wrote the commit and when. */
+export interface CommitTrailers {
+  sha: string
+  authorEmail: string
+  /** The author date, strict ISO 8601. */
+  date: string
+  values: string[]
 }
 
 /**
@@ -210,6 +229,33 @@ export function createGit(cwd: string, exec: GitExec = execGit): Git {
       const r = await exec(cwd, ['config', '--get', 'user.name'])
       const value = r.code === 0 ? r.stdout.toString('utf8').trim() : ''
       return value === '' ? null : value
+    },
+    authorEmail: async () => {
+      const r = await exec(cwd, ['var', 'GIT_AUTHOR_IDENT'])
+      const email = r.code === 0 ? (/<([^>]*)>/.exec(r.stdout.toString('utf8'))?.[1] ?? '') : ''
+      return email === '' ? null : email
+    },
+    commitTrailers: async (from, to, key) => {
+      // Unit and record separators keep a value apart from the fields around it, whatever it says.
+      const format = `%H%x1f%ae%x1f%aI%x1f%(trailers:key=${key},valueonly,unfold,separator=%x1e)%x1d`
+      const out = await run(['log', '--reverse', `--format=${format}`, `${from}..${to}`])
+      return out
+        .split('\x1d')
+        .map(record => record.trim())
+        .filter(record => record !== '')
+        .map(record => {
+          const [sha = '', authorEmail = '', date = '', values = ''] = record.split('\x1f')
+          return {
+            sha,
+            authorEmail,
+            date,
+            values: values
+              .split('\x1e')
+              .map(v => v.trim())
+              .filter(v => v !== ''),
+          }
+        })
+        .filter(commit => commit.values.length > 0)
     },
     firstExistingRef: async refs => {
       for (const ref of refs) {

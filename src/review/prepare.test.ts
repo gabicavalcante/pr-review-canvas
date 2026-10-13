@@ -86,6 +86,7 @@ describe('prepare', () => {
       tests: { patterns: [...DEFAULT_TEST_PATTERNS] },
       smallPr: true,
       largePr: false,
+      decisions: [],
       preparedAt: '2026-09-10T12:00:00.000Z',
     })
     const prompt = await readFile(result.promptPath, 'utf8')

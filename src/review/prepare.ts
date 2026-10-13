@@ -24,6 +24,7 @@ import type { Derived } from '../store/derived-store.js'
 import { fileDelta, findBasisCanvas, splitBasis } from './incremental.js'
 import { carriedPointLines } from './point-carry.js'
 import { loadPromptSources, type PromptSources, renderPrompt } from './prompt.js'
+import { readSettledDecisions } from './settled-decisions.js'
 
 export interface PrepareOptions {
   force: boolean
@@ -279,6 +280,13 @@ export async function prepare(
     tests: { patterns: config.tests.patterns },
     smallPr: derived.files.reduce((n, f) => n + f.hunks.length, 0) <= config.generation.smallPrHunks,
     largePr: isLargePr({ files: derived.files.length, additions, deletions }),
+    decisions: await readSettledDecisions({
+      git: ctx.git,
+      mergeBaseSha: pr.mergeBaseSha,
+      headSha: pr.headSha,
+      files: derived.files,
+      authorEmail: await ctx.git.authorEmail(),
+    }),
     preparedAt: ctx.now().toISOString(),
   }
   await clearCanvasDir(canvasDir)

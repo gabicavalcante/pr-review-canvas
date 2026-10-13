@@ -4,6 +4,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { LIMITS, type ModelOutput, ReviewArtifactSchema, TEXT_CAPS } from '../contract/review-artifact.js'
+import type { SettledDecision } from '../contract/generation-context.js'
 import { formatValidationError, VALIDATION_CODES, type ValidationError } from '../contract/validation.js'
 import { toFileEntry } from '../git/diff-collector.js'
 import { PACKAGE_ROOT } from '../server/context.js'
@@ -778,6 +779,74 @@ describe('validateModelOutput', () => {
 
   it('names every code once', () => {
     expect(new Set(VALIDATION_CODES).size).toBe(VALIDATION_CODES.length)
+  })
+
+  describe('settled decisions', () => {
+    // The clean output's first point is a decision on src/app.ts:4, a line of the diff.
+    const decision = (over: Partial<SettledDecision> = {}): SettledDecision => ({
+      id: 'abc1234-1',
+      commit: 'c'.repeat(40),
+      date: '2026-10-13T10:00:00-03:00',
+      text: 'keep the sum; the spec says sum',
+      path: 'src/app.ts',
+      side: 'new',
+      line: 4,
+      ...over,
+    })
+    const recording = (id: string, over: Partial<ModelOutput['points'][number]> = {}): ModelOutput => {
+      const output = clean()
+      output.points[0] = { ...output.points[0]!, settledDecision: id, ...over }
+      return output
+    }
+
+    it('accepts one point for each decision in the diff, and asks none for a decision outside it', () => {
+      const decisions = [decision(), decision({ id: 'abc1234-2', line: null })]
+      expect(errorsOf(recording('abc1234-1'), { decisions })).toEqual([])
+      expect(errorsOf(recording('abc1234-1', { line: 2, endLine: 5 }), { decisions })).toEqual([])
+    })
+
+    it('names a decision in the diff that no point records, and one that two points record', () => {
+      expect(errorsOf(clean(), { decisions: [decision()] }).map(formatValidationError)).toEqual([
+        'DECISION_MISSING settled decision abc1234-1 on src/app.ts:4 (new) has no point; write one with settledDecision "abc1234-1": keep the sum; the spec says sum',
+      ])
+      const twice = recording('abc1234-1')
+      twice.points.push({ ...twice.points[0]!, title: 'The same decision again' })
+      expect(errorsOf(twice, { decisions: [decision()] }).map(formatValidationError)).toEqual([
+        'DECISION_DUPLICATE settled decision abc1234-1 is recorded by points 1, 3; keep one',
+      ])
+    })
+
+    it('refuses a point that names a decision not listed in the diff', () => {
+      const decisions = [decision(), decision({ id: 'abc1234-2', line: null })]
+      for (const id of ['nope', 'abc1234-2']) {
+        const output = recording(id)
+        output.points.push({
+          ...output.points[0]!,
+          title: 'The decision itself',
+          settledDecision: 'abc1234-1',
+        })
+        expect(errorsOf(output, { decisions }).map(e => e.code)).toEqual(['DECISION_UNKNOWN'])
+      }
+    })
+
+    it("refuses a point that records a decision away from the decision's own line", () => {
+      const decisions = [decision()]
+      expect(errorsOf(recording('abc1234-1', { line: 2 }), { decisions }).map(formatValidationError)).toEqual(
+        [
+          'DECISION_OFF_ANCHOR point 1 "Sum instead of product" records settled decision abc1234-1, so it must cover src/app.ts:4 (new)',
+        ]
+      )
+      expect(
+        errorsOf(recording('abc1234-1', { path: 'src/new.ts', line: 1 }), { decisions }).map(e => e.code)
+      ).toEqual(['DECISION_OFF_ANCHOR'])
+      expect(
+        errorsOf(recording('abc1234-1', { side: 'old', line: 4 }), { decisions }).map(e => e.code)
+      ).toEqual(['DECISION_OFF_ANCHOR'])
+    })
+
+    it('checks no decision when there are none to check against, as for a stored canvas', () => {
+      expect(errorsOf(recording('anything'))).toEqual([])
+    })
   })
 
   it('accepts the committed PR #278 canvas against its own hunk index', async () => {

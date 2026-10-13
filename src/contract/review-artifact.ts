@@ -310,6 +310,13 @@ function pointBase(caps: Caps) {
     side: SideSchema.optional(),
     body: text(caps, 'pointBody'),
     audience: z.enum(POINT_AUDIENCES),
+    /**
+     * The id of the settled decision this point records. Publish resolves the point with the
+     * decision's reason, so the author's answer reaches the canvas without anyone settling it again.
+     */
+    settledDecision: z.string().min(1).optional().meta({
+      description: 'The id of a listed settled decision; set it only on the one point that records it.',
+    }),
   }
 }
 
@@ -337,6 +344,11 @@ export const SettlementSchema = z.object({
   reason: z.string().trim().min(1).max(SETTLEMENT_REASON_MAX),
   at: z.string(),
   commentUrl: z.string().optional(),
+  /** The commit whose `Settled-decision` trailer gave the reason, when the answer came from one. */
+  commit: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .optional(),
 })
 export type Settlement = z.infer<typeof SettlementSchema>
 
