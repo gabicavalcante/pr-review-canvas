@@ -1049,12 +1049,13 @@ One generation runs at a time across the worktrees of a clone; projects of other
 own. The job runs in the server, so you can close the dialog
 or reload the page; while it runs, the header command reads **generating** with the elapsed time
 and opens the dialog again.
-The dialog shows the phase, the latest tool calls of the agent, and the problems publish named on
-each repair attempt. While the agent works, a line says what it is doing (waiting to start,
-thinking, writing the answer with its length so far, or running a tool) and how long ago it last
-showed it was working, so a long stretch with no tool call does not look stuck. After three
-minutes with nothing from the agent, the dialog says it may be stuck. **stop** cancels the agent.
-When the canvas is published, the page loads it.
+The dialog shows the phase, the latest tool calls of the agent, and any validation issues. It
+says when the agent is automatically correcting them and hides them once the canvas is published.
+Issues remain visible if generation fails or is stopped. While the agent works, a line says what
+it is doing (waiting to start, thinking, writing the answer with its length so far, or running a
+tool) and how long ago it last showed it was working, so a long stretch with no tool call does not
+look stuck. After three minutes with nothing from the agent, the dialog says it may be stuck.
+**stop** cancels the agent. When the canvas is published, the page loads it.
 
 The agent follows the project's own copy of the `pr-review-canvas` skill, so a project that
 tailored its skill gets the canvas it would get from a terminal: `.claude/skills/pr-review-canvas`
