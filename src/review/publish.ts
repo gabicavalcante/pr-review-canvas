@@ -14,7 +14,7 @@ import type { AppContext } from '../server/context.js'
 import { readJson, readText } from '../store/atomic-json.js'
 import { standsForHead } from './carry-over.js'
 import { normalize } from './normalize.js'
-import { carriedSettlements, decisionSettlements } from './self-review.js'
+import { carriedSettlements } from './self-review.js'
 import { coveredTestPaths, type ValidationInput, validateModelOutput } from './validate.js'
 
 export interface PublishOptions {
@@ -172,7 +172,6 @@ export async function validationInput(
     highRisk: context.highRisk,
     headPaths,
     testPatterns: context.tests.patterns,
-    decisions: context.decisions,
   }
 }
 
@@ -267,12 +266,14 @@ export async function publish(
     generator,
     testPatterns: context.tests.patterns,
     basisCanvasSha: context.basis?.canvasSha,
+    decisions: context.decisions,
   })
-  // A resolution the author already wrote on a canvas stands over the decision's own words.
-  const settled = {
-    ...decisionSettlements(artifact, context.decisions),
-    ...(await settlementsToKeep(ctx, context, artifact)),
-  }
+  // A resolution the author wrote on a canvas stands over a decision's own words. One an earlier
+  // publish took from a commit does not: the decisions read now are the current ones.
+  const writtenOnCanvas = Object.entries(await settlementsToKeep(ctx, context, artifact)).filter(
+    ([, settlement]) => settlement.commit === undefined
+  )
+  const settled = { ...artifact.settled, ...Object.fromEntries(writtenOnCanvas) }
   if (Object.keys(settled).length > 0) {
     artifact.settled = settled
   }

@@ -1,12 +1,5 @@
 import { syntheticArtifact } from '../testing/synthetic.js'
-import {
-  carriedSettlements,
-  decisionSettlements,
-  isAuthor,
-  tallyCanvas,
-  tallyMarkdown,
-  withSettlement,
-} from './self-review.js'
+import { carriedSettlements, isAuthor, tallyCanvas, tallyMarkdown, withSettlement } from './self-review.js'
 
 const settlement = { reason: 'Known.', at: '2026-09-10T12:00:00.000Z' }
 
@@ -47,28 +40,6 @@ describe('isAuthor', () => {
     expect(isAuthor('OctoCat', { author: 'octocat' })).toBe(true)
     expect(isAuthor('hubot', { author: 'octocat' })).toBe(false)
     expect(isAuthor(null, { author: 'octocat' })).toBe(false)
-  })
-})
-
-describe('decisionSettlements', () => {
-  it('resolves each point that records a known decision with its reason, date, and commit', () => {
-    const artifact = syntheticArtifact()
-    const commit = 'c'.repeat(40)
-    artifact.points = artifact.points.map((p, i) =>
-      i === 0 ? { ...p, settledDecision: 'abc1234-1' } : i === 1 ? { ...p, settledDecision: 'gone-1' } : p
-    )
-    const decision = {
-      id: 'abc1234-1',
-      commit,
-      date: '2026-10-13T10:00:00-03:00',
-      text: 'keep the sum',
-      path: 'src/app.ts',
-      side: 'new' as const,
-      line: 4,
-    }
-    expect(decisionSettlements(artifact, [decision])).toEqual({
-      'fp-1': { reason: 'keep the sum', at: '2026-10-13T10:00:00-03:00', commit },
-    })
   })
 })
 

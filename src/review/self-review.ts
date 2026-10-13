@@ -1,7 +1,7 @@
 // Self-review: the author settles attention points before asking for review, and the canvas carries
 // each answer to every reviewer. Any point can be settled, a reviewer point too when it does not
 // apply. A settled point leaves the reviewer's list; its reason stays.
-import type { GenerationContext, SettledDecision } from '../contract/generation-context.js'
+import type { GenerationContext } from '../contract/generation-context.js'
 import type { Point, Pr, ReviewArtifact, Settlement } from '../contract/review-artifact.js'
 import { POINT_LEVELS } from '../contract/review-artifact.js'
 import { isLocalKey, type ReviewKey } from '../contract/review-key.js'
@@ -107,25 +107,6 @@ export function readerResolves(
   canvasCurrent: boolean
 ): boolean {
   return canvasCurrent && (isLocalKey(key) || isAuthor(login, pr))
-}
-
-/**
- * The resolutions the author's settled decisions give a newly generated canvas: each point that
- * records a decision is resolved with the decision's reason, dated by the commit that carries it.
- */
-export function decisionSettlements(
-  artifact: Pick<ReviewArtifact, 'points'>,
-  decisions: readonly SettledDecision[]
-): Record<string, Settlement> {
-  const byId = new Map(decisions.map(d => [d.id, d]))
-  const out: Record<string, Settlement> = {}
-  for (const point of artifact.points) {
-    const decision = point.settledDecision === undefined ? undefined : byId.get(point.settledDecision)
-    if (decision !== undefined) {
-      out[point.fingerprint] = { reason: decision.text, at: decision.date, commit: decision.commit }
-    }
-  }
-  return out
 }
 
 /**

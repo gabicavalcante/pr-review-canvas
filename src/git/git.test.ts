@@ -227,8 +227,8 @@ describe('createGit (real adapter)', () => {
     expect(await createGit('/tmp', unnamed).authorEmail()).toBeNull()
   })
 
-  it('reads one trailer of the commits in a range, oldest first, unfolded and one value per line', async () => {
-    const dir = await makeTempDir('pr-review-git-trailers-')
+  it('reads the keyed lines of the commits in a range, oldest first, wherever in the message they sit', async () => {
+    const dir = await makeTempDir('pr-review-git-keyed-')
     const inRepo = async (cwd: string, ...args: string[]): Promise<string> => {
       const r = await execGitAsRepoConfig(cwd, args)
       if (r.code !== 0) {
@@ -242,42 +242,29 @@ describe('createGit (real adapter)', () => {
       await inRepo(dir, 'config', 'user.name', 'Test')
       await inRepo(dir, 'commit', '-q', '--allow-empty', '-m', 'base')
       const base = await inRepo(dir, 'rev-parse', 'HEAD')
-      await inRepo(
-        dir,
-        'commit',
-        '-q',
-        '--allow-empty',
-        '-m',
+      const message = [
         'first',
-        '-m',
-        'Body.',
-        '-m',
-        'Settled-decision: a.ts:1 one\nSettled-decision: b.ts:2 two that\n  goes on\nReviewed-by: Someone'
-      )
+        'This is not a Settled-decision: line, it only names one.',
+        'Settled-decision: a.ts:1 one\nsettled-decision:   b.ts:2 two  \nReviewed-by: Someone',
+      ]
+      await inRepo(dir, 'commit', '-q', '--allow-empty', ...message.flatMap(m => ['-m', m]))
       const first = await inRepo(dir, 'rev-parse', 'HEAD')
       await inRepo(dir, 'commit', '-q', '--allow-empty', '-m', 'none', '-m', 'Reviewed-by: Someone')
-      await inRepo(
-        dir,
-        'commit',
-        '-q',
-        '--allow-empty',
-        '-m',
+      // A blank line keeps this decision out of the block git reads as trailers.
+      const apart = [
         'second',
-        '-m',
-        'Settled-decision: c.ts:3:old three'
-      )
+        'Settled-decision: c.ts:3:old three',
+        'Co-Authored-By: Someone <s@example.com>',
+      ]
+      await inRepo(dir, 'commit', '-q', '--allow-empty', ...apart.flatMap(m => ['-m', m]))
       const second = await inRepo(dir, 'rev-parse', 'HEAD')
-      const trailers = await createGit(dir, execGitAsRepoConfig).commitTrailers(
-        base,
-        'HEAD',
-        'Settled-decision'
-      )
-      expect(trailers).toEqual([
+      const git = createGit(dir, execGitAsRepoConfig)
+      expect(await git.commitKeyedLines(base, 'HEAD', 'Settled-decision')).toEqual([
         {
           sha: first,
           authorEmail: 'test@example.com',
           date: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
-          values: ['a.ts:1 one', 'b.ts:2 two that goes on'],
+          values: ['a.ts:1 one', 'b.ts:2 two'],
         },
         {
           sha: second,
@@ -286,9 +273,7 @@ describe('createGit (real adapter)', () => {
           values: ['c.ts:3:old three'],
         },
       ])
-      expect(
-        await createGit(dir, execGitAsRepoConfig).commitTrailers(second, 'HEAD', 'Settled-decision')
-      ).toEqual([])
+      expect(await git.commitKeyedLines(second, 'HEAD', 'Settled-decision')).toEqual([])
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

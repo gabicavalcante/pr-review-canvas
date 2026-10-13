@@ -30,15 +30,17 @@
 ### Settled decisions
 
 - A question the author already answered is recorded in the commit that carries the answer, as a
-  `Settled-decision: <path>:<line> <decision and reason>` trailer, and the canvas shows it as a
-  resolved attention point with that reason instead of asking it again. `prepare` reads the
-  trailers of the author's own commits, carries a decision to its line at the head when later
-  commits only moved it, and keeps one whose line changed as context the generator does not reopen.
-- Publish refuses a canvas that leaves a decision in the diff without its point, records one twice,
-  or anchors it off its line (`DECISION_MISSING`, `DECISION_DUPLICATE`, `DECISION_UNKNOWN`,
-  `DECISION_OFF_ANCHOR`). A reason the author wrote on the canvas stands over the trailer's.
-- The review loop skill writes a trailer for each decision its gate asks, and its Claude and Codex
-  copies are the same again.
+  `Settled-decision: <path>:<line> <decision and reason>` line, and publish adds it to the canvas
+  as a resolved attention point with that reason, so the canvas does not ask it again. The point
+  costs the generator none of its own.
+- `prepare` reads the decisions of the author's own commits, and on a pull request only when its
+  author prepares the canvas. A decision is carried to its line while later commits only move it,
+  and kept as context the generator does not reopen once its line changes. The line counts
+  anywhere in the message, so a blank line before `Co-Authored-By` loses nothing.
+- A reason the author wrote on the canvas stands over the commit's; a later decision on the same
+  line replaces an earlier one.
+- The review loop skill writes a decision line for each question its gate asks, and its Claude and
+  Codex copies are the same again.
 
 ## 0.8.0
 

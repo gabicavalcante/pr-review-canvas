@@ -319,7 +319,10 @@ function decisionLine(d: SettledDecision): string {
   return `- \`${d.id}\` on ${where} (commit \`${d.commit.slice(0, 7)}\`, ${d.date.slice(0, 10)}): ${d.text}`
 }
 
-/** The author's settled decisions: the anchored ones to record as points, the rest as context. */
+/**
+ * The author's settled decisions. Publish adds the ones in the diff to the canvas as resolved
+ * points; the generator only has to leave them, and the rest, unasked.
+ */
 function decisionsMarkdown(decisions: readonly SettledDecision[]): string {
   if (decisions.length === 0) {
     return '_No settled decisions are recorded on these commits._'
@@ -327,9 +330,9 @@ function decisionsMarkdown(decisions: readonly SettledDecision[]): string {
   const anchored = decisions.filter(d => d.line !== null).map(decisionLine)
   const context = decisions.filter(d => d.line === null).map(decisionLine)
   return [
-    'The author already settled these questions, each in a `Settled-decision` trailer of one of the commits. Do not raise any of them again as an open point.',
-    `**In this diff** — write exactly one point for each, anchored on its line, with \`settledDecision\` set to its id. State the decision and its reason in the author's terms; use \`kind: "decision"\`, \`level: "fyi"\`, and \`audience: "author"\`. Publish resolves the point with the author's reason:\n\n${anchored.length === 0 ? '_none_' : anchored.join('\n')}`,
-    `**Not in this diff** — the code changed after the commit, or sits outside the diff. Write no point for these; they are context, and a question they answer comes back only if the new code contradicts the answer:\n\n${context.length === 0 ? '_none_' : context.join('\n')}`,
+    'The author already settled these questions, each in a `Settled-decision` line of one of the commits. Do not raise any of them again, and write no point for them. A question one of them answers comes back only if the code contradicts the answer.',
+    `**In this diff** — publish adds each to the canvas as a point resolved with the author's reason:\n\n${anchored.length === 0 ? '_none_' : anchored.join('\n')}`,
+    `**Not in this diff** — the code changed after the commit, or sits outside the diff:\n\n${context.length === 0 ? '_none_' : context.join('\n')}`,
   ].join('\n\n')
 }
 

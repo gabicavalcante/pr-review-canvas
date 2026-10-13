@@ -381,7 +381,7 @@ describe('renderPrompt', () => {
   })
 
   it.each(['strict', 'surfacing'] as const)(
-    "lists the author's settled decisions in the %s prompt: the ones to record, and the ones that are context",
+    "lists the author's settled decisions in the %s prompt, in the diff and out of it, as questions not to raise",
     mode => {
       const none = context()
       none.generation.mode = mode
@@ -412,14 +412,14 @@ describe('renderPrompt', () => {
       })
       ctx.generation.mode = mode
       const prompt = renderPrompt(ctx, PATCHES, sources)
-      expect(prompt).toContain('with `settledDecision` set to its id')
+      expect(prompt).toContain('Do not raise any of them again, and write no point for them.')
       expect(prompt).toContain(
         '- `abc1234-1` on `src/app.ts` new-side line 4 (commit `abc1234`, 2026-10-13): keep the sum; the spec says sum\n\n**Not in this diff**'
       )
       expect(prompt).toContain(
         '- `abc1234-2` on `src/app.ts` (commit `abc1234`, 2026-10-13): other() stays private'
       )
-      expect(prompt).toContain('"settledDecision"')
+      expect(prompt).not.toContain('settledDecision')
     }
   )
 

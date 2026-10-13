@@ -1,12 +1,15 @@
+import type { FileEntry } from '../contract/review-artifact.js'
 import { SETTLEMENT_REASON_MAX } from '../contract/review-artifact.js'
 import { toFileEntry } from '../git/diff-collector.js'
-import type { CommitTrailers } from '../git/git.js'
+import type { CommitKeyedLines } from '../git/git.js'
 import { createFakeGit } from '../testing/fakes.js'
 import { BASE_SHA, HEAD_SHA, SYNTHETIC_FILES } from '../testing/synthetic.js'
-import { lineInLaterVersion, parseSettledDecision, readSettledDecisions } from './settled-decisions.js'
+import { MAX_DECISION_POINTS, parseSettledDecision, readSettledDecisions } from './settled-decisions.js'
 
 const FILES = SYNTHETIC_FILES.map(toFileEntry)
 const EARLIER = 'c'.repeat(40)
+const APP_AT_HEAD =
+  "import { a } from './a'\nimport { b } from './b'\nexport function run() {\n  return a() + b()\n}\n"
 
 describe('parseSettledDecision', () => {
   it('reads a path, a line, an optional old side, and the text', () => {
@@ -32,23 +35,8 @@ describe('parseSettledDecision', () => {
   )
 })
 
-describe('lineInLaterVersion', () => {
-  const before = ['a', 'b', 'c', 'd']
-
-  it('follows a line that only moved, and keeps one nothing touched', () => {
-    expect(lineInLaterVersion(before, ['x', 'y', ...before], 3)).toBe(5)
-    expect(lineInLaterVersion(before, before, 2)).toBe(2)
-  })
-
-  it('loses a line that was edited, deleted, or never there', () => {
-    expect(lineInLaterVersion(before, ['a', 'b', 'C', 'd'], 3)).toBeNull()
-    expect(lineInLaterVersion(before, ['a', 'b', 'd'], 3)).toBeNull()
-    expect(lineInLaterVersion(before, before, 9)).toBeNull()
-  })
-})
-
 describe('readSettledDecisions', () => {
-  const commit = (sha: string, values: string[], authorEmail = 'Author@Example.com'): CommitTrailers => ({
+  const commit = (sha: string, values: string[], authorEmail = 'Author@Example.com'): CommitKeyedLines => ({
     sha,
     authorEmail,
     date: '2026-10-13T10:00:00-03:00',
@@ -56,18 +44,18 @@ describe('readSettledDecisions', () => {
   })
 
   function read(
-    commits: CommitTrailers[],
-    opts: { email?: string | null; blobs?: Record<string, string> } = {}
+    commits: CommitKeyedLines[],
+    opts: { email?: string | null; blobs?: Record<string, string>; files?: readonly FileEntry[] } = {}
   ) {
     const git = createFakeGit({
-      trailers: { [`${BASE_SHA}..${HEAD_SHA}`]: commits },
-      ...(opts.blobs === undefined ? {} : { blobs: opts.blobs }),
+      keyedLines: { [`${BASE_SHA}..${HEAD_SHA}`]: commits },
+      blobs: opts.blobs ?? { [`${HEAD_SHA}:src/app.ts`]: APP_AT_HEAD },
     })
     const decisions = readSettledDecisions({
       git,
       mergeBaseSha: BASE_SHA,
       headSha: HEAD_SHA,
-      files: FILES,
+      files: opts.files ?? FILES,
       authorEmail: opts.email === undefined ? 'author@example.com' : opts.email,
     })
     return { git, decisions }
@@ -82,7 +70,7 @@ describe('readSettledDecisions', () => {
   it("keeps the author's decisions, whatever the case of the address, and drops everyone else's", async () => {
     const { decisions } = read([
       commit(HEAD_SHA, ['src/app.ts:2 keep the import']),
-      commit(HEAD_SHA, ['src/app.ts:5 another view'], 'someone@example.com'),
+      commit(HEAD_SHA, ['src/app.ts:4 another view'], 'someone@example.com'),
     ])
     expect(await decisions).toEqual([
       {
@@ -97,35 +85,49 @@ describe('readSettledDecisions', () => {
     ])
   })
 
-  it('anchors a line inside a chunk, and keeps a decision outside one or outside the diff as context', async () => {
-    const { git, decisions } = read([
+  it('keeps a decision outside a chunk, outside the diff, or in a file it cannot read as context', async () => {
+    const { decisions } = read([
       commit(HEAD_SHA, [
         'src/app.ts:2 in a chunk',
         'src/app.ts:8 between chunks',
         'README.md:1 not in the diff',
       ]),
-      commit(HEAD_SHA, ['src/gone.ts:1:old an old-side line']),
+      commit(HEAD_SHA, ['src/new.ts:1 unreadable']),
     ])
-    expect((await decisions).map(d => [d.text, d.side, d.line])).toEqual([
-      ['in a chunk', 'new', 2],
-      ['between chunks', 'new', null],
-      ['not in the diff', 'new', null],
-      ['an old-side line', 'old', 1],
+    expect((await decisions).map(d => [d.text, d.line])).toEqual([
+      ['in a chunk', 2],
+      ['between chunks', null],
+      ['not in the diff', null],
+      ['unreadable', null],
     ])
-    // The head's own lines and the merge base's never move, so no file was read to place them.
-    expect(git.calls.filter(c => c[0] === 'show')).toEqual([])
   })
 
-  it("carries an earlier commit's line to the head, and loses it when the file cannot be read", async () => {
-    const atEarlier = "import { a } from './a'\nexport function run() {\n"
-    const atHead = "import { a } from './a'\nimport { b } from './b'\nexport function run() {\n"
+  it("carries a new-side line from its commit's version to the head, and loses one that changed", async () => {
+    const atEarlier = "import { a } from './a'\nexport function run() {\n  return a()\n}\n"
     const { decisions } = read(
-      [commit(EARLIER, ['src/app.ts:2 run stays exported', 'src/new.ts:1 unreadable then'])],
-      { blobs: { [`${EARLIER}:src/app.ts`]: atEarlier, [`${HEAD_SHA}:src/app.ts`]: atHead } }
+      [commit(EARLIER, ['src/app.ts:2 run stays exported', 'src/app.ts:3 the sum'])],
+      {
+        blobs: { [`${EARLIER}:src/app.ts`]: atEarlier, [`${HEAD_SHA}:src/app.ts`]: APP_AT_HEAD },
+      }
     )
     expect((await decisions).map(d => [d.id, d.line])).toEqual([
       [`${EARLIER.slice(0, 7)}-1`, 3],
       [`${EARLIER.slice(0, 7)}-2`, null],
+    ])
+  })
+
+  it("carries an old-side line from the commit's parent to the merge base", async () => {
+    // The commit's parent had one more line above the one it deleted than the merge base has.
+    const { git, decisions } = read([commit(EARLIER, ['src/gone.ts:2:old dropped on purpose'])], {
+      blobs: {
+        [`${EARLIER}^:src/gone.ts`]: '// added first\nexport const old = 1\n// bye',
+        [`${BASE_SHA}:src/gone.ts`]: 'export const old = 1\n// bye',
+      },
+    })
+    expect((await decisions).map(d => [d.side, d.line])).toEqual([['old', 1]])
+    expect(git.calls.filter(c => c[0] === 'show')).toEqual([
+      ['show', `${EARLIER}^:src/gone.ts`],
+      ['show', `${BASE_SHA}:src/gone.ts`],
     ])
   })
 
@@ -144,5 +146,34 @@ describe('readSettledDecisions', () => {
     const [only] = await decisions
     expect(only?.text).toHaveLength(SETTLEMENT_REASON_MAX)
     expect(only?.text.endsWith('…')).toBe(true)
+  })
+
+  it('keeps the oldest decisions past the point budget as context', async () => {
+    const lines = MAX_DECISION_POINTS + 2
+    const big: FileEntry = {
+      path: 'big.ts',
+      key: 'big_ts',
+      status: 'added',
+      additions: lines,
+      deletions: 0,
+      hunks: [
+        {
+          id: 'big_ts#1',
+          header: `@@ -0,0 +1,${lines} @@`,
+          oldStart: 0,
+          oldLines: 0,
+          newStart: 1,
+          newLines: lines,
+        },
+      ],
+    }
+    const values = Array.from({ length: lines }, (_, i) => `big.ts:${i + 1} decision ${i + 1}`)
+    const { decisions } = read([commit(HEAD_SHA, values)], {
+      files: [big],
+      blobs: { [`${HEAD_SHA}:big.ts`]: Array.from({ length: lines }, (_, i) => `line ${i + 1}`).join('\n') },
+    })
+    const lineOf = (await decisions).map(d => d.line)
+    expect(lineOf.slice(0, 2)).toEqual([null, null])
+    expect(lineOf.slice(2)).toEqual(Array.from({ length: MAX_DECISION_POINTS }, (_, i) => i + 3))
   })
 })

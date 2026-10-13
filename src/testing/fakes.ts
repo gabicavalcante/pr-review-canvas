@@ -10,7 +10,7 @@ import type { CheckoutGit } from '../chat/checkouts.js'
 import type { RuntimeConfig } from '../config.js'
 import { GITHUB_HOST, type Host } from '../host/host.js'
 import type { ReviewArtifact } from '../contract/review-artifact.js'
-import { type CommitTrailers, execGitIn, type Git, GitError, type GitExec } from '../git/git.js'
+import { type CommitKeyedLines, execGitIn, type Git, GitError, type GitExec } from '../git/git.js'
 import { type CapabilityProbe, createCapabilityProbe } from '../host/capabilities.js'
 import { type CliResponse, HostCliError, type HostClient } from '../host/client.js'
 import { basePathOf, projectSlug, worktreeOf } from '../hub/slug.js'
@@ -56,8 +56,8 @@ export interface FakeGitOptions {
   user?: string | null
   /** The email `git var GIT_AUTHOR_IDENT` names. */
   email?: string | null
-  /** `<from>..<to>` → the commits of that range that carry a trailer, oldest first. */
-  trailers?: Record<string, CommitTrailers[]>
+  /** `<from>..<to>` → the commits of that range with keyed lines, oldest first. */
+  keyedLines?: Record<string, CommitKeyedLines[]>
 }
 
 export interface FakeGit extends Git {
@@ -172,9 +172,9 @@ export function createFakeGit(options: FakeGitOptions = {}): FakeGit {
       calls.push(['var', 'GIT_AUTHOR_IDENT'])
       return options.email ?? null
     },
-    commitTrailers: async (from, to, key) => {
-      calls.push(['log', `--trailers=${key}`, `${from}..${to}`])
-      return options.trailers?.[`${from}..${to}`] ?? []
+    commitKeyedLines: async (from, to, key) => {
+      calls.push(['log', `--keyed=${key}`, `${from}..${to}`])
+      return options.keyedLines?.[`${from}..${to}`] ?? []
     },
     currentBranch: async () => {
       calls.push(['symbolic-ref', 'HEAD'])

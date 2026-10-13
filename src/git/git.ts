@@ -48,10 +48,12 @@ export interface Git {
    */
   authorEmail(): Promise<string | null>
   /**
-   * The commits of `from..to` whose message carries the trailer `key`, oldest first, with each
-   * value of it. Continuation lines are unfolded, so a value is always one line.
+   * The commits of `from..to` whose message has lines `<key>: <value>`, oldest first, with each
+   * value. The key is matched without regard to case, at the start of a line anywhere in the
+   * message: a trailer block git would not recognize, such as one a blank line keeps apart from
+   * `Co-Authored-By`, still counts.
    */
-  commitTrailers(from: string, to: string, key: string): Promise<CommitTrailers[]>
+  commitKeyedLines(from: string, to: string, key: string): Promise<CommitKeyedLines[]>
   /**
    * A commit that holds the working tree as it is right now, or null when it matches HEAD.
    * Nothing the user staged is touched: the snapshot is built in an index of this tool's own.
@@ -61,8 +63,8 @@ export interface Git {
   anchorCommit(sha: string): Promise<void>
 }
 
-/** One commit's values of one trailer, with who wrote the commit and when. */
-export interface CommitTrailers {
+/** One commit's values of one keyed line, with who wrote the commit and when. */
+export interface CommitKeyedLines {
   sha: string
   authorEmail: string
   /** The author date, strict ISO 8601. */
@@ -235,25 +237,22 @@ export function createGit(cwd: string, exec: GitExec = execGit): Git {
       const email = r.code === 0 ? (/<([^>]*)>/.exec(r.stdout.toString('utf8'))?.[1] ?? '') : ''
       return email === '' ? null : email
     },
-    commitTrailers: async (from, to, key) => {
-      // Unit and record separators keep a value apart from the fields around it, whatever it says.
-      const format = `%H%x1f%ae%x1f%aI%x1f%(trailers:key=${key},valueonly,unfold,separator=%x1e)%x1d`
-      const out = await run(['log', '--reverse', `--format=${format}`, `${from}..${to}`])
+    commitKeyedLines: async (from, to, key) => {
+      // Unit and record separators keep the message apart from the fields around it, whatever it says.
+      const out = await run(['log', '--reverse', '--format=%H%x1f%ae%x1f%aI%x1f%B%x1d', `${from}..${to}`])
+      // The key is one of this tool's own names, letters and dashes, so it needs no escaping.
+      const keyed = new RegExp(`^${key}:(.*)$`, 'i')
       return out
         .split('\x1d')
-        .map(record => record.trim())
+        .map(record => record.replace(/^\n/, ''))
         .filter(record => record !== '')
         .map(record => {
-          const [sha = '', authorEmail = '', date = '', values = ''] = record.split('\x1f')
-          return {
-            sha,
-            authorEmail,
-            date,
-            values: values
-              .split('\x1e')
-              .map(v => v.trim())
-              .filter(v => v !== ''),
-          }
+          const [sha = '', authorEmail = '', date = '', message = ''] = record.split('\x1f')
+          const values = message
+            .split('\n')
+            .map(line => keyed.exec(line)?.[1]?.trim() ?? '')
+            .filter(value => value !== '')
+          return { sha, authorEmail, date, values }
         })
         .filter(commit => commit.values.length > 0)
     },

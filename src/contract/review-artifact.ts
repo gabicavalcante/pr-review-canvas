@@ -310,13 +310,6 @@ function pointBase(caps: Caps) {
     side: SideSchema.optional(),
     body: text(caps, 'pointBody'),
     audience: z.enum(POINT_AUDIENCES),
-    /**
-     * The id of the settled decision this point records. Publish resolves the point with the
-     * decision's reason, so the author's answer reaches the canvas without anyone settling it again.
-     */
-    settledDecision: z.string().min(1).optional().meta({
-      description: 'The id of a listed settled decision; set it only on the one point that records it.',
-    }),
   }
 }
 
@@ -326,7 +319,8 @@ export const PointSchema = z.object({
   audience: z.enum(POINT_AUDIENCES).default('reviewer'),
   id: z.string().min(1),
   fingerprint: z.string().min(1),
-  origin: z.enum(['model', 'tests']),
+  /** Who wrote the point: the generator, publish for a missing test, or publish for a settled decision. */
+  origin: z.enum(['model', 'tests', 'decision']),
   /** The layer that owns the point's hunk; publish fills it from the file's layer. */
   layerId: z.string().optional(),
 })

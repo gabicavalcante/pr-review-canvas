@@ -14,7 +14,6 @@ import {
   type Side,
   type TextCaps,
 } from '../contract/review-artifact.js'
-import type { SettledDecision } from '../contract/generation-context.js'
 import type { ValidationCode, ValidationError, ValidationReport } from '../contract/validation.js'
 import { hunkForLine, hunkLineRanges } from '../git/patch-lines.js'
 import type { HighRiskRule } from '../project-config.js'
@@ -35,12 +34,6 @@ export interface ValidationInput {
   headPaths?: ReadonlySet<string>
   /** The globs that make a file a test; the project config's list, or the built-in one. */
   testPatterns?: readonly string[] | undefined
-  /**
-   * The author's settled decisions this canvas must record: one point for each decision in the
-   * diff, anchored on its line. Absent when there is nothing to check them against, as for a
-   * stored `review.json`.
-   */
-  decisions?: readonly SettledDecision[] | undefined
   /**
    * The output was read back from a stored `review.json`, whose generator may predate the rules
    * about what a canvas must hide. Only the correctness rules apply then: coordinates, and the
@@ -477,65 +470,6 @@ function checkPoints(output: ModelOutput, index: Index, limits: Limits, report: 
   })
 }
 
-/**
- * Each settled decision in the diff is recorded by exactly one point, on the decision's own line,
- * so publish can resolve it; a decision outside the diff is context and needs none.
- */
-function checkDecisions(output: ModelOutput, decisions: readonly SettledDecision[], report: Report): void {
-  const anchored = new Map<string, SettledDecision & { line: number }>()
-  for (const d of decisions) {
-    if (d.line !== null) {
-      anchored.set(d.id, { ...d, line: d.line })
-    }
-  }
-  const recordedBy = new Map<string, number[]>()
-  output.points.forEach((p, i) => {
-    if (p.settledDecision === undefined) {
-      return
-    }
-    const where = `point:${i + 1}`
-    const decision = anchored.get(p.settledDecision)
-    if (decision === undefined) {
-      report.add(
-        'DECISION_UNKNOWN',
-        where,
-        `point ${i + 1} "${p.title}" names settled decision ${p.settledDecision}, which is not one listed in this diff; drop settledDecision`
-      )
-      return
-    }
-    recordedBy.set(decision.id, [...(recordedBy.get(decision.id) ?? []), i + 1])
-    const { line } = decision
-    if (
-      p.path !== decision.path ||
-      (p.side ?? 'new') !== decision.side ||
-      line < p.line ||
-      line > (p.endLine ?? p.line)
-    ) {
-      report.add(
-        'DECISION_OFF_ANCHOR',
-        where,
-        `point ${i + 1} "${p.title}" records settled decision ${decision.id}, so it must cover ${decision.path}:${line} (${decision.side})`
-      )
-    }
-  })
-  for (const decision of anchored.values()) {
-    const points = recordedBy.get(decision.id) ?? []
-    if (points.length === 0) {
-      report.add(
-        'DECISION_MISSING',
-        'points',
-        `settled decision ${decision.id} on ${decision.path}:${decision.line} (${decision.side}) has no point; write one with settledDecision "${decision.id}": ${decision.text}`
-      )
-    } else if (points.length > 1) {
-      report.add(
-        'DECISION_DUPLICATE',
-        'points',
-        `settled decision ${decision.id} is recorded by points ${points.join(', ')}; keep one`
-      )
-    }
-  }
-}
-
 /** One link, parsed and resolved against the artifact; a problem reads as one line. */
 function checkLink(report: Report, targets: LinkTargets, where: string, label: string, href: string): void {
   const parsed = parseLink(href)
@@ -656,9 +590,6 @@ export function validateModelOutput(raw: unknown, input: ValidationInput): Valid
     report.add(error.code, error.where ?? 'folds', error.message)
   }
   checkPoints(output, index, input.limits, report)
-  if (input.decisions !== undefined) {
-    checkDecisions(output, input.decisions, report)
-  }
   checkLinks(output, input.files, report)
   checkDiagramLinks(output, input.files, input.limits, report)
   return report.errors.length === 0
