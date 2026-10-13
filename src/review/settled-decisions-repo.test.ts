@@ -104,7 +104,7 @@ describe('settled decisions against a real repository', () => {
   /** Prepares and publishes a canvas whose model is the whole diff in one layer, with no point of its own. */
   async function published(head: string, force = false) {
     const { result, context } = await prepared(head, force)
-    const derived = await t.ctx.derived.ensure(head, context.mergeBaseSha)
+    const derived = await t.ctx.derived.ensure({ headSha: head, mergeBaseSha: context.mergeBaseSha })
     const model = {
       summary: 'Changes the app.',
       layers: [

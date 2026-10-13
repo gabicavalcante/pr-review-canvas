@@ -13,7 +13,7 @@ import type { CheckoutsResponse, SettingsResponse } from '../../contract/setting
 import { isChatAgent, SettingsInputSchema } from '../../contract/settings.js'
 import { lookupCanvas } from '../../review/carry-over.js'
 import { readerResolves } from '../../review/self-review.js'
-import type { Derived } from '../../store/derived-store.js'
+import type { Derived, DiffedCommit } from '../../store/derived-store.js'
 import type { PrLoader } from '../bundle.js'
 import type { AppContext } from '../context.js'
 import { AppError, logRequestError } from '../errors.js'
@@ -69,8 +69,10 @@ function settingsResponse(ctx: AppContext, settings: SettingsResponse['settings'
 /** What the chat talks about: the canvas on screen, and the diff that canvas is shown with. */
 interface ChatSubject {
   artifact: ReviewArtifact
-  /** The head for a current canvas; the canvas's own commit for an outdated one, as the page shows it. */
-  headSha: string
+  /** The head's diff for a current canvas; the canvas's own diff for an outdated one, as the page shows it. */
+  diff: DiffedCommit
+  /** False for an outdated canvas, the head's own included once the pull request moved to another base. */
+  current: boolean
   files: Derived['files']
   patches: Derived['patches']
 }
@@ -81,7 +83,7 @@ interface ChatSubject {
  */
 async function subjectForChat(ctx: AppContext, key: ReviewKey, pr: Pr): Promise<ChatSubject> {
   if (ctx.fixtureArtifact !== null) {
-    return withDiff({ ...ctx.fixtureArtifact, pr }, pr.headSha, await ctx.derived.read(pr.headSha))
+    return withDiff({ ...ctx.fixtureArtifact, pr }, pr, true, await ctx.derived.read(pr))
   }
   const found = isLocalKey(key)
     ? await ctx.canvases.findForLocal(key, pr.headSha)
@@ -96,26 +98,28 @@ async function subjectForChat(ctx: AppContext, key: ReviewKey, pr: Pr): Promise<
     )
   }
   if (found.status === 'stale') {
-    // The diff is the canvas's own commit's, so the stored artifact, which names that commit,
-    // is already the one that describes it.
+    // The diff is the canvas's own, so the stored artifact, which names that commit, is already
+    // the one that describes it. A canvas without its manifest names no merge base to diff from.
     const manifest = await ctx.canvases.readManifest(found.headSha)
-    return withDiff(
-      artifact,
-      found.headSha,
-      await ctx.derived.readOrBuild(found.headSha, manifest?.mergeBaseSha)
-    )
+    const diff = manifest ?? { headSha: found.headSha, mergeBaseSha: pr.mergeBaseSha }
+    return withDiff(artifact, diff, false, manifest === null ? null : await ctx.derived.readOrBuild(manifest))
   }
   // A carried-over canvas was generated for an earlier commit but is read with the head's diff,
   // so the live pull request is stamped on it: the seed's header names the commit whose diff the
   // agent is given, with that commit's file and line counts.
-  return withDiff({ ...artifact, pr }, pr.headSha, await ctx.derived.read(pr.headSha))
+  return withDiff({ ...artifact, pr }, pr, true, await ctx.derived.read(pr))
 }
 
 /**
  * The subject with its diff, or the 404 that says the diff is not on this machine. The artifact
  * passed in names `headSha` as its own commit, so the seed header and the diff agree.
  */
-function withDiff(artifact: ReviewArtifact, headSha: string, derived: Derived | null): ChatSubject {
+function withDiff(
+  artifact: ReviewArtifact,
+  diff: DiffedCommit,
+  current: boolean,
+  derived: Derived | null
+): ChatSubject {
   if (derived === null) {
     throw new AppError(
       'NOT_FOUND',
@@ -124,7 +128,7 @@ function withDiff(artifact: ReviewArtifact, headSha: string, derived: Derived | 
       'fetch the PR head and reload'
     )
   }
-  return { artifact, headSha, files: derived.files, patches: derived.patches }
+  return { artifact, diff, current, files: derived.files, patches: derived.patches }
 }
 
 /**
@@ -235,19 +239,19 @@ export function chatRoutes(ctx: AppContext, loader: PrLoader): Hono {
       '{ "message": "…", "context": { "kind": "pr" } }'
     )
     const pr = await loader.currentTarget(key)
-    const { artifact, headSha, files, patches } = await subjectForChat(ctx, key, pr)
+    const { artifact, diff, current, files, patches } = await subjectForChat(ctx, key, pr)
     const events = ctx.chat.send(
       {
         key,
-        headSha,
+        headSha: diff.headSha,
         artifact,
         files,
         patches,
-        derivedDir: ctx.derived.derivedDir(headSha),
-        readLines: (side, filePath, from, to) => ctx.derived.readLines(headSha, side, filePath, from, to),
+        derivedDir: ctx.derived.derivedDir(diff),
+        readLines: (side, filePath, from, to) => ctx.derived.readLines(diff, side, filePath, from, to),
         // The same reader the page offers resolve to: an outdated canvas is read with its own
         // commit, so its points are not resolved here. The probe answers from its cache.
-        readerResolves: readerResolves(key, (await ctx.capabilities.get()).login, pr, headSha === pr.headSha),
+        readerResolves: readerResolves(key, (await ctx.capabilities.get()).login, pr, current),
       },
       { message: input.message, context: input.context, thread: input.thread }
     )

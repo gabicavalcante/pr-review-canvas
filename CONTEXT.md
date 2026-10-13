@@ -83,7 +83,7 @@ Content of the basis canvas that the head's diff touched, or a point the generat
 _Avoid_: Invalidated, rejected, expired
 
 **Outdated canvas**:
-A canvas of another commit of the pull request that the head's diff no longer matches, shown with the diff of its own commit and a bar saying so. Review marks made on it stay with it and never count for a later canvas.
+A canvas whose diff the head's diff no longer matches: of another commit of the pull request, or of the head itself diffed from a merge base the pull request no longer has, as after it moved to another base branch. It is shown with its own diff and a bar saying so. Review marks made on it stay with it and never count for a later canvas, a canvas generated again for the same commit on the new base included.
 _Avoid_: Stale review, expired canvas
 
 **Review checkout**:

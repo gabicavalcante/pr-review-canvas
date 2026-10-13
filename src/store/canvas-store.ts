@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { mkdir, realpath } from 'node:fs/promises'
 import { lock } from 'proper-lockfile'
-import type { CarriedOverInfo } from '../contract/api.js'
+import type { CarriedOverInfo, StaleRelation } from '../contract/api.js'
 import {
   type CanvasIndex,
   CanvasIndexSchema,
@@ -13,20 +13,26 @@ import { isLocalKey, type LocalKey, type ReviewKey } from '../contract/review-ke
 import type { Git } from '../git/git.js'
 import { readJson, readText, writeJsonAtomic } from './atomic-json.js'
 
-/** A canvas of a commit the head was built on, and how many commits the head gained since. */
-export interface AncestorCanvas {
-  status: 'stale'
-  headSha: string
-  relation: 'ancestor'
-  commitsBehind: number
-}
-
 export type CanvasLookup =
   /** `headSha` is the canvas's own commit: the head, or another commit with an identical diff. */
   { status: 'ready'; headSha: string; carriedOver?: CarriedOverInfo } | StaleCanvas | { status: 'missing' }
 
-/** A canvas of another commit: one the head was built on, or one from a line the head no longer contains. */
-export type StaleCanvas = AncestorCanvas | { status: 'stale'; headSha: string; relation: 'unrelated' }
+/** A canvas of another diff than the head's, and how it relates to the head. */
+export type StaleCanvas = { status: 'stale'; headSha: string } & StaleRelation
+
+/**
+ * How a canvas of another commit relates to the head: built on by it, with the commits the head
+ * gained since, or off a line the head no longer contains.
+ */
+export async function relateToHead(
+  git: Git,
+  sha: string,
+  headSha: string
+): Promise<Extract<StaleRelation, { relation: 'ancestor' | 'unrelated' }>> {
+  return (await git.isAncestor(sha, headSha))
+    ? { relation: 'ancestor', commitsBehind: await git.countCommitsBetween(sha, headSha) }
+    : { relation: 'unrelated' }
+}
 
 /** One canvas as `index.json` lists it. */
 export type CanvasEntry = CanvasIndex['canvases'][string]
@@ -140,14 +146,11 @@ export function createCanvasStore(repoRoot: string, git: Git, worktree: string |
     )
     const ranked: Array<{ generatedAt: string; found: StaleCanvas }> = []
     for (const [sha, entry] of candidates) {
-      const found: StaleCanvas = (await git.isAncestor(sha, currentHeadSha))
-        ? {
-            status: 'stale',
-            headSha: sha,
-            relation: 'ancestor',
-            commitsBehind: await git.countCommitsBetween(sha, currentHeadSha),
-          }
-        : { status: 'stale', headSha: sha, relation: 'unrelated' }
+      const found: StaleCanvas = {
+        status: 'stale',
+        headSha: sha,
+        ...(await relateToHead(git, sha, currentHeadSha)),
+      }
       ranked.push({ generatedAt: entry.generatedAt, found })
     }
     ranked.sort((a, b) => {

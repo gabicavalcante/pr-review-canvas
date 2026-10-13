@@ -219,9 +219,9 @@ export function generationStatusHtml(job, now) {
       ? ''
       : `<ol class="gen-activity" aria-label="Latest agent tool calls">${job.activity.map(a => `<li>${esc(a)}</li>`).join('')}</ol>`
   const problems =
-    job.problems === undefined || job.problems.length === 0
+    job.phase === 'done' || job.problems === undefined || job.problems.length === 0
       ? ''
-      : `<details class="gen-problems"${job.phase === 'failed' ? ' open' : ''}><summary>${job.problems.length} problem${job.problems.length === 1 ? '' : 's'} publish named</summary><ul>${job.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`
+      : `<details class="gen-problems"${job.phase === 'failed' ? ' open' : ''}><summary>${job.problems.length} issue${job.problems.length === 1 ? '' : 's'} found during validation</summary><ul>${job.problems.map(p => `<li>${esc(p)}</li>`).join('')}</ul></details>`
   const error = job.error
     ? `<div class="callout warn" role="alert">${esc(job.error.message)}${job.error.hint ? ` — ${esc(job.error.hint)}` : ''}</div>`
     : ''
@@ -238,6 +238,9 @@ export function generationStatusHtml(job, now) {
     skillHtml(job.skill) +
     error +
     done +
+    (job.phase === 'repairing' && !job.stopping
+      ? '<p class="hint" role="status">The agent is automatically correcting the issues below. No action is needed.</p>'
+      : '') +
     (running ? pulseHtml(job.pulse, now) : '') +
     activity +
     problems +

@@ -160,7 +160,10 @@ describe('the files of a review', () => {
     expect(await stateOf(main, 'branch')).toEqual({})
 
     // A pull request's marks are the same review from either checkout.
-    await main.ctx.state.setReviewed(42, 'layer:l1', true, { canvasSha: HEAD_SHA, carried: {} })
+    await main.ctx.state.setReviewed(42, 'layer:l1', true, {
+      canvas: { headSha: HEAD_SHA, mergeBaseSha: BASE_SHA },
+      carried: {},
+    })
     expect(await stateOf(fix, 42)).toEqual({ 'layer:l1': true })
   })
 

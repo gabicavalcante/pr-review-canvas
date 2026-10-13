@@ -101,7 +101,7 @@ function gh(extra: Parameters<typeof ghFor42>[0] = {}): FakeGh {
 async function withCanvas(forge: FakeGh = gh()): Promise<TestContext> {
   const t = await makeTestContext({ git: gitFor42(), gh: forge })
   await t.ctx.canvases.write(HEAD_SHA, syntheticArtifact(), MANIFEST, 42)
-  await t.ctx.derived.ensure(HEAD_SHA, BASE_SHA)
+  await t.ctx.derived.ensure({ headSha: HEAD_SHA, mergeBaseSha: BASE_SHA })
   return t
 }
 
