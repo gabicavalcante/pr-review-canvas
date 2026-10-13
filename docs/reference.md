@@ -818,9 +818,10 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   point for it. A rebase rewrites the versions the numbers refer to while the lines keep their
   text, so after one a decision can land on another line, or be lost; regenerate with care, or
   write the decision again.
-- Two decisions on the same line: the later commit's stands. That is how a decision is revised or
-  withdrawn: reopening its point on the canvas lasts only until the canvas is generated again,
-  because the commit still says it.
+- Two decisions on the same line: the later commit's stands, which is how a decision is revised.
+  There is no line that withdraws one. To ask its question again, change the line it is about, so
+  the decision becomes context, or rewrite the commit; reopening its point on the canvas lasts only
+  until the canvas is generated again, because the commit still says it.
 - Publish adds each decision in the diff to the canvas as a `decision` point for the author,
   titled with the decision, on its line, and resolved with its reason as of its commit. These
   points are not the generator's to write and do not count toward its attention points. A canvas
