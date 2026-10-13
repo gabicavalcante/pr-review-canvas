@@ -271,6 +271,12 @@ describe('generationStatusHtml', () => {
       'Read a.ts',
       'Read <b>.ts',
     ])
+    expect(document.querySelector('[role="status"]')?.textContent).toBe(
+      'The agent is automatically correcting the issues below. No action is needed.'
+    )
+    expect(document.querySelector('.gen-problems summary')?.textContent).toBe(
+      '1 issue found during validation'
+    )
     expect(document.querySelector('.gen-problems')?.hasAttribute('open')).toBe(false)
     expect(document.querySelector('[data-gen="stop"]')?.hasAttribute('disabled')).toBe(false)
     expect(document.querySelector('[data-gen="again"]')).toBeNull()
@@ -294,8 +300,11 @@ describe('generationStatusHtml', () => {
       NOW
     )
     expect(document.querySelector('[role="alert"]')?.textContent).toBe('rejected — run the skill')
-    expect(document.querySelector('.gen-problems summary')?.textContent).toBe('2 problems publish named')
+    expect(document.querySelector('.gen-problems summary')?.textContent).toBe(
+      '2 issues found during validation'
+    )
     expect(document.querySelector('.gen-problems')?.hasAttribute('open')).toBe(true)
+    expect(document.querySelector('[role="status"]')).toBeNull()
     expect(document.querySelector('[data-gen="again"]')).not.toBeNull()
     expect(document.querySelector('[data-gen="stop"]')).toBeNull()
   })
@@ -312,15 +321,52 @@ describe('generationStatusHtml', () => {
     expect(generationStatusHtml(done, NOW)).not.toContain('data-gen="again"')
   })
 
+  it('hides corrected issues after publishing, even when the job retains them', () => {
+    document.body.innerHTML = generationStatusHtml(
+      job({
+        phase: 'done',
+        round: 2,
+        problems: ['SCHEMA points.1.kind: invalid kind'],
+        sharing: { status: 'local' },
+      }),
+      NOW
+    )
+    expect(document.body.textContent).toContain('The canvas is published.')
+    expect(document.querySelector('.gen-problems')).toBeNull()
+    expect(document.body.textContent).not.toContain('SCHEMA')
+    expect(document.querySelector('[role="status"]')).toBeNull()
+  })
+
+  it.each(
+    /** @type {const} */ ([
+      { phase: 'publishing' },
+      { phase: 'repairing', stopping: true },
+      { phase: 'cancelled' },
+    ])
+  )('keeps unresolved issues without promising a correction when %j', over => {
+    document.body.innerHTML = generationStatusHtml(
+      job({ ...over, round: 2, problems: ['SCHEMA <kind>'] }),
+      NOW
+    )
+    expect(document.querySelector('.gen-problems li')?.textContent).toBe('SCHEMA <kind>')
+    expect(document.querySelector('[role="status"]')).toBeNull()
+  })
+
   it('shows a failed share with the warning publish wrote, once, and where the ZIP is', () => {
     // The warning as publish writes it (src/canvas/share.ts), which already says to upload the ZIP.
     const warning =
       'Automatic canvas sharing failed: gh: Not Found (HTTP 404). Upload the ZIP to the pull request description manually.'
     document.body.innerHTML = generationStatusHtml(
-      job({ phase: 'done', sharing: { status: 'failed', warning, zipPath: '/x/c.zip' } }),
+      job({
+        phase: 'done',
+        round: 2,
+        problems: ['SCHEMA points.1.kind: invalid kind'],
+        sharing: { status: 'failed', warning, zipPath: '/x/c.zip' },
+      }),
       NOW
     )
     expect(document.querySelector('.callout')?.textContent).toBe(`${warning} The ZIP: /x/c.zip`)
+    expect(document.querySelector('.gen-problems')).toBeNull()
   })
 
   it('labels the header command with the running job', () => {
