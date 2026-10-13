@@ -314,9 +314,12 @@ function reJudgedMarkdown(basis: BasisSplit | undefined): string {
   ].join('\n\n')
 }
 
-function decisionLine(d: SettledDecision): string {
-  const where = d.line === null ? `\`${d.path}\`` : `\`${d.path}\` ${d.side}-side line ${d.line}`
-  return `- \`${d.id}\` on ${where} (commit \`${d.commit.slice(0, 7)}\`, ${d.date.slice(0, 10)}): ${d.text}`
+function decisionLine(decision: SettledDecision): string {
+  const where =
+    decision.line === null
+      ? `\`${decision.path}\``
+      : `\`${decision.path}\` ${decision.side}-side line ${decision.line}`
+  return `- \`${decision.id}\` on ${where} (commit \`${decision.commit.slice(0, 7)}\`, ${decision.date.slice(0, 10)}): ${decision.text}`
 }
 
 /**
@@ -327,8 +330,8 @@ function decisionsMarkdown(decisions: readonly SettledDecision[]): string {
   if (decisions.length === 0) {
     return '_No settled decisions are recorded on these commits._'
   }
-  const anchored = decisions.filter(d => d.line !== null).map(decisionLine)
-  const context = decisions.filter(d => d.line === null).map(decisionLine)
+  const anchored = decisions.filter(decision => decision.line !== null).map(decisionLine)
+  const context = decisions.filter(decision => decision.line === null).map(decisionLine)
   return [
     'The author already settled these questions, each in a `Settled-decision` line of one of the commits. Do not raise any of them again, and write no point for them. A question one of them answers comes back only if the code contradicts the answer.',
     `**In this diff** — publish adds each to the canvas as a point resolved with the author's reason:\n\n${anchored.length === 0 ? '_none_' : anchored.join('\n')}`,

@@ -98,7 +98,7 @@ export function splitBasis(
   // Publish writes a settled decision's point again from the commits, so the generator is never
   // asked to copy one.
   const points: BasisSplitPoint[] = artifact.points
-    .filter(p => p.origin !== 'decision')
+    .filter(point => point.origin !== 'decision')
     .map(point => {
       const split = { kind: point.kind, path: point.path, title: point.title }
       const headLines = !linksStand(point, unchanged)

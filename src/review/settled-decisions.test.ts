@@ -94,7 +94,7 @@ describe('readSettledDecisions', () => {
       ]),
       commit(HEAD_SHA, ['src/new.ts:1 unreadable']),
     ])
-    expect((await decisions).map(d => [d.text, d.line])).toEqual([
+    expect((await decisions).map(decision => [decision.text, decision.line])).toEqual([
       ['in a chunk', 2],
       ['between chunks', null],
       ['not in the diff', null],
@@ -110,7 +110,7 @@ describe('readSettledDecisions', () => {
         blobs: { [`${EARLIER}:src/app.ts`]: atEarlier, [`${HEAD_SHA}:src/app.ts`]: APP_AT_HEAD },
       }
     )
-    expect((await decisions).map(d => [d.id, d.line])).toEqual([
+    expect((await decisions).map(decision => [decision.id, decision.line])).toEqual([
       [`${EARLIER.slice(0, 7)}-1`, 3],
       [`${EARLIER.slice(0, 7)}-2`, null],
     ])
@@ -124,8 +124,8 @@ describe('readSettledDecisions', () => {
         [`${BASE_SHA}:src/gone.ts`]: 'export const old = 1\n// bye',
       },
     })
-    expect((await decisions).map(d => [d.side, d.line])).toEqual([['old', 1]])
-    expect(git.calls.filter(c => c[0] === 'show')).toEqual([
+    expect((await decisions).map(decision => [decision.side, decision.line])).toEqual([['old', 1]])
+    expect(git.calls.filter(call => call[0] === 'show')).toEqual([
       ['show', `${EARLIER}^:src/gone.ts`],
       ['show', `${BASE_SHA}:src/gone.ts`],
     ])
@@ -136,7 +136,7 @@ describe('readSettledDecisions', () => {
       commit(HEAD_SHA, ['not a decision', 'src/app.ts:2 first answer']),
       commit(HEAD_SHA, ['src/app.ts:2 second answer']),
     ])
-    expect((await decisions).map(d => [d.id, d.text])).toEqual([
+    expect((await decisions).map(decision => [decision.id, decision.text])).toEqual([
       [`${HEAD_SHA.slice(0, 7)}-1`, 'second answer'],
     ])
   })
@@ -172,7 +172,7 @@ describe('readSettledDecisions', () => {
       files: [big],
       blobs: { [`${HEAD_SHA}:big.ts`]: Array.from({ length: lines }, (_, i) => `line ${i + 1}`).join('\n') },
     })
-    const lineOf = (await decisions).map(d => d.line)
+    const lineOf = (await decisions).map(decision => decision.line)
     expect(lineOf.slice(0, 2)).toEqual([null, null])
     expect(lineOf.slice(2)).toEqual(Array.from({ length: MAX_DECISION_POINTS }, (_, i) => i + 3))
   })

@@ -230,11 +230,11 @@ describe('createGit (real adapter)', () => {
   it('reads the keyed lines of the commits in a range, oldest first, wherever in the message they sit', async () => {
     const dir = await makeTempDir('pr-review-git-keyed-')
     const inRepo = async (cwd: string, ...args: string[]): Promise<string> => {
-      const r = await execGitAsRepoConfig(cwd, args)
-      if (r.code !== 0) {
-        throw new GitError(args, r.stderr, r.code)
+      const result = await execGitAsRepoConfig(cwd, args)
+      if (result.code !== 0) {
+        throw new GitError(args, result.stderr, result.code)
       }
-      return r.stdout.toString('utf8').trim()
+      return result.stdout.toString('utf8').trim()
     }
     try {
       await inRepo(dir, 'init', '-q', '-b', 'main')
@@ -247,7 +247,7 @@ describe('createGit (real adapter)', () => {
         'This is not a Settled-decision: line, it only names one.',
         'Settled-decision: a.ts:1 one\nsettled-decision:   b.ts:2 two  \nReviewed-by: Someone',
       ]
-      await inRepo(dir, 'commit', '-q', '--allow-empty', ...message.flatMap(m => ['-m', m]))
+      await inRepo(dir, 'commit', '-q', '--allow-empty', ...message.flatMap(paragraph => ['-m', paragraph]))
       const first = await inRepo(dir, 'rev-parse', 'HEAD')
       await inRepo(dir, 'commit', '-q', '--allow-empty', '-m', 'none', '-m', 'Reviewed-by: Someone')
       // A blank line keeps this decision out of the block git reads as trailers.
@@ -256,7 +256,7 @@ describe('createGit (real adapter)', () => {
         'Settled-decision: c.ts:3:old three',
         'Co-Authored-By: Someone <s@example.com>',
       ]
-      await inRepo(dir, 'commit', '-q', '--allow-empty', ...apart.flatMap(m => ['-m', m]))
+      await inRepo(dir, 'commit', '-q', '--allow-empty', ...apart.flatMap(paragraph => ['-m', paragraph]))
       const second = await inRepo(dir, 'rev-parse', 'HEAD')
       const git = createGit(dir, execGitAsRepoConfig)
       expect(await git.commitKeyedLines(base, 'HEAD', 'Settled-decision')).toEqual([

@@ -13,12 +13,12 @@ import { publish } from './publish.js'
 import { withSettlement } from './self-review.js'
 
 // Commits here are by the people the repository's config names, not by whoever commits outside it.
-async function g(cwd: string, ...args: string[]): Promise<string> {
-  const r = await execGitAsRepoConfig(cwd, args)
-  if (r.code !== 0) {
-    throw new GitError(args, r.stderr, r.code)
+async function runGit(cwd: string, ...args: string[]): Promise<string> {
+  const result = await execGitAsRepoConfig(cwd, args)
+  if (result.code !== 0) {
+    throw new GitError(args, result.stderr, result.code)
   }
-  return r.stdout.toString('utf8').trim()
+  return result.stdout.toString('utf8').trim()
 }
 
 async function write(dir: string, file: string, content: string): Promise<void> {
@@ -28,8 +28,8 @@ async function write(dir: string, file: string, content: string): Promise<void> 
 
 /** A commit whose message is these paragraphs, each its own `-m`. */
 async function commit(dir: string, paragraphs: string[], ...flags: string[]): Promise<string> {
-  await g(dir, ...flags, 'commit', '-q', '-a', ...paragraphs.flatMap(p => ['-m', p]))
-  return g(dir, 'rev-parse', 'HEAD')
+  await runGit(dir, ...flags, 'commit', '-q', '-a', ...paragraphs.flatMap(paragraph => ['-m', paragraph]))
+  return runGit(dir, 'rev-parse', 'HEAD')
 }
 
 const APP = 'a\nb\nc\nd\nE!\nf\ng\nh\n'
@@ -44,18 +44,18 @@ describe('settled decisions against a real repository', () => {
   // the same line decided again; a deleted line decided as numbered in its parent; the decided line
   // edited.
   const heads = { decided: '', other: '', shifted: '', revised: '', deleted: '', edited: '' }
-  let t: TestContext
+  let harness: TestContext
 
   beforeAll(async () => {
     dir = await makeTempDir('pr-review-decisions-')
-    await g(dir, 'init', '-q', '-b', 'main')
-    await g(dir, 'config', 'user.email', 'test@example.com')
-    await g(dir, 'config', 'user.name', 'Test')
+    await runGit(dir, 'init', '-q', '-b', 'main')
+    await runGit(dir, 'config', 'user.email', 'test@example.com')
+    await runGit(dir, 'config', 'user.name', 'Test')
     await write(dir, 'src/app.ts', 'a\nb\nc\nd\ne\nf\ng\nh\n')
     await write(dir, 'src/old.ts', 'one\ntwo\nthree\n')
-    await g(dir, 'add', '.')
-    await g(dir, 'commit', '-q', '-m', 'base')
-    await g(dir, 'checkout', '-q', '-b', 'feature')
+    await runGit(dir, 'add', '.')
+    await runGit(dir, 'commit', '-q', '-m', 'base')
+    await runGit(dir, 'checkout', '-q', '-b', 'feature')
     await write(dir, 'src/app.ts', APP)
     heads.decided = await commit(dir, [
       'fix(app): keep E uppercase',
@@ -91,12 +91,16 @@ describe('settled decisions against a real repository', () => {
   })
   afterAll(async () => rm(dir, { recursive: true, force: true }))
   beforeEach(async () => {
-    t = await makeTestContext({ git: createGit(dir, execGitAsRepoConfig) })
+    harness = await makeTestContext({ git: createGit(dir, execGitAsRepoConfig) })
   })
-  afterEach(() => t.cleanup())
+  afterEach(() => harness.cleanup())
 
   async function prepared(head: string, force = false) {
-    const result = await prepare(t.ctx, { kind: 'refs', base: 'main', head }, { force, log: () => undefined })
+    const result = await prepare(
+      harness.ctx,
+      { kind: 'refs', base: 'main', head },
+      { force, log: () => undefined }
+    )
     const context = GenerationContextSchema.parse(JSON.parse(await readFile(result.contextPath, 'utf8')))
     return { result, context, prompt: await readFile(result.promptPath, 'utf8') }
   }
@@ -104,7 +108,7 @@ describe('settled decisions against a real repository', () => {
   /** Prepares and publishes a canvas whose model is the whole diff in one layer, with no point of its own. */
   async function published(head: string, force = false) {
     const { result, context } = await prepared(head, force)
-    const derived = await t.ctx.derived.ensure({ headSha: head, mergeBaseSha: context.mergeBaseSha })
+    const derived = await harness.ctx.derived.ensure({ headSha: head, mergeBaseSha: context.mergeBaseSha })
     const model = {
       summary: 'Changes the app.',
       layers: [
@@ -114,14 +118,22 @@ describe('settled decisions against a real repository', () => {
           rationale: 'The whole change.',
           kind: 'layer',
           tests: [],
-          files: derived.files.map(f => ({ path: f.path, hunks: f.hunks.map(h => h.id), annotations: [] })),
+          files: derived.files.map(file => ({
+            path: file.path,
+            hunks: file.hunks.map(hunk => hunk.id),
+            annotations: [],
+          })),
         },
       ],
       points: [],
     }
     await writeFile(path.join(result.canvasDir, 'model.json'), JSON.stringify(model))
-    await publish(t.ctx, result.canvasDir, { agent: 'claude', harness: 'claude-code', allowStale: false })
-    const artifact = await t.ctx.canvases.readArtifact(head)
+    await publish(harness.ctx, result.canvasDir, {
+      agent: 'claude',
+      harness: 'claude-code',
+      allowStale: false,
+    })
+    const artifact = await harness.ctx.canvases.readArtifact(head)
     if (artifact === null) {
       throw new Error('canvas missing')
     }
@@ -150,42 +162,52 @@ describe('settled decisions against a real repository', () => {
   })
 
   it("ignores a decision in someone else's commit on the branch", async () => {
-    expect((await prepared(heads.other)).context.decisions.map(d => d.text)).toEqual([REASON])
+    expect((await prepared(heads.other)).context.decisions.map(decision => decision.text)).toEqual([REASON])
   })
 
   it('carries a decision past lines added above it, to its line at the head', async () => {
     const { context } = await prepared(heads.shifted)
-    expect(context.decisions.map(d => [d.text, d.line])).toEqual([[REASON, 7]])
+    expect(context.decisions.map(decision => [decision.text, decision.line])).toEqual([[REASON, 7]])
   })
 
   it("places a deleted line's decision, numbered as in its commit's parent, on the merge base's line", async () => {
     const { context } = await prepared(heads.deleted)
-    expect(context.decisions.filter(d => d.side === 'old').map(d => [d.path, d.line])).toEqual([
-      ['src/old.ts', 2],
-    ])
+    expect(
+      context.decisions
+        .filter(decision => decision.side === 'old')
+        .map(decision => [decision.path, decision.line])
+    ).toEqual([['src/old.ts', 2]])
   })
 
   it('keeps a decision whose line changed after the commit as context, and adds no point for it', async () => {
     const { context, artifact } = await published(heads.edited)
-    expect(context.decisions.filter(d => d.path === 'src/app.ts').map(d => [d.text, d.line])).toEqual([
+    expect(
+      context.decisions
+        .filter(decision => decision.path === 'src/app.ts')
+        .map(decision => [decision.text, decision.line])
+    ).toEqual([
       [REASON, null],
       [REVISED, null],
     ])
-    expect(artifact.points.filter(p => p.origin === 'decision').map(p => p.path)).toEqual(['src/old.ts'])
+    expect(artifact.points.filter(point => point.origin === 'decision').map(point => point.path)).toEqual([
+      'src/old.ts',
+    ])
   })
 
   it('adds the decision as a resolved point, and again on the next canvas, which copies none of it', async () => {
     const expected = { reason: REASON, at: expect.any(String), commit: heads.decided }
     const first = await published(heads.decided)
-    expect(first.artifact.points.filter(p => p.origin === 'decision')).toEqual([
+    expect(first.artifact.points.filter(point => point.origin === 'decision')).toEqual([
       expect.objectContaining({ kind: 'decision', level: 'fyi', audience: 'author', title: REASON, line: 5 }),
     ])
     expect(first.artifact.settled).toEqual({ [decisionFp(REASON)]: expected })
 
     const second = await published(heads.shifted)
     expect(second.context.basis?.canvasSha).toBe(heads.decided)
-    expect(second.context.basis?.points.map(p => p.title)).not.toContain(REASON)
-    expect(second.artifact.points.filter(p => p.origin === 'decision').map(p => p.line)).toEqual([7])
+    expect(second.context.basis?.points.map(point => point.title)).not.toContain(REASON)
+    expect(
+      second.artifact.points.filter(point => point.origin === 'decision').map(point => point.line)
+    ).toEqual([7])
     expect(second.artifact.settled).toEqual({ [decisionFp(REASON)]: expected })
   })
 
@@ -193,7 +215,9 @@ describe('settled decisions against a real repository', () => {
     await published(heads.decided)
     await published(heads.shifted)
     const { artifact } = await published(heads.revised)
-    expect(artifact.points.filter(p => p.origin === 'decision').map(p => p.title)).toEqual([REVISED])
+    expect(artifact.points.filter(point => point.origin === 'decision').map(point => point.title)).toEqual([
+      REVISED,
+    ])
     expect(artifact.settled).toEqual({
       [decisionFp(REVISED)]: { reason: REVISED, at: expect.any(String), commit: heads.revised },
     })
@@ -202,7 +226,7 @@ describe('settled decisions against a real repository', () => {
   it("keeps the reason the author wrote on the canvas over the commit's when the canvas is generated again", async () => {
     const { artifact } = await published(heads.decided)
     const reworded = { reason: 'Reworded on the canvas.', at: '2026-10-13T12:00:00.000Z' }
-    await t.ctx.canvases.revise(
+    await harness.ctx.canvases.revise(
       heads.decided,
       withSettlement(artifact, decisionFp(REASON), reworded, reworded.at)
     )

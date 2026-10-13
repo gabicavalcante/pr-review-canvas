@@ -33,11 +33,11 @@ const TRAILER_VALUE = /^(\S+):(\d+)(:old)?\s+(\S.*)$/
 
 /** One value, or null when it does not read as `<path>:<line>[:old] <text>`. */
 export function parseSettledDecision(value: string): ParsedDecision | null {
-  const m = TRAILER_VALUE.exec(value.trim())
-  if (m === null) {
+  const match = TRAILER_VALUE.exec(value.trim())
+  if (match === null) {
     return null
   }
-  const [, path = '', lineText = '', old, text = ''] = m
+  const [, path = '', lineText = '', old, text = ''] = match
   const line = Number(lineText)
   if (line < 1) {
     return null
@@ -75,7 +75,7 @@ async function lineInDiff(
   commit: string,
   decision: ParsedDecision
 ): Promise<number | null> {
-  const entry = src.files.find(f => f.path === decision.path)
+  const entry = src.files.find(file => file.path === decision.path)
   if (entry === undefined) {
     return null
   }
@@ -105,12 +105,12 @@ export async function readSettledDecisions(src: DecisionSources): Promise<Settle
   const email = src.authorEmail.toLowerCase()
   const commits = await src.git.commitKeyedLines(src.mergeBaseSha, src.headSha, SETTLED_DECISION_TRAILER)
   const decisions: SettledDecision[] = []
-  for (const commit of commits.filter(c => c.authorEmail.toLowerCase() === email)) {
-    for (const [i, value] of commit.values.entries()) {
+  for (const commit of commits.filter(candidate => candidate.authorEmail.toLowerCase() === email)) {
+    for (const [position, value] of commit.values.entries()) {
       const parsed = parseSettledDecision(value)
       if (parsed !== null) {
         decisions.push({
-          id: `${commit.sha.slice(0, 7)}-${i + 1}`,
+          id: `${commit.sha.slice(0, 7)}-${position + 1}`,
           commit: commit.sha,
           date: commit.date,
           text: capReason(parsed.text),
@@ -121,11 +121,12 @@ export async function readSettledDecisions(src: DecisionSources): Promise<Settle
       }
     }
   }
-  const anchor = (d: SettledDecision) => `${d.path}\n${d.side}\n${d.line}`
+  const anchor = (decision: SettledDecision) => `${decision.path}\n${decision.side}\n${decision.line}`
   const standing = decisions.filter(
-    (d, i) => d.line === null || !decisions.slice(i + 1).some(later => anchor(later) === anchor(d))
+    (decision, index) =>
+      decision.line === null || !decisions.slice(index + 1).some(later => anchor(later) === anchor(decision))
   )
-  const anchored = standing.filter(d => d.line !== null)
+  const anchored = standing.filter(decision => decision.line !== null)
   const asContext = new Set(anchored.slice(0, Math.max(0, anchored.length - MAX_DECISION_POINTS)))
-  return standing.map(d => (asContext.has(d) ? { ...d, line: null } : d))
+  return standing.map(decision => (asContext.has(decision) ? { ...decision, line: null } : decision))
 }

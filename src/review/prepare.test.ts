@@ -45,7 +45,7 @@ describe('prepare', () => {
   })
 
   it("reads a pull request's settled decisions only when its author prepares the canvas", async () => {
-    const decision = {
+    const commitWithDecision = {
       sha: HEAD_SHA,
       authorEmail: 'octocat@example.com',
       date: '2026-10-13T10:00:00-03:00',
@@ -54,19 +54,21 @@ describe('prepare', () => {
     const prepareAs = async (login: string) => {
       const git = gitFor42()
       git.options.email = 'octocat@example.com'
-      git.options.keyedLines = { [`${BASE_SHA}..${HEAD_SHA}`]: [decision] }
+      git.options.keyedLines = { [`${BASE_SHA}..${HEAD_SHA}`]: [commitWithDecision] }
       t = await makeTestContext({ git, gh: ghFor42({ routes: { user: ghJson({ login }) } }) })
       const result = await prepare(t.ctx, { kind: 'pr', number: 42 }, opts())
       const context = GenerationContextSchema.parse(JSON.parse(await readFile(result.contextPath, 'utf8')))
       return { git, context }
     }
     const author = await prepareAs('octocat')
-    expect(author.context.decisions.map(d => [d.text, d.line])).toEqual([['keep the import', 2]])
+    expect(author.context.decisions.map(decision => [decision.text, decision.line])).toEqual([
+      ['keep the import', 2],
+    ])
     await t.cleanup()
     // Someone else's canvas of the same pull request asks git for no decision at all.
     const reviewer = await prepareAs('reviewer')
     expect(reviewer.context.decisions).toEqual([])
-    expect(reviewer.git.calls.filter(c => c[0] === 'var' || c[1]?.startsWith('--keyed'))).toEqual([])
+    expect(reviewer.git.calls.filter(call => call[0] === 'var' || call[1]?.startsWith('--keyed'))).toEqual([])
   })
 
   it('fetches the PR, builds derived/, and writes prompt.md + context.json for a PR target', async () => {

@@ -254,8 +254,8 @@ describe('normalize', () => {
         decision('c-3', 'not in the diff', null),
       ],
     })
-    const points = artifact.points.filter(p => p.origin === 'decision')
-    expect(points.map(p => [p.title, p.line, p.layerId])).toEqual([
+    const points = artifact.points.filter(point => point.origin === 'decision')
+    expect(points.map(point => [point.title, point.line, point.layerId])).toEqual([
       [
         `${long
           .slice(0, TEXT_CAPS.pointTitle - 1)
@@ -278,7 +278,9 @@ describe('normalize', () => {
       [points[1]!.fingerprint]: { reason: unbroken, at: '2026-10-13T10:00:00-03:00', commit },
     })
     // They are publish's, so a saved canvas hands none of them back to the generator.
-    expect(artifactToModelOutput(artifact).points.map(p => p.title)).not.toContain('Settled decision…')
+    expect(artifactToModelOutput(artifact).points.map(point => point.title)).not.toContain(
+      'Settled decision…'
+    )
   })
 
   it('keeps the fingerprint stable across spacing and case, and distinct across kind or path', () => {

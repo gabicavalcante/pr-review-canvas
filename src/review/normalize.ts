@@ -192,29 +192,29 @@ function decisionPoints(
 ): { points: Unassigned[]; settled: Record<string, Settlement> } {
   const points: Unassigned[] = []
   const settled: Record<string, Settlement> = {}
-  for (const d of decisions) {
-    if (d.line === null) {
+  for (const decision of decisions) {
+    if (decision.line === null) {
       continue
     }
-    const title = shortTitle(d.text, titleCap, 'Settled decision')
+    const title = shortTitle(decision.text, titleCap, 'Settled decision')
     const point: Unassigned = {
       kind: 'decision',
       level: 'fyi',
       title,
-      path: d.path,
-      line: d.line,
-      side: d.side,
-      body: `The author settled this in commit \`${d.commit.slice(0, 7)}\` on ${d.date.slice(0, 10)}.`,
+      path: decision.path,
+      line: decision.line,
+      side: decision.side,
+      body: `The author settled this in commit \`${decision.commit.slice(0, 7)}\` on ${decision.date.slice(0, 10)}.`,
       audience: 'author',
-      fingerprint: fingerprint({ kind: 'decision', path: d.path, title }),
+      fingerprint: fingerprint({ kind: 'decision', path: decision.path, title }),
       origin: 'decision',
     }
-    const layerId = layerIdForLine(layers, files, d.path, d.side, d.line)
+    const layerId = layerIdForLine(layers, files, decision.path, decision.side, decision.line)
     if (layerId !== undefined) {
       point.layerId = layerId
     }
     points.push(point)
-    settled[point.fingerprint] = { reason: d.text, at: d.date, commit: d.commit }
+    settled[point.fingerprint] = { reason: decision.text, at: decision.date, commit: decision.commit }
   }
   return { points, settled }
 }

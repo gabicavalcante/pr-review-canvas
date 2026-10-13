@@ -233,8 +233,8 @@ export function createGit(cwd: string, exec: GitExec = execGit): Git {
       return value === '' ? null : value
     },
     authorEmail: async () => {
-      const r = await exec(cwd, ['var', 'GIT_AUTHOR_IDENT'])
-      const email = r.code === 0 ? (/<([^>]*)>/.exec(r.stdout.toString('utf8'))?.[1] ?? '') : ''
+      const ident = await exec(cwd, ['var', 'GIT_AUTHOR_IDENT'])
+      const email = ident.code === 0 ? (/<([^>]*)>/.exec(ident.stdout.toString('utf8'))?.[1] ?? '') : ''
       return email === '' ? null : email
     },
     commitKeyedLines: async (from, to, key) => {

@@ -49,16 +49,16 @@ export function unchangedLines(from: readonly string[], to: readonly string[]): 
     return null
   }
   const kept = new Map<number, number>()
-  let a = 1
-  let b = 1
+  let fromLine = 1
+  let toLine = 1
   for (const change of changes) {
     if (!change.added && !change.removed) {
-      for (let i = 0; i < change.count; i += 1) {
-        kept.set(a + i, b + i)
+      for (let offset = 0; offset < change.count; offset += 1) {
+        kept.set(fromLine + offset, toLine + offset)
       }
     }
-    a += change.added ? 0 : change.count
-    b += change.removed ? 0 : change.count
+    fromLine += change.added ? 0 : change.count
+    toLine += change.removed ? 0 : change.count
   }
   return kept
 }
