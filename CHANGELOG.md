@@ -84,11 +84,11 @@ Changes since 0.8.0.
 
 ### Upgrade from 0.8.0
 
-1. Restart the running `pr-review serve` after upgrading. `pr-review generate` needs the new
-   server, and the server moves each earlier diff into its merge base's folder the first time it
-   is read.
-2. The skill and the canvas format did not change, so `pr-review upgrade` is not needed, and
-   teammates on 0.8.0 can still open the canvases.
+1. Run `pr-review upgrade` in a project. The skill did not change, so it only installs the new
+   version, and each project's skill copy stays as it is.
+2. Restart the running `pr-review serve`. `pr-review generate` needs the new server, and the
+   server moves each earlier diff into its merge base's folder the first time it is read.
+3. The canvas format did not change, so teammates on 0.8.0 can still open the canvases.
 
 ## 0.8.0
 
