@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.9.0
+
+Changes since 0.8.0.
 
 ### Generating from the terminal
 
@@ -76,6 +78,17 @@
   written on it are listed as written on an earlier diff and are refused on submit unless the diff
   is unchanged, and a page drawn before the move cannot post or mark until it is reloaded.
   `pr-review import` and a generation that finished after the move say so too.
+- The generation dialog says when the agent is correcting the issues validation found, so they no
+  longer read as errors to act on, and hides them once the canvas is published. They stay shown
+  when the generation fails or is stopped.
+
+### Upgrade from 0.8.0
+
+1. Run `pr-review upgrade` in a project. The skill did not change, so it only installs the new
+   version, and each project's skill copy stays as it is.
+2. Restart the running `pr-review serve`. `pr-review generate` needs the new server, and the
+   server moves each earlier diff into its merge base's folder the first time it is read.
+3. The canvas format did not change, so teammates on 0.8.0 can still open the canvases.
 
 ## 0.8.0
 
