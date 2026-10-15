@@ -110,17 +110,17 @@ export const BasisSplitSchema = z.object({
 export type BasisSplit = z.infer<typeof BasisSplitSchema>
 
 /**
- * A decision the author already took about this change, read from a `Settled-decision` trailer of
- * one of its commits. `line` is where the decision's code sits at the head, inside a chunk of this
- * diff; null when that code changed after the commit, or sits outside the diff.
+ * A decision the author already took about this change, read from a `Settled-decision` line in the
+ * message of one of its commits. `line` is where the decision's code sits at the head, inside a
+ * chunk of this diff; null when that code changed after the commit, or sits outside the diff.
  */
 export const SettledDecisionSchema = z.object({
-  /** `<short sha>-<n>`: the commit and the trailer's position in it, stable across runs. */
+  /** `<short sha>-<n>`: the commit and which of its decision lines this is, stable across runs. */
   id: z.string().min(1),
   commit: z.string().regex(/^[0-9a-f]{40}$/),
   /** The commit's author date. */
   date: z.string(),
-  /** The decision and its reason, as the trailer states them. */
+  /** The decision and its reason, as the line states them. */
   text: z.string().min(1),
   path: z.string().min(1),
   side: SideSchema,

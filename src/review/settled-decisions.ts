@@ -14,7 +14,7 @@ import type { Git } from '../git/git.js'
 import { hunkForLine } from '../git/patch-lines.js'
 import { unchangedLines } from './point-carry.js'
 
-export const SETTLED_DECISION_TRAILER = 'Settled-decision'
+export const SETTLED_DECISION_KEY = 'Settled-decision'
 
 /**
  * How many decisions a canvas shows as points: the room a canvas has left once the generator has
@@ -29,11 +29,11 @@ export interface ParsedDecision {
   text: string
 }
 
-const TRAILER_VALUE = /^(\S+):(\d+)(:old)?\s+(\S.*)$/
+const DECISION_VALUE = /^(\S+):(\d+)(:old)?\s+(\S.*)$/
 
 /** One value, or null when it does not read as `<path>:<line>[:old] <text>`. */
 export function parseSettledDecision(value: string): ParsedDecision | null {
-  const match = TRAILER_VALUE.exec(value.trim())
+  const match = DECISION_VALUE.exec(value.trim())
   if (match === null) {
     return null
   }
@@ -103,7 +103,7 @@ export async function readSettledDecisions(src: DecisionSources): Promise<Settle
     return []
   }
   const email = src.authorEmail.toLowerCase()
-  const commits = await src.git.commitKeyedLines(src.mergeBaseSha, src.headSha, SETTLED_DECISION_TRAILER)
+  const commits = await src.git.commitKeyedLines(src.mergeBaseSha, src.headSha, SETTLED_DECISION_KEY)
   const decisions: SettledDecision[] = []
   for (const commit of commits.filter(candidate => candidate.authorEmail.toLowerCase() === email)) {
     for (const [position, value] of commit.values.entries()) {

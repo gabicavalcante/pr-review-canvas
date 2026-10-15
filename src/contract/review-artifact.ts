@@ -338,7 +338,7 @@ export const SettlementSchema = z.object({
   reason: z.string().trim().min(1).max(SETTLEMENT_REASON_MAX),
   at: z.string(),
   commentUrl: z.string().optional(),
-  /** The commit whose `Settled-decision` trailer gave the reason, when the answer came from one. */
+  /** The commit whose `Settled-decision` line gave the reason, when the answer came from one. */
   commit: z
     .string()
     .regex(/^[0-9a-f]{40}$/)
