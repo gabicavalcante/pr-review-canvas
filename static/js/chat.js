@@ -731,7 +731,10 @@ export function wireChat(options) {
           const status =
             t.name === answering ? 'answering…' : t.turns === 1 ? '1 question' : `${t.turns} questions`
           // While an answer comes in, it is drawn into its own thread, so no other one opens.
-          const waiting = streaming && t.name !== activeThread ? ' disabled' : ''
+          const waiting =
+            streaming && t.name !== activeThread
+              ? ' disabled title="An answer is still coming in. Open this thread once it ends."'
+              : ''
           return (
             `<li><button type="button" class="thread-item${t.name === activeThread ? ' current' : ''}" data-thread-open="${esc(t.name)}"${waiting}>` +
             `<span class="thread-item-t">${esc(shownTitle(t))}</span>` +

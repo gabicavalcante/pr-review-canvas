@@ -120,3 +120,28 @@ test('the wheel scrolls a long Threads list, and the page under a short one', as
   await page.mouse.wheel(0, 400)
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
 })
+
+test('the other threads wait, and look it, while an answer comes in', async ({
+  page,
+  chatServer,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  const { url } = await chatServer({ runner: { delayMs: 400 } })
+  await page.goto(url)
+  const pointAsk = page
+    .locator('section.layer li.finding[data-fingerprint="fp-1"]')
+    .locator('[data-act="ask"]')
+    .first()
+  await askAbout(page, page.getByRole('button', { name: 'ask about this layer' }).first(), 'Anything risky?')
+  await pointAsk.click()
+  await page.getByText('ask something else…', { exact: true }).first().click()
+  await page.locator('#msg').fill('Is the sum intended?')
+  await page.keyboard.press('Enter')
+  await page.locator('#side-tab-threads').click()
+  const layerThread = page.locator('#thread-index [data-thread-open]').filter({ hasText: 'layer · Run path' })
+  await expect(layerThread).toBeDisabled()
+  await expect(layerThread).toHaveCSS('cursor', 'not-allowed')
+  // Once the answer is in, the thread opens again.
+  await expect(layerThread).toBeEnabled({ timeout: 10_000 })
+  await expect(layerThread).toHaveCSS('cursor', 'pointer')
+})
