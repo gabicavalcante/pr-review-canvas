@@ -50,7 +50,7 @@ import {
   updateRenderState,
 } from './layers.js'
 import { buildNavOrder, layerOf, readingItem, step } from './nav.js'
-import { inHiddenSection } from './one-layer.js'
+import { hiddenOnlyBySection, inHiddenSection } from './one-layer.js'
 import { issueCommentHtml } from './overview.js'
 import { pendingCount, refreshPendingBar } from './pending.js'
 import { refreshReviewPanel } from './review-panel.js'
@@ -113,10 +113,7 @@ function drawnTop(el) {
  * @param {Element} el
  */
 function isShown(el) {
-  return (
-    (el.closest('[hidden]') === null || inHiddenSection(el)) &&
-    (el.parentElement?.closest('details:not([open])') ?? null) === null
-  )
+  return hiddenOnlyBySection(el) && (el.parentElement?.closest('details:not([open])') ?? null) === null
 }
 
 /**

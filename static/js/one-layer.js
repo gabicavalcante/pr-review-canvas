@@ -27,12 +27,23 @@ export function pageSections(root) {
 }
 
 /**
- * True for an element that a section the page is not showing hides. It hides nothing for good:
- * `reveal-code` on anything inside it shows the section.
+ * True for an element in a section the page is not showing, whatever else hides it inside that
+ * section, such as its closed layer. It hides nothing for good: `reveal-code` on anything inside
+ * it shows the section.
  * @param {Element} el
  */
 export function inHiddenSection(el) {
-  return el.closest('[hidden]')?.matches(SECTION_SELECTOR) === true
+  return el.closest(SECTION_SELECTOR)?.hasAttribute('hidden') === true
+}
+
+/**
+ * True for an element nothing hides, or nothing but a section the page is not showing: a closed
+ * layer or file card around it counts as hiding it.
+ * @param {Element} el
+ */
+export function hiddenOnlyBySection(el) {
+  const hider = el.closest('[hidden]')
+  return hider === null || hider.matches(SECTION_SELECTOR)
 }
 
 /**

@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures.js'
+import { expect, openFiles, test } from './fixtures.js'
 
 // A first visit: nothing in storage says the reader opened the chat before.
 test.use({ chatOpened: false })
@@ -119,6 +119,7 @@ test('starts the docked chat minimized on a wide screen and remembers how it was
 test('leaves the canvas scrolled where it was across minimize and restore', async ({ page, reviewUrl }) => {
   await page.setViewportSize({ width: 1600, height: 900 })
   await page.goto(reviewUrl)
+  await openFiles(page)
   const launcher = page.getByRole('button', { name: 'AI Chat', exact: true })
   const minimize = page.getByRole('button', { name: 'Minimize AI Chat' })
   await launcher.click()

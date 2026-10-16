@@ -52,6 +52,9 @@
 - A layer's attention points start as one line each, with their level, kind, audience, and location.
   Click the title, **show**, or press `o` to read one. **show details** in the list's heading opens
   every open point, and the browser remembers it.
+- The page opens with only the first layer open, and every file closed under its name. The rail,
+  `j`, `k`, `n`, `p`, and links open the layer or file they land on. Raising **Hide code** closes the files it hides
+  whole; lowering it no longer reopens them.
 
 ### AI Chat
 

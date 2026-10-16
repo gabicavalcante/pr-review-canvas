@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises'
-import { expect, test } from './fixtures.js'
+import { expect, openFiles, test } from './fixtures.js'
 import { syntheticArtifact } from '../src/testing/synthetic.js'
 
 // Release 0.6 browser regressions retained from the adversarial audit.
@@ -59,6 +59,7 @@ for (const receipt of ['available', 'unavailable']) {
       },
     })
     await page.goto(url)
+    await openFiles(page)
     await openChat()
     await page.locator('#msg').fill('Propose a comment')
     await page.locator('#chat-send').click()
@@ -67,6 +68,7 @@ for (const receipt of ['available', 'unavailable']) {
     await card.locator('[data-act="proposed-queue"]').click()
     await expect(card).toContainText('in your review')
     await page.reload()
+    await openFiles(page)
     await openChat()
     await expect(card).toContainText('in your review')
     await expect(page.locator('.pending-bar')).toContainText('1 pending comment')
@@ -103,6 +105,7 @@ for (const receipt of ['available', 'unavailable']) {
     await expect(card.locator('[data-act="proposed-queue"]')).toHaveCount(0)
     await expect(card.locator('[data-act="proposed-post"]')).toHaveCount(0)
     await page.reload()
+    await openFiles(page)
     await openChat()
     for (const offset of [2, 4]) {
       movedBy = offset
@@ -112,6 +115,7 @@ for (const receipt of ['available', 'unavailable']) {
       await expect(card.locator('a[href$="discussion_r8001"]')).toHaveCount(1)
       await expect(secondCard.locator('a[href$="discussion_r8002"]')).toHaveCount(1)
       await page.reload()
+      await openFiles(page)
       await openChat()
       await expect(card.locator('a[href$="discussion_r8001"]')).toHaveCount(1)
       await expect(secondCard.locator('a[href$="discussion_r8002"]')).toHaveCount(1)
@@ -241,13 +245,14 @@ test('file name single/double/triple clicks preserve the intended collapsed stat
   const file = page.locator('article.file').first()
   const name = file.locator('[data-act="toggle-card"]').filter({ hasText: 'src/app.ts' })
   const body = file.locator('.file-body')
+  await expect(body).toBeHidden()
   await name.click()
-  await expect(body).toBeHidden()
+  await expect(body).toBeVisible()
   await name.dblclick()
-  await expect(body).toBeHidden()
+  await expect(body).toBeVisible()
   await page.evaluate(() => window.getSelection()?.removeAllRanges())
   await name.click({ clickCount: 3 })
-  await expect(body).toBeHidden()
+  await expect(body).toBeVisible()
 })
 
 test('a failed settlement preserves the reason for retry', async ({ page, selfReviewUrl }) => {

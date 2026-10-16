@@ -419,6 +419,10 @@ export function wireCardReveal(root) {
     if (target instanceof Element) {
       target.closest('[data-point].is-resolved')?.setAttribute('data-revealed', '')
     }
+    // Layers and files start closed, so a key or a link that lands on one opens it as well.
+    if (target instanceof HTMLElement && target.matches('section.layer, article.file')) {
+      setCardCollapsed(target, false)
+    }
     for (
       let node = target instanceof Element ? target.parentElement : null;
       node !== null;
@@ -431,22 +435,42 @@ export function wireCardReveal(root) {
       }
     }
   }
+  // The rail's anchors, and the `#layer-…` fragment `j` and `k` leave in the URL, scroll natively
+  // and raise no `reveal-code`, so the layer they name opens here.
+  /** @param {string | null} fragment */
+  const openLayerAt = fragment => {
+    const section = fragment?.startsWith('#layer-')
+      ? root.ownerDocument.getElementById(fragment.slice(1))
+      : null
+    if (section instanceof HTMLElement && section.matches('section.layer') && root.contains(section)) {
+      setCardCollapsed(section, false)
+    }
+  }
+  /** @param {Event} event */
+  const openLinkedLayer = event => {
+    const link = event.target instanceof Element ? event.target.closest('a[href^="#layer-"]') : null
+    openLayerAt(link?.getAttribute('href') ?? null)
+  }
+  openLayerAt(root.ownerDocument.defaultView?.location.hash ?? null)
   root.addEventListener('reveal-code', reveal)
-  return () => root.removeEventListener('reveal-code', reveal)
+  root.addEventListener('click', openLinkedLayer)
+  return () => {
+    root.removeEventListener('reveal-code', reveal)
+    root.removeEventListener('click', openLinkedLayer)
+  }
 }
 
 /**
  * @param {LayerFile} lf
  * @param {FileEntry | undefined} entry
  * @param {Layer} layer
- * @param {{ hunkIndex: Map<string, { layer: Layer, index: number }>, paths: ReadonlySet<string>, firstCardFor: Set<string>, state?: PrState, keepOpen?: boolean }} ctx
+ * @param {{ hunkIndex: Map<string, { layer: Layer, index: number }>, paths: ReadonlySet<string>, firstCardFor: Set<string>, state?: PrState }} ctx
  * @returns {string}
  */
 export function renderFileCard(lf, entry, layer, ctx) {
   const key = entry?.key ?? sanitizeKey(lf.path)
   const cardReviewedId = reviewedId(layer.key, lf.path)
   const cardReviewed = ctx.state?.reviewed[cardReviewedId] === true
-  const collapsed = cardReviewed || (collapsesAt(lf, foldLevel) && ctx.keepOpen !== true)
   const isFirst = !ctx.firstCardFor.has(key)
   ctx.firstCardFor.add(key)
   const id = isFirst ? fileAnchorId(key) : `${fileAnchorId(key)}-${layer.key}`
@@ -466,10 +490,10 @@ export function renderFileCard(lf, entry, layer, ctx) {
   const elsewhere = elsewhereHtml(lf, entry, layer, ctx.hunkIndex)
   return (
     `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}" aria-labelledby="${esc(id)}-h">` +
-    `<div class="file-h">${chevronHtml('Collapse file', !collapsed, { act: 'toggle-card' })}<h3 id="${esc(id)}-h" class="path" data-act="toggle-card">${path}${testTag}</h3>${status}${pills}` +
+    `<div class="file-h">${chevronHtml('Collapse file', false, { act: 'toggle-card' })}<h3 id="${esc(id)}-h" class="path" data-act="toggle-card">${path}${testTag}</h3>${status}${pills}` +
     `<label class="chk"><input type="checkbox" data-reviewed-id="${esc(cardReviewedId)}"${cardReviewed ? ' checked' : ''}> reviewed</label>` +
     `<span class="tbtns">${askButtonHtml({ kind: 'file', path: lf.path }, { title: 'Ask AI Chat about this file' })}</span></div>` +
-    `<div class="file-body"${collapsed ? ' hidden' : ''}>${note}<div class="diff-host" data-key="${esc(key)}" data-hunks="${esc(lf.hunks.join(','))}"><div class="loading">Loading diff…</div></div>${elsewhere}</div></article></pr-file>`
+    `<div class="file-body" hidden>${note}<div class="diff-host" data-key="${esc(key)}" data-hunks="${esc(lf.hunks.join(','))}"><div class="loading">Loading diff…</div></div>${elsewhere}</div></article></pr-file>`
   )
 }
 
@@ -519,15 +543,7 @@ export function elsewhereHtml(lf, entry, layer, hunkIndex) {
  */
 export function renderLayerSection(layer, index, artifact, files, state, ctx) {
   const byPath = new Map(files.map(f => [f.path, f]))
-  const commentPaths = new Set(ctx.comments.map(comment => comment.path))
-  const cards = layer.files
-    .map(lf =>
-      renderFileCard(lf, byPath.get(lf.path), layer, {
-        ...ctx,
-        keepOpen: cardKeepsOpen(lf, layer.id, artifact, commentPaths),
-      })
-    )
-    .join('')
+  const cards = layer.files.map(lf => renderFileCard(lf, byPath.get(lf.path), layer, ctx)).join('')
   const id = layerAnchorId(layer.key)
   if (layer.kind === 'other') {
     return (
@@ -547,13 +563,15 @@ export function renderLayerSection(layer, index, artifact, files, state, ctx) {
           .join('')}</span>`
       : ''
   const reviewed = layerProgress(layer, state) === 'done'
+  // Only the first layer starts open, so the page reads from the top; a reviewed one stays closed.
+  const collapsed = reviewed || semanticIndex > 0
   const layerReviewedId = reviewedId(layer.key)
   return (
     `<pr-layer><section class="layer${reviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-layer="${esc(layer.id)}" aria-labelledby="${esc(id)}-h">` +
-    `<div class="panel-h layer-h">${chevronHtml('Collapse layer', !reviewed, { act: 'toggle-card' })}<h2 id="${esc(id)}-h"><span class="lbl">Layer ${semanticIndex + 1} of ${total}</span>${esc(layer.title)}${risks}</h2>` +
+    `<div class="panel-h layer-h">${chevronHtml('Collapse layer', !collapsed, { act: 'toggle-card' })}<h2 id="${esc(id)}-h"><span class="lbl">Layer ${semanticIndex + 1} of ${total}</span>${esc(layer.title)}${risks}</h2>` +
     `<div class="layer-ctl"><label class="chk"><input type="checkbox" data-reviewed-id="${esc(layerReviewedId)}"${reviewed ? ' checked' : ''}> reviewed</label>` +
     `${askButtonHtml({ kind: 'layer', layerId: layer.id }, { label: 'ask about this layer' })}</div></div>` +
-    `<div class="layer-body"${reviewed ? ' hidden' : ''}>` +
+    `<div class="layer-body"${collapsed ? ' hidden' : ''}>` +
     `<div class="body"><div class="rationale prose">${renderMarkdown(layer.rationale, { paths: ctx.paths, diagrams: true })}</div>${layerDiagramHtml(layer)}${judgmentHtml(layer, ctx.paths)}</div>` +
     testMapHtml(layer, ctx.paths) +
     layerPointsHtml(layer, artifact.points, ctx.paths, state, ctx.posted) +
@@ -863,9 +881,9 @@ export function hydrateAll(root, ctx) {
 }
 
 /**
- * Switches how much code the page hides. A card the reader opened or closed by hand follows the
- * new level too: changing the level is a request to change exactly that. The folds and counters
- * then follow as refreshFolds says.
+ * Switches how much code the page hides. Every card starts closed and the reader opens what they
+ * read, so the level only closes the cards it hides whole, opened by hand or not, and opens none.
+ * The folds and counters then follow as refreshFolds says.
  * @param {ParentNode} root
  * @param {import('./contract-types.js').FoldLevel} level
  */
@@ -883,12 +901,12 @@ export function setFoldLevel(root, level) {
         ? layerFileOf(ctx, card.getAttribute('data-layer') ?? '', card.getAttribute('data-path') ?? '')
         : undefined
     if (card instanceof HTMLElement && lf !== undefined) {
-      setCardCollapsed(
-        card,
-        card.classList.contains('is-reviewed') ||
-          (collapsesAt(lf, level) &&
-            !cardKeepsOpen(lf, card.getAttribute('data-layer') ?? '', ctx.artifact, commentPaths))
-      )
+      if (
+        collapsesAt(lf, level) &&
+        !cardKeepsOpen(lf, card.getAttribute('data-layer') ?? '', ctx.artifact, commentPaths)
+      ) {
+        setCardCollapsed(card, true)
+      }
     }
   }
   refreshFolds(root)

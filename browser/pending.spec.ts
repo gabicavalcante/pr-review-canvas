@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures.js'
+import { expect, openFiles, test } from './fixtures.js'
 
 for (const skin of ['terminal', 'github'] as const) {
   test(`holds a comment in a pending review, shows it, and discards it in the ${skin} skin`, async ({
@@ -6,6 +6,7 @@ for (const skin of ['terminal', 'github'] as const) {
     reviewUrl,
   }) => {
     await page.goto(`${reviewUrl}?skin=${skin}`)
+    await openFiles(page)
     const file = page.locator('article.file[data-path="src/app.ts"]').first()
     await file.scrollIntoViewIfNeeded()
 
@@ -75,6 +76,7 @@ for (const skin of ['terminal', 'github'] as const) {
 
 test('gives a draft its commands back when an edit is cancelled', async ({ page, reviewUrl }) => {
   await page.goto(reviewUrl)
+  await openFiles(page)
   const file = page.locator('article.file[data-path="src/app.ts"]').first()
   await file.scrollIntoViewIfNeeded()
 
@@ -110,6 +112,7 @@ test('gives a draft its commands back when an edit is cancelled', async ({ page,
 
 test('keeps a pending review across a reload', async ({ page, reviewUrl }) => {
   await page.goto(reviewUrl)
+  await openFiles(page)
   const file = page.locator('article.file[data-path="src/app.ts"]').first()
   await file.scrollIntoViewIfNeeded()
   await file.locator('#L-src_app_ts-new-4 .plus').click()
@@ -118,6 +121,7 @@ test('keeps a pending review across a reload', async ({ page, reviewUrl }) => {
   await expect(page.locator('.pending-bar')).toContainText('1 pending comment')
 
   await page.reload()
+  await openFiles(page)
   // The drafts are review state on this machine, so they are still there.
   await expect(page.locator('.pending-bar')).toContainText('1 pending comment')
   const reloaded = page.locator('article.file[data-path="src/app.ts"]').first()
@@ -127,6 +131,7 @@ test('keeps a pending review across a reload', async ({ page, reviewUrl }) => {
 
 test('comments on a range of lines picked with a shift-click', async ({ page, reviewUrl }) => {
   await page.goto(reviewUrl)
+  await openFiles(page)
   const file = page.locator('article.file[data-path="src/app.ts"]').first()
   await file.scrollIntoViewIfNeeded()
   await file.locator('#L-src_app_ts-new-4 td.ln').nth(1).click()
@@ -153,6 +158,7 @@ test('comments on a range of lines picked with a shift-click', async ({ page, re
 
 test('adds an attention point to the review and gives it back on delete', async ({ page, reviewUrl }) => {
   await page.goto(reviewUrl)
+  await openFiles(page)
   const point = page.locator('.findings li.finding[data-fingerprint="fp-1"]').first()
   await point.scrollIntoViewIfNeeded()
   // A point offers both ways to send it, and keeps both while a review is open.
@@ -218,6 +224,7 @@ test('keeps a layer open when a draft is added or deleted, whatever marks an old
     },
   })
   await page.goto(url)
+  await openFiles(page)
   const layer = page.locator('section.layer[data-layer="run-path"]')
   const body = layer.locator(':scope > .layer-body')
   await expect(body).toBeVisible()

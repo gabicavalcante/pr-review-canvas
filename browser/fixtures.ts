@@ -24,6 +24,25 @@ import {
 
 export { expect } from '@playwright/test'
 
+/**
+ * Opens every file of the layers that are open, as a reader who reads each one: a file starts
+ * closed, and a spec that works in its diff opens it first.
+ */
+export async function openFiles(page: Page): Promise<void> {
+  const closed = page.locator(
+    'section.layer:has(> .layer-body:not([hidden])) article.file > .file-h > .chev[aria-expanded="false"]'
+  )
+  await expect(page.locator('section.layer').first()).toBeVisible()
+  while ((await closed.count()) > 0) {
+    await closed.first().click()
+  }
+  // The clicks leave the focus on a chevron and the page scrolled; the reader starts at the top.
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    window.scrollTo(0, 0)
+  })
+}
+
 /** What a chat-enabled server is built with: how the fake agent and the fake checkout behave. */
 export interface ChatServerOptions {
   runner?: FakeRunnerOptions

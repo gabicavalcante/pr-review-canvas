@@ -393,18 +393,18 @@ afterEach(() => {
 })
 
 describe('card toggles', () => {
-  it('collapses and opens a file card without touching anything else', () => {
+  it('opens and collapses a file card without touching anything else', () => {
     const { root } = setup()
     const card = root.querySelector('article.file#file-src_app_ts')
     const checkbox = card?.querySelector('input[data-reviewed-id]')
     const otherCard = root.querySelector('article.file#file-src_new_name_ts')
     click(root, 'article.file#file-src_app_ts .file-h .chev')
-    expect(card?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(true)
-    expect(card?.querySelector('.chev')?.getAttribute('aria-expanded')).toBe('false')
-    expect(checkbox instanceof HTMLInputElement ? checkbox.checked : true).toBe(false)
-    expect(otherCard?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
-    click(root, 'article.file#file-src_app_ts .file-h .chev')
     expect(card?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
+    expect(card?.querySelector('.chev')?.getAttribute('aria-expanded')).toBe('true')
+    expect(checkbox instanceof HTMLInputElement ? checkbox.checked : true).toBe(false)
+    expect(otherCard?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(true)
+    click(root, 'article.file#file-src_app_ts .file-h .chev')
+    expect(card?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(true)
   })
 
   it('toggles a file card from its name, but not when the click ends a selection in it', () => {
@@ -412,9 +412,9 @@ describe('card toggles', () => {
     const body = root.querySelector('article.file#file-src_app_ts > .file-body')
     const title = root.querySelector('article.file#file-src_app_ts .file-h .path')
     click(root, 'article.file#file-src_app_ts .file-h .path')
-    expect(body?.hasAttribute('hidden')).toBe(true)
-    click(root, 'article.file#file-src_app_ts .file-h .path')
     expect(body?.hasAttribute('hidden')).toBe(false)
+    click(root, 'article.file#file-src_app_ts .file-h .path')
+    expect(body?.hasAttribute('hidden')).toBe(true)
 
     const text = title?.firstChild
     if (text === null || text === undefined) {
@@ -422,10 +422,10 @@ describe('card toggles', () => {
     }
     window.getSelection()?.setBaseAndExtent(text, 0, text, 3)
     click(root, 'article.file#file-src_app_ts .file-h .path')
-    expect(body?.hasAttribute('hidden')).toBe(false)
+    expect(body?.hasAttribute('hidden')).toBe(true)
     // A selection in the title does not stop the chevron.
     click(root, 'article.file#file-src_app_ts .file-h .chev')
-    expect(body?.hasAttribute('hidden')).toBe(true)
+    expect(body?.hasAttribute('hidden')).toBe(false)
     window.getSelection()?.removeAllRanges()
   })
 
@@ -448,20 +448,20 @@ describe('card toggles', () => {
       window.getSelection()?.removeAllRanges()
     }
     clicks(2)
-    expect(body?.hasAttribute('hidden')).toBe(false)
+    expect(body?.hasAttribute('hidden')).toBe(true)
     clicks(3)
-    expect(body?.hasAttribute('hidden')).toBe(false)
+    expect(body?.hasAttribute('hidden')).toBe(true)
     clicks(1)
-    expect(body?.hasAttribute('hidden')).toBe(true)
+    expect(body?.hasAttribute('hidden')).toBe(false)
     clicks(2)
-    expect(body?.hasAttribute('hidden')).toBe(true)
+    expect(body?.hasAttribute('hidden')).toBe(false)
 
     // A click that ended a drag flipped nothing, so a second click right after it undoes nothing.
     window.getSelection()?.setBaseAndExtent(text, 0, text, 3)
     title.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
     title.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }))
     window.getSelection()?.removeAllRanges()
-    expect(body?.hasAttribute('hidden')).toBe(true)
+    expect(body?.hasAttribute('hidden')).toBe(false)
   })
 
   it('collapses a layer section from its own chevron', () => {
@@ -1441,6 +1441,8 @@ describe('keyboard', () => {
     expect(root.querySelector('.is-focused')?.id).toBe('layer-run-path')
     key('n')
     expect(root.querySelector('.is-focused')?.id).toBe('file-src_app_ts')
+    // n opens the file it lands on, and o closes it again.
+    expect(root.querySelector('#file-src_app_ts .file-body')?.hasAttribute('hidden')).toBe(false)
     key('o')
     expect(root.querySelector('#file-src_app_ts .file-body')?.hasAttribute('hidden')).toBe(true)
     // There is no file before the first one, so the focus stays where it is.
@@ -1476,7 +1478,7 @@ describe('keyboard', () => {
     key('o')
     expect(card?.hasAttribute('data-expanded')).toBe(true)
     // The point's file card stays as it was.
-    expect(root.querySelector('#file-src_app_ts .file-body')?.hasAttribute('hidden')).toBe(false)
+    expect(root.querySelector('#file-src_app_ts .file-body')?.hasAttribute('hidden')).toBe(true)
     key('o')
     expect(card?.hasAttribute('data-expanded')).toBe(false)
   })

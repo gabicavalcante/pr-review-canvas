@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures.js'
+import { expect, openFiles, test } from './fixtures.js'
 
 test('keeps a dismissed point expanded when its save completes', async ({ page, reviewUrl }) => {
   let releaseSave = () => {}
@@ -37,6 +37,7 @@ test('dismisses a point everywhere, keeps it dismissed after reload, and restore
   reviewUrl,
 }) => {
   await page.goto(reviewUrl)
+  await openFiles(page)
   const card = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
   const inline = page.locator('tr.ifind[data-fingerprint="fp-1"]')
   await expect(card).toBeVisible()
@@ -53,6 +54,7 @@ test('dismisses a point everywhere, keeps it dismissed after reload, and restore
   await expect(page.locator('.toast')).toBeHidden({ timeout: 7000 })
 
   await page.reload()
+  await openFiles(page)
   await expect(page.locator('.point-statuses')).toContainText('1 dismissed')
   await expect(card).toHaveAttribute('data-status', 'dismissed')
   await page.locator('article.file[data-path="src/app.ts"]').first().scrollIntoViewIfNeeded()
@@ -75,14 +77,18 @@ test('dismisses a point everywhere, keeps it dismissed after reload, and restore
   await expect(page.locator('[data-act="toggle-handled"]')).toHaveCount(0)
 })
 
-test('collapses and reopens file and layer bodies', async ({ page, reviewUrl }) => {
+test('opens and closes file and layer bodies', async ({ page, reviewUrl }) => {
   await page.goto(reviewUrl)
   const layer = page.locator('section.layer[data-layer="run-path"]')
   const file = layer.locator('article.file[data-path="src/app.ts"]')
   const fileBody = file.locator(':scope > .file-body')
   const fileToggle = file.locator(':scope > .file-h > .chev')
-  await expect(fileBody).toBeVisible()
+  // The first layer starts open, with every file closed under its name.
+  await expect(layer.locator(':scope > .layer-body')).toBeVisible()
+  await expect(fileBody).toBeHidden()
   await file.scrollIntoViewIfNeeded()
+  await fileToggle.click()
+  await expect(fileBody).toBeVisible()
   await expect(file.locator('tr.ifind[data-fingerprint="fp-1"]')).toBeVisible()
   await fileToggle.click()
   await expect(fileBody).toBeHidden()
@@ -147,6 +153,7 @@ test.describe('a first visit', () => {
     reviewUrl,
   }) => {
     await page.goto(reviewUrl)
+    await openFiles(page)
     const card = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
     await expect(card.locator('.f-title .p-title')).toBeVisible()
     await expect(card.locator('.prose')).toBeHidden()

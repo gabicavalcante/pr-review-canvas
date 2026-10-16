@@ -639,6 +639,11 @@ server and the corresponding canvas to use a localhost link.
 
 ### Collapsed diffs
 
+The page opens with the first layer open and the others closed; a layer marked reviewed stays
+closed. Every file starts closed under its name, its counts, and its **reviewed** box: click the
+name or the chevron, or press `o` on it, to read its diff. The rail, the keys that step through
+layers and files (`j`, `k`, `n`, `p`), and any link into a layer or a file open what they land on.
+
 Import-only changes, whitespace changes, moved code, and ranges selected by the generator may
 start collapsed. Click the summary to expand them. Moves are detected within a file; moves
 between files appear as deletions and additions. Edited moves keep their changed text visible.
@@ -661,14 +666,15 @@ in its Files heading, and the sign-off dialog records the total.
 
 The page opens at `foldLevel` from `settings.yml` (`light` by default), which the **Hide code by
 default** field in the settings dialog sets. The control and the `f` key change the level for the
-current page only. Changing the level redraws the visible diffs and re-applies file collapse,
-including cards opened by hand.
+current page only. Changing the level redraws the visible diffs and closes the files it hides
+whole, including cards opened by hand. It never opens a file: lowering the level leaves closed
+files closed.
 
 These always stay visible:
 
 - Attention points, comment threads, and pending review drafts. A file with a thread or a draft
   folds nothing.
-- Files with an annotation or an attention point. They never collapse whole.
+- Files with an annotation or an attention point. No level closes them whole.
 - Annotations, except under an `aggressive` fold that covers the whole annotation and no other. That
   fold shows the annotation's text instead of its title.
 - Test files at `light`, except snapshots and fixtures. From `moderate`, each test body folds under
