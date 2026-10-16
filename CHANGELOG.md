@@ -26,8 +26,8 @@
 ### Attention points
 
 - Each level has its own shape: a diamond for **decide**, a checked box for **check**, and an info
-  circle for **fyi**. The shapes replace the colored squares on cards, diff rows, the overview
-  counts, and the legend, so the level reads without color.
+  circle for **fyi**. The shapes replace the colored squares on cards, diff rows, and the overview
+  counts, so the level reads without color.
 - **Point colors** in the settings dialog picks the palette: **classic** (red, amber, gray, the
   default) or **action** (purple, blue, gray), for readers who took the red and amber for a
   severity scale. It is saved as `pointColors` in `settings.yml`.
@@ -42,6 +42,8 @@
 
 - The overview summary, a layer's rationale and the PR description fill the width of their panel,
   diagrams included, instead of stopping at 100 characters.
+- The overview header names each level next to its count, as in `3 decide · 1 check · 2 fyi`, in
+  place of the legend that opened on hover.
 
 ### Upgrade
 

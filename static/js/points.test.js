@@ -93,7 +93,7 @@ describe('points', () => {
     expect(tr?.getAttribute('data-point')).toBe('p-2')
     expect(tr?.querySelector('.f-title span:not(.lv):not(.pill)')?.textContent).toBe(p.title)
     document.body.innerHTML = sevsumHtml(points)
-    expect(document.querySelector('.sevsum')?.textContent).toBe('111decidecheckfyi')
+    expect(document.querySelector('.sevsum')?.textContent).toBe('1 decide1 check1 fyi')
     expect(document.querySelector('.sevsum a')).toBeNull()
     document.body.innerHTML = sevsumHtml(points, syntheticArtifact().layers)
     expect([...document.querySelectorAll('.sevsum > a')].map(a => a.getAttribute('href'))).toEqual([
@@ -101,11 +101,11 @@ describe('points', () => {
       '#layer-other',
       '#layer-other',
     ])
-    expect(document.querySelector('.lv.decide')?.getAttribute('aria-label')).toBe('1 decide')
-    expect(document.querySelectorAll('.legend .lv[aria-hidden="true"]')).toHaveLength(3)
+    expect(document.querySelector('.sevsum .lv.decide')?.getAttribute('aria-hidden')).toBe('true')
+    expect(document.querySelector('.sevsum .legend')).toBeNull()
     document.body.innerHTML = sevsumHtml([], syntheticArtifact().layers)
     expect(document.querySelector('.sevsum a')).toBeNull()
-    expect(document.querySelector('.sevsum')?.textContent).toBe('000decidecheckfyi')
+    expect(document.querySelector('.sevsum')?.textContent).toBe('0 decide0 check0 fyi')
   })
 })
 

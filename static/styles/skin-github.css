@@ -438,10 +438,6 @@
   .prose ul {
     list-style: disc;
   }
-  .sevsum > .legend {
-    border-radius: var(--r);
-    box-shadow: var(--drop-shadow);
-  }
   /* GitHub draws progress as a filled track rather than a hairline. */
   .pline {
     background: var(--line);
