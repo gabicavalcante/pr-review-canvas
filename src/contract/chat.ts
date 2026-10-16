@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ChatContext } from '../../static/js/chat-context.js'
 import { SideSchema } from './review-artifact.js'
 
 // The context helpers live in static/js/chat-context.js so the browser can load them without a
@@ -56,7 +57,15 @@ export const ChatTurnSchema = z.object({
 export type ChatTurn = z.infer<typeof ChatTurnSchema>
 
 export interface ChatThreadsResponse {
-  threads: Array<{ name: string; agent: string; title: string; createdAt: string }>
+  threads: Array<{
+    name: string
+    agent: string
+    title: string
+    createdAt: string
+    /** The turns the thread has taken. */
+    turns: number
+    anchor?: ChatContext
+  }>
   activeThread: string | null
   /** The agent the next thread would use, from the settings plus any flag override. */
   agent: string

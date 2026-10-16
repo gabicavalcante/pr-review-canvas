@@ -3,7 +3,7 @@ import { readFile, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AgentEvent } from '../acpx/events.js'
-import type { ChatEvent } from '../contract/chat.js'
+import type { ChatContext, ChatEvent } from '../contract/chat.js'
 import { toFileEntry, toPatchMap } from '../git/diff-collector.js'
 import { createPrStore } from '../store/pr-store.js'
 import { createSettingsStore, type SettingsStore } from '../store/settings-store.js'
@@ -19,7 +19,7 @@ import {
   createChatManager,
 } from './chat-manager.js'
 import { CheckoutBusyError, checkoutsFor, createReviewCheckouts, type ReviewCheckouts } from './checkouts.js'
-import { createTranscriptStore, type TranscriptStore } from './threads.js'
+import { createTranscriptStore, THREAD_TITLE_MAX, type TranscriptStore } from './threads.js'
 
 const artifact = syntheticArtifact()
 const files = SYNTHETIC_FILES.map(toFileEntry)
@@ -112,6 +112,102 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(dataDir, { recursive: true, force: true })
+})
+
+const T2 = 'pr-review-acme-widgets-42-claude-t2'
+const POINT: ChatContext = { kind: 'point', fingerprint: 'fp-1' }
+const LAYER: ChatContext = { kind: 'layer', layerId: 'run-path' }
+
+/** Sends one question and reads the answer to its end. */
+async function ask(context: ChatContext, message = 'why?', thread?: string): Promise<void> {
+  await collect(manager.send(target(), { message, context, ...(thread === undefined ? {} : { thread }) }))
+}
+
+describe('a thread per place', () => {
+  it('opens the thread of the place asked about, titled after it, and keeps it for the next question', async () => {
+    await ask(POINT, 'is the sum intended?')
+    await ask(POINT, 'and the test?')
+    const { threads, activeThread } = await manager.threads(42)
+    expect(threads).toEqual([
+      {
+        name: T1,
+        agent: 'claude',
+        title: 'point · Sum instead of product',
+        createdAt: '2026-09-11T10:00:00.000Z',
+        turns: 2,
+        anchor: POINT,
+      },
+    ])
+    expect(activeThread).toBe(T1)
+    expect(runner.runs.map(run => run.session)).toEqual([T1, T1])
+  })
+
+  it('opens another thread for another place, and goes back to the first when it is asked again', async () => {
+    await ask(POINT)
+    await ask(LAYER)
+    expect((await manager.threads(42)).activeThread).toBe(T2)
+    await ask(POINT)
+    const { threads, activeThread } = await manager.threads(42)
+    expect(threads.map(thread => [thread.name, thread.anchor, thread.turns])).toEqual([
+      [T1, POINT, 2],
+      [T2, LAYER, 1],
+    ])
+    expect(activeThread).toBe(T1)
+    // Each thread is its own acpx session, seeded on its own first question only.
+    expect(runner.runs.map(run => [run.session, run.prompt.startsWith('SEED')])).toEqual([
+      [T1, true],
+      [T2, true],
+      [T1, false],
+    ])
+  })
+
+  it('matches lines on their exact range', async () => {
+    await ask({ kind: 'lines', path: 'src/app.ts', side: 'new', start: 3, end: 4 })
+    await ask({ kind: 'lines', path: 'src/app.ts', side: 'new', start: 3, end: 5 })
+    await ask({ kind: 'lines', path: 'src/app.ts', side: 'new', start: 3, end: 4 })
+    expect((await manager.threads(42)).threads.map(thread => thread.turns)).toEqual([2, 1])
+  })
+
+  it('does not continue a place’s thread with another agent', async () => {
+    await ask(POINT)
+    await settings.write({ chatAgent: 'codex' })
+    await ask(POINT)
+    const { threads } = await manager.threads(42)
+    expect(threads.map(thread => [thread.agent, thread.anchor])).toEqual([
+      ['claude', POINT],
+      ['codex', POINT],
+    ])
+  })
+
+  it('keeps a question about the whole PR in the open thread, and a named thread over the place', async () => {
+    await ask(POINT)
+    await ask({ kind: 'pr' }, 'and overall?')
+    await ask(LAYER, 'here instead', T1)
+    const { threads } = await manager.threads(42)
+    expect(threads.map(thread => [thread.name, thread.turns])).toEqual([[T1, 3]])
+  })
+
+  it('sends every question to the open thread when the reader turns it off', async () => {
+    await settings.write({ chatThreadPerPlace: false })
+    await ask(POINT, 'first')
+    await ask(LAYER, 'second')
+    const { threads } = await manager.threads(42)
+    expect(threads).toEqual([
+      { name: T1, agent: 'claude', title: 'first', createdAt: '2026-09-11T10:00:00.000Z', turns: 2 },
+    ])
+  })
+
+  it('cuts a long place name to the title’s length', async () => {
+    const layers = artifact.layers.map(layer =>
+      layer.id === 'run-path' ? { ...layer, title: 'A layer with a long title '.repeat(4) } : layer
+    )
+    await collect(
+      manager.send({ ...target(), artifact: { ...artifact, layers } }, { message: 'x', context: LAYER })
+    )
+    const title = (await manager.threads(42)).threads[0]?.title ?? ''
+    expect(title.endsWith('…')).toBe(true)
+    expect(title).toHaveLength(THREAD_TITLE_MAX)
+  })
 })
 
 describe('createChatManager().send', () => {
@@ -222,6 +318,8 @@ describe('createChatManager().send', () => {
   })
 
   it('writes both turns to the transcript and titles the thread from the first message', async () => {
+    // With a thread per place, a question about a file goes to that file's thread instead.
+    await settings.write({ chatThreadPerPlace: false })
     await collect(
       manager.send(target(), { message: 'is this covered?', context: { kind: 'file', path: 'src/app.ts' } })
     )
@@ -240,7 +338,13 @@ describe('createChatManager().send', () => {
     ])
     const threads = await manager.threads(42)
     expect(threads.threads).toEqual([
-      { name: T1, agent: 'claude', title: 'is this covered?', createdAt: '2026-09-11T10:00:00.000Z' },
+      {
+        name: T1,
+        agent: 'claude',
+        title: 'is this covered?',
+        createdAt: '2026-09-11T10:00:00.000Z',
+        turns: 1,
+      },
     ])
     expect(threads.activeThread).toBe(T1)
   })

@@ -363,7 +363,10 @@ export class PrAppElement extends HTMLElement {
         openReview: () => (this.chat ?? this.reviewPane)?.openReview(),
         openSettings: el =>
           void openSettingsDialog(this, el, {
-            onSaved: data => this.layerView?.setView(data.settings.layerView),
+            onSaved: data => {
+              this.layerView?.setView(data.settings.layerView)
+              this.chat?.setThreadPerPlace(data.settings.chatThreadPerPlace)
+            },
           }),
       })
       this.interactions = interactions
@@ -372,6 +375,7 @@ export class PrAppElement extends HTMLElement {
           root: this,
           prNumber: boot.prNumber,
           session,
+          ...(bundle.chat.threadPerPlace === undefined ? {} : { threadPerPlace: bundle.chat.threadPerPlace }),
           onProposed: (what, comment, el) => interactions.onProposedComment(what, comment, el),
           onResolution: (what, resolution, el) => interactions.onProposedResolution(what, resolution, el),
         })

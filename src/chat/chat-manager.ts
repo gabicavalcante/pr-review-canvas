@@ -3,7 +3,14 @@
 // agents writing into one thread.
 import type { AgentRunner } from '../acpx/acpx.js'
 import { latestModel } from '../acpx/models.js'
-import type { ChatContext, ChatEvent, ChatThreadsResponse, ChatTurn } from '../contract/chat.js'
+import {
+  type ChatContext,
+  type ChatEvent,
+  type ChatThreadsResponse,
+  type ChatTurn,
+  chatContextLabel,
+  sameChatContext,
+} from '../contract/chat.js'
 import type { FileEntry, Repo, ReviewArtifact } from '../contract/review-artifact.js'
 import type { Settings, SettingsOverrides } from '../contract/settings.js'
 import { parseReviewFolder, type ReviewKey, reviewFolder } from '../contract/review-key.js'
@@ -16,6 +23,7 @@ import { type CodeSource, renderSeed, type SeedPaths } from './seed.js'
 import {
   NEW_THREAD_TITLE,
   nextThreadIndex,
+  THREAD_TITLE_MAX,
   type TranscriptStore,
   threadName,
   threadTitle,
@@ -138,7 +146,11 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     }
   }
 
-  const newThread = async (key: ReviewKey, agent: string): Promise<ChatThread> => {
+  const newThread = async (
+    key: ReviewKey,
+    agent: string,
+    anchored?: { anchor: ChatContext; title: string }
+  ): Promise<ChatThread> => {
     const at = deps.now().toISOString()
     let created: ChatThread | null = null
     await deps.state.update(key, state => {
@@ -146,9 +158,10 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         name: threadName(deps.repo, key, agent, nextThreadIndex(state.chat.threads)),
         agent,
         rev: 0,
-        title: NEW_THREAD_TITLE,
+        title: anchored?.title ?? NEW_THREAD_TITLE,
         createdAt: at,
         seededHeadSha: '',
+        ...(anchored === undefined ? {} : { anchor: anchored.anchor }),
       }
       created = thread
       return { ...state, chat: { threads: [...state.chat.threads, thread], activeThread: thread.name } }
@@ -159,10 +172,36 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     return created
   }
 
-  /** The thread a message goes to: the one asked for, the active one, or a fresh one. */
-  const resolveThread = async (key: ReviewKey, agent: string, wanted?: string): Promise<ChatThread> => {
+  /**
+   * The thread a message goes to: the one asked for; for a message about a place, when the reader
+   * keeps a thread per place, that place's thread, made the first time; otherwise the active one,
+   * or a fresh one.
+   */
+  const resolveThread = async (
+    key: ReviewKey,
+    settings: Settings,
+    wanted: string | undefined,
+    context: ChatContext,
+    artifact: ReviewArtifact
+  ): Promise<ChatThread> => {
+    const agent = settings.chatAgent
     const state = await deps.state.read(key)
     const byName = wanted === undefined ? undefined : state.chat.threads.find(t => t.name === wanted)
+    if (byName === undefined && context.kind !== 'pr' && settings.chatThreadPerPlace) {
+      const placed = state.chat.threads.find(
+        t => t.agent === agent && t.anchor !== undefined && sameChatContext(t.anchor, context)
+      )
+      if (placed === undefined) {
+        return newThread(key, agent, { anchor: context, title: anchorTitle(context, artifact) })
+      }
+      if (state.chat.activeThread !== placed.name) {
+        await deps.state.update(key, current => ({
+          ...current,
+          chat: { ...current.chat, activeThread: placed.name },
+        }))
+      }
+      return placed
+    }
     const active =
       byName ??
       (state.chat.activeThread === undefined
@@ -211,8 +250,9 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
                 seededHeadSha,
                 seededCwd,
                 seededReaderResolves,
-                // The first turn of a thread gives it its title.
-                title: t.rev === 0 ? threadTitle(userText) : t.title,
+                // The first turn of a general thread gives it its title; an anchored one is named
+                // after its place.
+                title: t.rev === 0 && t.anchor === undefined ? threadTitle(userText) : t.title,
               }
             : t
         ),
@@ -289,7 +329,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     slot: RunningTurn
   ): AsyncIterable<ChatEvent> {
     const settings = await effectiveSettings()
-    const thread = await resolveThread(target.key, settings.chatAgent, input.thread)
+    const thread = await resolveThread(target.key, settings, input.thread, input.context, target.artifact)
     const at = deps.now().toISOString()
     const contextBlock = await renderChatContext(input.context, {
       artifact: target.artifact,
@@ -465,6 +505,8 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
           agent: t.agent,
           title: t.title,
           createdAt: t.createdAt,
+          turns: t.rev,
+          ...(t.anchor === undefined ? {} : { anchor: t.anchor }),
         })),
         activeThread: state.chat.activeThread ?? null,
         agent: settings.chatAgent,
@@ -504,6 +546,16 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         return review !== null && folderOf(review.key) === folder ? [review.key] : []
       }),
   }
+}
+
+/** An anchored thread's title: its place, named the way the composer names a context. */
+function anchorTitle(context: ChatContext, artifact: ReviewArtifact): string {
+  const title = chatContextLabel(
+    context,
+    id => artifact.layers.find(layer => layer.id === id)?.title,
+    fingerprint => artifact.points.find(point => point.fingerprint === fingerprint)?.title
+  )
+  return title.length <= THREAD_TITLE_MAX ? title : `${title.slice(0, THREAD_TITLE_MAX - 1)}…`
 }
 
 function seedPaths(deps: ChatManagerDeps, target: ChatTarget, code: CodeSource): SeedPaths {

@@ -52,12 +52,95 @@
 .chat-h h2 {
   margin-right: auto;
 }
-.chat-h select {
-  padding: 3px 6px;
-  font-size: 13px;
-  flex: 1 1 120px;
+/* The AI Chat tab shows one thread at a time; the Threads tab lists them all. */
+.chat[data-tab='threads'] > :is(.chat-h, .transcript, .chat-composer) {
+  display: none;
+}
+.threads-panel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.threads-panel[hidden] {
+  display: none;
+}
+.threads-h {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ink);
+  background: var(--panel-2);
+}
+.thread-title {
+  flex: 1 1 0;
   min-width: 0;
-  width: 0;
+  margin: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thread-index {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px 14px 14px;
+}
+.thread-index .empty {
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.thread-group {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.thread-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.thread-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ink);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.thread-item:hover,
+.thread-item:focus-visible {
+  background: var(--panel-2);
+}
+.thread-item.current {
+  border-color: var(--accent);
+}
+.thread-item-t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* An ask command whose place has a thread carries its question count, written by chat.js. */
+[data-act='ask']::after {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 600;
 }
 select,
 input,
@@ -147,21 +230,26 @@ textarea {
 }
 
 /* ---- The side pane's tabs: AI Chat and the review being written ---- */
+/* Three tabs and minimize fit the default width; a pane dragged narrower scrolls them sideways
+   instead of breaking a label over two lines. */
 .side-tabs {
   display: flex;
   flex-shrink: 0;
   align-items: stretch;
-  padding: 0 14px 0 4px;
+  padding: 0 8px 0 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
   border-bottom: 1px solid var(--ink);
   background: var(--panel-2);
 }
 .side-tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 10px 8px;
+  gap: 4px;
+  padding: 10px 6px 8px;
   border: 0;
   border-bottom: 2px solid transparent;
+  white-space: nowrap;
   background: none;
   color: var(--fg-muted);
   font: inherit;
@@ -176,10 +264,16 @@ textarea {
   outline: 2px solid var(--focus);
   outline-offset: -2px;
 }
+/* Minimize stays in reach while the tabs scroll under it. */
 .side-tabs .chat-minimize {
+  position: sticky;
+  right: 0;
   align-self: center;
+  padding-left: 6px;
+  background: var(--panel-2);
 }
-.review-count {
+.review-count,
+.thread-count {
   min-width: 18px;
   padding: 0 5px;
   border-radius: 9px;
@@ -189,9 +283,14 @@ textarea {
   line-height: 18px;
   text-align: center;
 }
-.review-count[data-empty] {
+/* A thread is not something left to do, so its count stays quiet, and is gone while there is none. */
+.review-count[data-empty],
+.thread-count {
   background: var(--line);
   color: var(--fg-muted);
+}
+.thread-count[data-empty] {
+  display: none;
 }
 /* The review tab hides the chat's parts without unmounting them, so a draft message survives. */
 .chat[data-tab='review'] > :is(.chat-h, .transcript, .chat-composer) {
