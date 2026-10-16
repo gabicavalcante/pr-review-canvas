@@ -61,7 +61,10 @@ import {
   pointSwitches,
   pointToMarkdown,
   postedUrls,
+  pointCollapses,
+  readPageDensity,
   setPointExpanded,
+  setPointsDensity,
 } from './points.js'
 import { openSettleBox, resolvePoint, selfReviewActions, setSettled } from './self-review.js'
 import { layerProgress } from './progress.js'
@@ -993,6 +996,15 @@ export function wireReview(root, session, opts = {}) {
         setPointExpanded(point)
       }
     },
+    'points-density': () => {
+      const page = doc.documentElement
+      const storage = typeof localStorage === 'undefined' ? null : localStorage
+      setPointsDensity(page, readPageDensity(page) === 'detailed' ? 'compact' : 'detailed', storage)
+      // A point opened by hand closes with the switch, so the list reads as the switch says.
+      for (const point of Array.from(root.querySelectorAll('.findings > li[data-expanded]'))) {
+        setPointExpanded(point, false)
+      }
+    },
     'toggle-handled': el => flipSwitch(el, 'hiding'),
     'toggle-resolved': el => flipSwitch(el, 'showingResolved'),
     ...selfReviewActions(session, message => toast(root, message)),
@@ -1299,10 +1311,10 @@ export function wireReview(root, session, opts = {}) {
         stepPoint(order, points, decided.action === 'next-point' ? 1 : -1)
         break
       case 'toggle': {
-        // A point already acted on opens or collapses itself.
-        const handled = focused()?.closest('[data-point].is-handled')
-        if (handled !== null && handled !== undefined) {
-          setPointExpanded(handled)
+        // A point drawn as its title line opens or collapses itself.
+        const collapsible = focused()?.closest('[data-point]')
+        if (collapsible !== null && collapsible !== undefined && pointCollapses(collapsible)) {
+          setPointExpanded(collapsible)
           break
         }
         // An open point in focus stands for the file card that holds its line, not the layer it is listed in.

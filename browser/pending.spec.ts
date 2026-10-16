@@ -171,7 +171,7 @@ test('adds an attention point to the review and gives it back on delete', async 
   await expect(page.locator('tr.pending-row .pending-cmt')).toContainText('Sum instead of product')
 
   // Expanded, the point shows its draft, which is edited right there.
-  await point.locator('[data-act="point-expand"]').click()
+  await point.locator('.p-toggle').click()
   const draft = point.locator('.p-outcome .pending-cmt')
   await expect(draft).toContainText('Sum instead of product')
   await draft.locator('[data-act="pending-edit"]').click()

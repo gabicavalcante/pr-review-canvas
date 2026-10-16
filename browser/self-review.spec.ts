@@ -40,7 +40,7 @@ test('the author settles a reviewer point with a reason, reads it after a reload
   await expect(showResolved).toHaveText('show the 1 resolved')
   await showResolved.click()
   await expect(card).toBeVisible()
-  await card.locator('[data-act="point-expand"]').click()
+  await card.locator('.p-toggle').click()
   await expect(card.locator('.settled-reason')).toContainText('The spec says sum')
   await expect(card.locator('a[href$="#discussion_r5001"]')).toHaveCount(1)
   await card.locator('[data-act="point-unsettle"]').click()

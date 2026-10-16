@@ -50,15 +50,21 @@ const POSTED_INLINE = ghPost(body => ({
 export const test = base.extend<{
   /** The reader opened AI Chat before, so a wide screen docks it; false starts as a first visit. */
   chatOpened: boolean
+  /** The density the reader chose for the layers' point lists; most specs act on whole points. */
+  pointsDensity: 'compact' | 'detailed'
   reviewUrl: string
   selfReviewUrl: string
   noChatUrl: string
   chatServer: (options?: ChatServerOptions) => Promise<ChatServer>
 }>({
   chatOpened: [true, { option: true }],
-  page: async ({ page, chatOpened }, use) => {
+  pointsDensity: ['detailed', { option: true }],
+  page: async ({ page, chatOpened, pointsDensity }, use) => {
     if (chatOpened) {
       await page.addInitScript(() => localStorage.setItem('pr-review.chat-minimized', '0'))
+    }
+    if (pointsDensity === 'detailed') {
+      await page.addInitScript(() => localStorage.setItem('pr-review.points-density', 'detailed'))
     }
     await use(page)
   },

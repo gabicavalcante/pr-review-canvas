@@ -343,6 +343,37 @@
 .is-handled:not([data-expanded]) .p-title {
   color: var(--fg-muted);
 }
+/* In a compact list (anything but `data-points="detailed"`, as `readPageDensity` reads it) each
+   point shows its title line until the reader opens it, as a point acted on does. A detailed list
+   shows open points whole, with no toggle to hide them. */
+:root:not([data-points='detailed'])
+  .findings
+  > li[data-point]:not([data-expanded])
+  :is(.prose, .p-outcome, .tbtns, .settle-box, .p-summary) {
+  display: none;
+}
+:root:not([data-points='detailed']) .findings > li:not([data-expanded]) {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+:root:not([data-points='detailed']) .findings > li:not([data-expanded]) .f-title {
+  margin-bottom: 0;
+}
+:root[data-points='detailed'] .findings > li:not(.is-handled) .p-toggle,
+:root:not([data-points='detailed']) .points-density .when-detailed,
+:root[data-points='detailed'] .points-density .when-compact {
+  display: none;
+}
+.findings .p-title[data-act] {
+  cursor: pointer;
+}
+.points-density {
+  margin-left: 12px;
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
 .f-title .p-toggle {
   margin-left: auto;
   font-size: 12px;

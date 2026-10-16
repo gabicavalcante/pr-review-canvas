@@ -766,6 +766,11 @@ in the layer, your draft with **edit** and **delete**; in the diff the draft has
 under the point), and the commands that undo it: **reopen**, **restore**, or
 deleting the draft. The point collapses again when its status changes. A reload also collapses it.
 
+In a layer's list every point starts as one line: its level, title, a `decide` point's impact,
+kind, audience, and location. Click the title or **show** to read it and use its commands. **show details** in the heading of a
+list shows every open point whole, in every layer, and **compact** goes back; the browser remembers
+the choice. A point on its line in the diff is always drawn whole while it is open.
+
 The counts in the rail, the layer headings, and the overview squares include only open points. The
 overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author · …** counts
 each status. Resolved points start off the page for every reader, the author too: **show the N
@@ -774,8 +779,8 @@ all resolved drops its **Attention points** heading while they are hidden. A lin
 point shows that one point, and a point you just resolved stays shown until the next load. The
 line's **hide the N acted on** command removes your other collapsed points from the page until you
 click it again; **edit** on an AI Chat proposed resolution brings its point back while the reason
-box is open. `]` and `[` step only through open points. `o` on a collapsed point expands it or collapses
-it again.
+box is open. `]` and `[` step only through open points. `o` on a point drawn as one line expands it or
+collapses it again.
 
 ### Self-review
 

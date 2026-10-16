@@ -15,7 +15,7 @@ test('keeps a dismissed point expanded when its save completes', async ({ page, 
     await card.locator('[data-act="point-dismiss"]').click()
     // The page shows the dismissal before the server answers.
     await expect(card).toHaveAttribute('data-status', 'dismissed')
-    const toggle = card.locator('[data-act="point-expand"]')
+    const toggle = card.locator('.p-toggle')
     await toggle.click()
     await expect(card.locator('.prose')).toBeVisible()
 
@@ -66,7 +66,7 @@ test('dismisses a point everywhere, keeps it dismissed after reload, and restore
   await hide.click()
   await expect(card).toBeVisible()
 
-  await card.locator('[data-act="point-expand"]').click()
+  await card.locator('.p-toggle').click()
   await card.locator('[data-act="point-restore"]').click()
   await expect(card).toHaveAttribute('data-status', 'open')
   await expect(card.locator('.prose')).toBeVisible()
@@ -136,5 +136,38 @@ test('hidden takes priority over component display rules', async ({ page, review
   expect(displays).toEqual({
     hidden: ['none', 'none', 'none', 'none', 'none'],
     shown: ['grid', 'flex', 'inline-flex', 'grid', 'table-row'],
+  })
+})
+
+test.describe('a first visit', () => {
+  test.use({ pointsDensity: 'compact' })
+
+  test('lists each point as one line, opens one from its title, and remembers show details', async ({
+    page,
+    reviewUrl,
+  }) => {
+    await page.goto(reviewUrl)
+    const card = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
+    await expect(card.locator('.f-title .p-title')).toBeVisible()
+    await expect(card.locator('.prose')).toBeHidden()
+    await expect(card.locator('.tbtns')).toBeHidden()
+    // The point stays whole on its line in the diff.
+    await page.locator('#file-src_app_ts').scrollIntoViewIfNeeded()
+    await expect(page.locator('tr.ifind[data-fingerprint="fp-1"] .prose')).toBeVisible()
+    await card.locator('.p-title').click()
+    await expect(card.locator('.prose')).toBeVisible()
+    await expect(card.locator('[data-act="point-dismiss"]')).toBeVisible()
+    await card.locator('.p-title').click()
+    await expect(card.locator('.prose')).toBeHidden()
+
+    const density = page.locator('section.layer[data-layer="run-path"] [data-act="points-density"]')
+    await expect(density).toHaveText('show details', { useInnerText: true })
+    await density.click()
+    await expect(card.locator('.prose')).toBeVisible()
+    await expect(card.locator('.p-toggle')).toBeHidden()
+    await expect(density).toHaveText('compact', { useInnerText: true })
+    await page.reload()
+    await expect(card.locator('.prose')).toBeVisible()
+    await expect(density).toHaveText('compact', { useInnerText: true })
   })
 })

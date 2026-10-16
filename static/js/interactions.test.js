@@ -663,13 +663,30 @@ describe('attention points', () => {
   it('expands a collapsed point and collapses it again', async () => {
     const { root } = setup({ state: { ...BASE, dismissed: { 'fp-1': { at: NOW.toISOString() } } } })
     const card = layerCard(root, 'fp-1')
-    const toggle = click(root, 'section.layer li.finding[data-fingerprint="fp-1"] [data-act="point-expand"]')
+    const toggle = click(root, 'section.layer li.finding[data-fingerprint="fp-1"] .p-toggle')
     expect(card?.hasAttribute('data-expanded')).toBe(true)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     // The row in the diff keeps its own view.
     expect(root.querySelector('tr.ifind[data-fingerprint="fp-1"]')?.hasAttribute('data-expanded')).toBe(false)
-    click(root, 'section.layer li.finding[data-fingerprint="fp-1"] [data-act="point-expand"]')
+    // The title opens and closes it as well.
+    click(root, 'section.layer li.finding[data-fingerprint="fp-1"] .p-title')
     expect(card?.hasAttribute('data-expanded')).toBe(false)
+  })
+
+  it('opens an open point of a compact list from its title, and closes every one with the switch', () => {
+    const { root } = setup()
+    const card = layerCard(root, 'fp-1')
+    click(root, 'section.layer li.finding[data-fingerprint="fp-1"] .p-title')
+    expect(card?.hasAttribute('data-expanded')).toBe(true)
+    click(root, '[data-act="points-density"]')
+    expect(document.documentElement.dataset['points']).toBe('detailed')
+    expect(card?.hasAttribute('data-expanded')).toBe(false)
+    // A detailed list shows the point whole, so its title opens nothing.
+    click(root, 'section.layer li.finding[data-fingerprint="fp-1"] .p-title')
+    expect(card?.hasAttribute('data-expanded')).toBe(false)
+    click(root, '[data-act="points-density"]')
+    expect(document.documentElement.dataset['points']).toBe('compact')
+    delete document.documentElement.dataset['points']
   })
 
   it('switches the points acted on off the page and back from the overview', () => {
@@ -1623,10 +1640,16 @@ describe('keyboard', () => {
     const box = root.querySelector('.composer-box')
     expect(box?.closest('tr')?.previousElementSibling?.id).toBe('L-src_app_ts-new-4')
     key('Escape')
-    // o collapses the file card of the point's line, and leaves the layer it is listed in open.
+    // In a compact list o opens the point in focus.
+    key('o')
+    expect(root.querySelector('#point-p-1')?.hasAttribute('data-expanded')).toBe(true)
+    // In a detailed list the point is whole, so o collapses the file card of the point's line and
+    // leaves the layer it is listed in open.
+    document.documentElement.dataset['points'] = 'detailed'
     key('o')
     expect(root.querySelector('#file-src_app_ts .file-body')?.hasAttribute('hidden')).toBe(true)
     expect(root.querySelector('#layer-run-path .layer-body')?.hasAttribute('hidden')).toBe(false)
+    delete document.documentElement.dataset['points']
     key('R')
     await flush()
     expect(calls).toEqual([['reviewed', { id: 'layer:run-path', reviewed: true }]])
