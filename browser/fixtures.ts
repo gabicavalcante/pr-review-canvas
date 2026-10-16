@@ -48,11 +48,20 @@ const POSTED_INLINE = ghPost(body => ({
 }))
 
 export const test = base.extend<{
+  /** The reader opened AI Chat before, so a wide screen docks it; false starts as a first visit. */
+  chatOpened: boolean
   reviewUrl: string
   selfReviewUrl: string
   noChatUrl: string
   chatServer: (options?: ChatServerOptions) => Promise<ChatServer>
 }>({
+  chatOpened: [true, { option: true }],
+  page: async ({ page, chatOpened }, use) => {
+    if (chatOpened) {
+      await page.addInitScript(() => localStorage.setItem('pr-review.chat-minimized', '0'))
+    }
+    await use(page)
+  },
   chatServer: async ({ page }, use) => {
     const stops: Array<() => Promise<void>> = []
     await use(async (options = {}) => {

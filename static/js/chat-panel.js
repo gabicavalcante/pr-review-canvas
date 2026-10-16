@@ -18,7 +18,7 @@ export function wireChatPanel(root, pane, opts = {}) {
   const layout = root.querySelector('.layout')
   const narrow = window.matchMedia('(max-width: 1360px)')
   const mobile = window.matchMedia('(max-width: 600px)')
-  /** Floating panels start minimized; a docked one starts the way the reader last left it. */
+  /** Floating panels start minimized; a docked one starts the way the reader last left it, minimized at first. */
   let floating = false
   let docked = !opts.minimized
 
@@ -44,8 +44,11 @@ export function wireChatPanel(root, pane, opts = {}) {
 
   function open() {
     if (!shown()) {
-      if (narrow.matches) floating = true
-      else {
+      // A chat opened while floating stays open when the window widens past the breakpoint.
+      if (narrow.matches) {
+        floating = true
+        docked = true
+      } else {
         docked = true
         opts.onMinimizedChange?.(false)
       }

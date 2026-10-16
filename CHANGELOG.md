@@ -45,6 +45,11 @@
 - The overview header names each level next to its count, as in `3 decide · 1 check · 2 fyi`, in
   place of the legend that opened on hover.
 
+### AI Chat
+
+- On a wide screen AI Chat starts minimized until you open it once, so a canvas you do not chat
+  on keeps its full width. After that it opens the way you last left it.
+
 ### Upgrade
 
 - A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled
