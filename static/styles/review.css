@@ -74,10 +74,15 @@
   color: var(--fg-muted);
   font-weight: 400;
 }
-.summary,
-.rationale,
+/* Prose in cards and comments keeps a readable line length. The summary, a layer's rationale and
+   the PR description span the whole panel, diagrams included, so they fill it. */
 .prose {
   max-width: 100ch;
+}
+.summary,
+.rationale,
+.pr-desc .prose {
+  max-width: none;
 }
 .summary {
   font-size: 15px;

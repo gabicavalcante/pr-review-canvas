@@ -38,6 +38,11 @@
 - A generation that leaves a decide point without an impact, or gives one to another point, is
   sent back to the agent to fix (`POINT_IMPACT`).
 
+### Reading
+
+- The overview summary, a layer's rationale and the PR description fill the width of their panel,
+  diagrams included, instead of stopping at 100 characters.
+
 ### Upgrade
 
 - A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled
