@@ -327,7 +327,6 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     slot: RunningTurn
   ): AsyncIterable<ChatEvent> {
     const settings = await effectiveSettings()
-    const thread = await resolveThread(target.key, settings, input.thread, input.context, target.artifact)
     const at = deps.now().toISOString()
     const contextBlock = await renderChatContext(input.context, {
       artifact: target.artifact,
@@ -337,6 +336,9 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     })
     const code = yield* prepareCode(target, settings, slot)
     const { cwd } = code
+    // Resolved once nothing above can refuse the question: a question that names no thread makes
+    // one, and a refused one would leave it empty, under no name the pane ever heard.
+    const thread = await resolveThread(target.key, settings, input.thread, input.context, target.artifact)
     // Saved on the answer, so the warning is still there when the thread is opened again.
     const fallback: Pick<ChatTurn, 'fallback'> =
       code.kind === 'fallback' ? { fallback: { message: code.message, branch: code.branch } } : {}

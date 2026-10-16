@@ -207,6 +207,11 @@ describe('a thread per place', () => {
     expect(activeThread).toBe(T2)
   })
 
+  it('makes no thread for a question about a place the canvas does not have', async () => {
+    await expect(ask({ kind: 'point', fingerprint: 'gone' })).rejects.toThrow('no such attention point')
+    expect((await manager.threads(42)).threads).toEqual([])
+  })
+
   it('cuts a long place name to the title’s length', async () => {
     const layers = artifact.layers.map(layer =>
       layer.id === 'run-path' ? { ...layer, title: 'A layer with a long title '.repeat(4) } : layer
@@ -931,8 +936,13 @@ describe('the review checkout a turn reads', () => {
     await expect(
       collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
     ).rejects.toThrow(CheckoutBusyError)
+    // The refused question made no thread, so asking it again, still unnamed, makes one.
+    expect((await manager.threads(42)).threads).toEqual([])
     await held.release()
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    expect((await manager.threads(42)).threads.map(thread => [thread.title, thread.turns])).toEqual([
+      ['two', 1],
+    ])
     const again = await checkouts.lease(42, 'chat')
     await again.release()
   })

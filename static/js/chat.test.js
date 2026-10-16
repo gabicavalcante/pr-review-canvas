@@ -758,6 +758,37 @@ describe('a thread per place', () => {
     expect(el(root, '#chat-log').textContent).toContain('A new thread about the whole PR.')
   })
 
+  it('takes a thread’s place from the server once the list holds it', async () => {
+    // The setting was off on the server when the draft's question went: it landed in a thread
+    // with no place.
+    const general = {
+      name: 'pr-review-a-b-42-claude-t3',
+      agent: 'claude',
+      title: 'why this order?',
+      createdAt: '',
+      turns: 1,
+    }
+    let listed = PLACED
+    const { root, chat } = mount({
+      fetchThreads: async () => listed,
+      streamChat: async (_pr, _input, opts) => {
+        listed = { ...PLACED, threads: [...PLACED.threads, general], activeThread: general.name }
+        opts.onEvent({ event: 'turn', data: { thread: general.name, agent: 'claude', seeded: true } })
+      },
+    })
+    await flush()
+    chat.ask(LAYER)
+    await flush()
+    await sendMessage(root, 'why this order?')
+    await flush()
+    expect(el(root, '#thread-title').textContent).toBe('why this order?')
+    expect(el(root, '#thread-goto').hidden).toBe(true)
+    // The layer still has no thread, so asking about it opens one rather than staying here.
+    chat.ask(LAYER)
+    await flush()
+    expect(el(root, '#chat-log').textContent).toContain('A new thread about layer · Run path')
+  })
+
   it('stays in the thread an answer is coming into, and says so', async () => {
     /** @type {{ run: (() => void) | null }} */
     const done = { run: null }

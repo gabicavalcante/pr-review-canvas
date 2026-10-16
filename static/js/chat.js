@@ -891,12 +891,22 @@ export function wireChat(options) {
 
   /**
    * Takes the review's thread list. The open thread stays the pane's own: a draft is in no list,
-   * and a turn names its thread before the list is fetched again.
+   * and a turn names its thread before the list is fetched again. Once the list holds the open
+   * thread, its place is the one the server keeps: a draft's question can land in a thread with
+   * no place, after the setting changed or the place left the canvas.
    * @param {import('./contract-types.js').ChatThreadsResponse} data
    */
   const drawThreads = data => {
     threads = data.threads
     agentName = data.agent
+    const open = currentThread()
+    if (open !== undefined) {
+      openPlace = open.anchor
+      if (threadPerPlace) {
+        context = askedIn(openPlace)
+        drawContext()
+      }
+    }
     drawIndex()
     drawHead()
     drawMarks()
