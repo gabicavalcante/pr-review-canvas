@@ -214,7 +214,26 @@ export function testMapHtml(layer, paths) {
       return `<tr><td>${esc(t.behavior)}${note}</td><td class="st ${t.status}">${esc(t.status)}</td><td>${where}</td></tr>`
     })
     .join('')
-  return `<h3 class="lbl sub">Tests</h3><table class="testmap"><thead><tr><th scope="col">Behavior</th><th scope="col">Status</th><th scope="col">Test</th></tr></thead><tbody>${rows}</tbody></table>`
+  const coverage = testCoverage(layer.tests)
+  return (
+    `<details class="test-map">${detailsSummaryHtml(`<h3>Tests</h3><span class="pill test-cov ${coverage.level}">${coverage.label}</span>`, 'Toggle tests', 'lbl sub')}` +
+    `<table class="testmap"><thead><tr><th scope="col">Behavior</th><th scope="col">Status</th><th scope="col">Test</th></tr></thead><tbody>${rows}</tbody></table></details>`
+  )
+}
+
+/**
+ * How well the layer's tests cover its behaviors, for the label on the closed Tests table. A
+ * behavior that needs no test counts toward neither side.
+ * @param {ReadonlyArray<{ status: 'covered' | 'missing' | 'not-needed' }>} tests
+ * @returns {{ level: 'full' | 'partial' | 'none' | 'not-needed', label: string }}
+ */
+export function testCoverage(tests) {
+  const covered = tests.filter(t => t.status === 'covered').length
+  const needed = covered + tests.filter(t => t.status === 'missing').length
+  if (needed === 0) return { level: 'not-needed', label: 'no tests needed' }
+  if (covered === needed) return { level: 'full', label: 'fully covered' }
+  if (covered === 0) return { level: 'none', label: 'not covered' }
+  return { level: 'partial', label: `${covered} of ${needed} covered` }
 }
 
 /**

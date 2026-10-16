@@ -45,6 +45,7 @@ import {
   setCardRenderedHook,
   setFoldLevel,
   setRenderContext,
+  testCoverage,
   testMapHtml,
   threadsForHunks,
 } from './layers.js'
@@ -164,11 +165,26 @@ describe('layer sections', () => {
       throw new Error('no layer')
     }
     document.body.innerHTML = testMapHtml(layer, paths)
+    // Closed, under a label that says how much of what needs a test has one.
+    expect(document.querySelector('details.test-map')?.hasAttribute('open')).toBe(false)
+    expect(document.querySelector('.test-map > summary.lbl.sub h3')?.textContent).toBe('Tests')
+    expect(document.querySelector('.test-map > summary .test-cov.partial')?.textContent).toBe(
+      '1 of 2 covered'
+    )
     const rows = [...document.querySelectorAll('tbody tr')]
     expect(rows.map(r => r.querySelector('.st')?.textContent)).toEqual(['covered', 'missing', 'not-needed'])
     expect(rows[0]?.querySelector('a.loc')?.getAttribute('href')).toBe('#file:src/app.test.ts')
     expect(rows[1]?.querySelector('.muted.small')?.textContent?.trim()).toBe('y is unused')
     expect(testMapHtml({ ...layer, tests: [] }, paths)).toBe('')
+  })
+
+  it('labels the coverage from the behaviors that need a test', () => {
+    /** @param {Array<'covered' | 'missing' | 'not-needed'>} statuses */
+    const coverage = statuses => testCoverage(statuses.map(status => ({ status })))
+    expect(coverage(['covered', 'covered', 'not-needed'])).toEqual({ level: 'full', label: 'fully covered' })
+    expect(coverage(['covered', 'missing', 'missing'])).toEqual({ level: 'partial', label: '1 of 3 covered' })
+    expect(coverage(['missing', 'not-needed'])).toEqual({ level: 'none', label: 'not covered' })
+    expect(coverage(['not-needed'])).toEqual({ level: 'not-needed', label: 'no tests needed' })
   })
 
   it('renders a file card that was already reviewed as checked and folded away', () => {
@@ -223,7 +239,7 @@ describe('layer sections', () => {
       )
     ).toEqual(['body', 'lbl sub', 'testmap', 'lbl sub', 'findings', 'lbl sub', 'files'])
     expect([...(section?.querySelectorAll('.lbl.sub') ?? [])].map(h => h.textContent)).toEqual([
-      'Tests',
+      'Tests1 of 2 covered',
       'Attention points · 1',
       'Files · 3',
     ])

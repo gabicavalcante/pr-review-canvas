@@ -46,6 +46,9 @@
   place of the legend that opened on hover.
 - The overview's Conversation starts closed, like the PR description and the review history, with
   its comment count in the title.
+- A layer's Tests table starts closed under a label that sums up its coverage: `fully covered`,
+  `2 of 3 covered`, `not covered`, or `no tests needed`. A behavior that needs no test counts
+  toward neither side.
 
 ### AI Chat
 

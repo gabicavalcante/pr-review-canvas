@@ -445,7 +445,28 @@ details[open] > summary .chev,
   overflow-wrap: anywhere;
 }
 
-/* test map */
+/* test map: closed under a header whose label says how well the tests cover the layer */
+.test-map > summary.lbl.sub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.test-map > summary h3 {
+  margin: 0;
+  font: inherit;
+}
+.test-cov.full {
+  color: var(--ok);
+}
+.test-cov.partial {
+  color: var(--warn);
+}
+.test-cov.none {
+  color: var(--bad);
+}
+.test-cov.not-needed {
+  color: var(--fg-muted);
+}
 .testmap {
   width: 100%;
   border-collapse: collapse;

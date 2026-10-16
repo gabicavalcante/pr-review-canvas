@@ -166,7 +166,8 @@ test('adds an attention point to the review and gives it back on delete', async 
   await expect(point.locator('.p-summary')).toHaveText('Waits in your review · not on GitHub yet')
   await expect(point.locator('.prose').first()).toBeHidden()
   await expect(page.locator('.pending-bar')).toContainText('1 pending comment')
-  // The point's own text is what waits, drawn on the line it is anchored to.
+  // The point's own text is what waits, drawn on the line it is anchored to once that card draws.
+  await page.locator('#file-src_app_ts').scrollIntoViewIfNeeded()
   await expect(page.locator('tr.pending-row .pending-cmt')).toContainText('Sum instead of product')
 
   // Expanded, the point shows its draft, which is edited right there.
