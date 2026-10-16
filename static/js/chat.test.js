@@ -725,16 +725,37 @@ describe('a thread per place', () => {
     expect(selected).toEqual(['pr-review-a-b-42-claude-t1'])
   })
 
-  it('opens a draft about the whole PR when asked about it from a place’s thread', async () => {
+  it('goes back to the latest thread about the whole PR when asked about it from a place’s thread', async () => {
+    /** @type {string[]} */
+    const loaded = []
     const { root, chat } = mount({
       fetchThreads: async () => ({ ...PLACED, activeThread: 'pr-review-a-b-42-claude-t1' }),
+      fetchThreadHistory: async (_pr, name) => {
+        loaded.push(name)
+        return { name, turns: [] }
+      },
+    })
+    await flush()
+    chat.ask({ kind: 'pr' })
+    await flush()
+    expect(el(root, '#thread-title').textContent).toBe('overall')
+    expect(loaded).toEqual(['pr-review-a-b-42-claude-t1', 'pr-review-a-b-42-claude-t2'])
+    expect(el(root, '#thread-goto').hidden).toBe(true)
+  })
+
+  it('opens a draft about the whole PR when there is no thread about it yet', async () => {
+    const { root, chat } = mount({
+      fetchThreads: async () => ({
+        ...PLACED,
+        threads: PLACED.threads.slice(0, 1),
+        activeThread: 'pr-review-a-b-42-claude-t1',
+      }),
     })
     await flush()
     chat.ask({ kind: 'pr' })
     await flush()
     expect(el(root, '#thread-title').textContent).toBe('New thread')
     expect(el(root, '#chat-log').textContent).toContain('A new thread about the whole PR.')
-    expect(el(root, '#thread-goto').hidden).toBe(true)
   })
 
   it('stays in the thread an answer is coming into, and says so', async () => {

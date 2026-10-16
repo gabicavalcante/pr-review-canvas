@@ -186,6 +186,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
   ): Promise<ChatThread> => {
     const agent = settings.chatAgent
     const state = await deps.state.read(key)
+    // A question about the whole PR that names no thread comes from new thread, so it starts one.
     const place = settings.chatThreadPerPlace && context.kind !== 'pr' ? context : undefined
     const thread =
       state.chat.threads.find(t => t.name === wanted && t.agent === agent) ??

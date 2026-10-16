@@ -983,10 +983,10 @@ the focused target, and `/` focuses the message box.
 
 The **Threads** tab lists the review's threads by kind of place (attention points, lines, files,
 layers, whole PR) with the number of questions in each; pick one to open it in **AI Chat**. **new
-thread** starts one about the whole PR. Threads saved before threads had a place still appear in
-the Threads tab, under whole PR. When the canvas is generated again without a thread's place, the
-thread's head says the place is no longer on this canvas, and its questions are about the whole
-PR.
+thread** starts one about the whole PR, and an ask about the whole PR comes back to the latest of
+those. Threads saved before threads had a place still appear in the Threads tab, under whole PR.
+When the canvas is generated again without a thread's place, the thread's head says the place is no
+longer on this canvas, and its questions are about the whole PR.
 
 To send every ask to the open thread instead, clear **A thread per place** under **AI Chat** in
 **settings**, or set `chatThreadPerPlace: false` in [`settings.yml`](#local-settings-and-storage).

@@ -10,7 +10,8 @@
   conversation about one point no longer mixes with another's.
 - The chat pane shows one thread at a time, with its place on top and **go to code** to lead back
   to it. The new **Threads** tab lists them by kind of place, with the questions in each, and
-  **new thread** starts one about the whole PR. It replaces the thread list in the pane's head.
+  **new thread** starts one about the whole PR; an ask about the whole PR comes back to the latest
+  of those. It replaces the thread list in the pane's head.
 - The ask command of a place with a thread shows how many questions that thread holds.
 - The open thread comes back when the page is reloaded.
 - `chatThreadPerPlace: false` in `settings.yml`, or **A thread per place** cleared in the settings

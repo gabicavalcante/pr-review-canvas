@@ -16,8 +16,9 @@ export const WHOLE_PR = { kind: 'pr' }
 
 /**
  * The thread an ask about a place continues: the one this agent keeps for that place. A thread of
- * another agent is not continued, since its session belongs to that agent, and a thread with no
- * place, from before threads had one or about the whole PR, is no place's.
+ * another agent is not continued, since its session belongs to that agent. A thread with no place,
+ * one from before threads had a place included, is about the whole PR; new thread makes several of
+ * those, and an ask about the whole PR continues the latest.
  * @template {{ agent: string, anchor?: ChatContext | undefined }} Thread
  * @param {readonly Thread[]} threads
  * @param {string} agent
@@ -25,7 +26,7 @@ export const WHOLE_PR = { kind: 'pr' }
  * @returns {Thread | undefined}
  */
 export function threadOfPlace(threads, agent, place) {
-  return threads.find(t => t.agent === agent && t.anchor !== undefined && sameChatContext(t.anchor, place))
+  return threads.findLast(t => t.agent === agent && sameChatContext(t.anchor ?? WHOLE_PR, place))
 }
 
 /**

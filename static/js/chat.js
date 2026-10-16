@@ -1185,7 +1185,7 @@ export function wireChat(options) {
       refuseWhileAnswering()
       return false
     }
-    const placed = next.kind === 'pr' ? undefined : threadOfPlace(threads, agentName, next)
+    const placed = threadOfPlace(threads, agentName, next)
     if (placed === undefined) {
       openDraft(next)
     } else {
