@@ -126,22 +126,32 @@ test('the other threads wait, and look it, while an answer comes in', async ({
   chatServer,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
-  const { url } = await chatServer({ runner: { delayMs: 400 } })
+  // The question is held where the turn sets up, so the answer is still coming in for as long as
+  // the test looks.
+  let release = () => {}
+  const held = new Promise<void>(resolve => {
+    release = resolve
+  })
+  const { url } = await chatServer({
+    runner: { ensureGate: held },
+    setup: async t => {
+      await t.ctx.chat.createThread(42)
+    },
+  })
   await page.goto(url)
   const pointAsk = page
     .locator('section.layer li.finding[data-fingerprint="fp-1"]')
     .locator('[data-act="ask"]')
     .first()
-  await askAbout(page, page.getByRole('button', { name: 'ask about this layer' }).first(), 'Anything risky?')
   await pointAsk.click()
   await page.getByText('ask something else…', { exact: true }).first().click()
   await page.locator('#msg').fill('Is the sum intended?')
   await page.keyboard.press('Enter')
   await page.locator('#side-tab-threads').click()
-  const layerThread = page.locator('#thread-index [data-thread-open]').filter({ hasText: 'layer · Run path' })
-  await expect(layerThread).toBeDisabled()
-  await expect(layerThread).toHaveCSS('cursor', 'not-allowed')
-  // Once the answer is in, the thread opens again.
-  await expect(layerThread).toBeEnabled({ timeout: 10_000 })
-  await expect(layerThread).toHaveCSS('cursor', 'pointer')
+  const waiting = page.locator('#thread-index [data-thread-open]').filter({ hasText: 'New thread' })
+  await expect(waiting).toBeDisabled()
+  await expect(waiting).toHaveCSS('cursor', 'not-allowed')
+  release()
+  await expect(waiting).toBeEnabled()
+  await expect(waiting).toHaveCSS('cursor', 'pointer')
 })
