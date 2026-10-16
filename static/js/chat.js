@@ -7,15 +7,14 @@
 /** @typedef {import('./proposed-comment.js').ProposedComment} ProposedComment */
 /** @typedef {import('./proposed-comment.js').ProposedResolution} ProposedResolution */
 /** @typedef {import('./review-session.js').ReviewSession} ReviewSession */
+import { cancelChat, fetchThreadHistory, fetchThreads, selectThread, streamChat } from './api.js'
 import {
-  cancelChat,
-  createThread,
-  fetchThreadHistory,
-  fetchThreads,
-  selectThread,
-  streamChat,
-} from './api.js'
-import { chatContextAttrs, chatContextLabel, sameChatContext, WHOLE_PR } from './chat-context.js'
+  chatContextAttrs,
+  chatContextLabel,
+  sameChatContext,
+  threadOfPlace,
+  WHOLE_PR,
+} from './chat-context.js'
 import { wireChatPanel } from './chat-panel.js'
 import { navigateLink } from './deep-link.js'
 import {
@@ -30,7 +29,9 @@ import {
 import { runCommand, showCommandError } from './commands.js'
 import { isQueuedComment, postedCommentUrl, sendCommandsHtml } from './comment-link.js'
 import { esc, flash, qs, scrollIntoViewSafe } from './dom.js'
+import { cssEscape } from './anchors.js'
 import { getRenderContext } from './layers.js'
+import { lineLink } from './links.js'
 import { renderMarkdown } from './markdown.js'
 import { pendingComments } from './pending.js'
 import { pointStatus, resolvable } from './points.js'
@@ -177,7 +178,6 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
 /**
  * @typedef {{
  *   fetchThreads: typeof fetchThreads,
- *   createThread: typeof createThread,
  *   fetchThreadHistory: typeof fetchThreadHistory,
  *   selectThread: typeof selectThread,
  *   cancelChat: typeof cancelChat,
@@ -189,7 +189,6 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
 function withDefaults(overrides) {
   return {
     fetchThreads,
-    createThread,
     fetchThreadHistory,
     selectThread,
     cancelChat,
@@ -576,6 +575,12 @@ export function wireChat(options) {
   })
   /** @type {string | null} */
   let activeThread = null
+  /**
+   * The place the thread on the AI Chat tab is about: a saved thread's place, or the one a draft
+   * was opened for. Undefined for a thread about the whole PR.
+   * @type {ChatContext | undefined}
+   */
+  let openPlace
   /** The reader's `chatThreadPerPlace`: an ask opens the thread of its place, or the open one. */
   let threadPerPlace = options.threadPerPlace ?? true
   // A thread of its own place is titled after it; the open thread takes questions about anything,
@@ -630,30 +635,42 @@ export function wireChat(options) {
     session.artifact.points.find(p => p.fingerprint === fp)?.title
   const currentThread = () => threads.find(t => t.name === activeThread)
   /**
-   * What the open thread is about. A thread not made yet is about the context it was opened for:
-   * its first message makes it on the server.
-   * @returns {ChatContext | undefined}
+   * Whether a place is on the canvas on screen. A thread outlives the canvas it was made on, and a
+   * question about a place the canvas no longer has is refused.
+   * @param {ChatContext} place
    */
-  const openAnchor = () =>
-    activeThread === null
-      ? context.kind === 'pr' || !threadPerPlace
-        ? undefined
-        : context
-      : currentThread()?.anchor
+  const onCanvas = place => {
+    switch (place.kind) {
+      case 'point':
+        return pointTitle(place.fingerprint) !== undefined
+      case 'layer':
+        return layerTitle(place.layerId) !== undefined
+      case 'file':
+      case 'lines':
+        return paths.has(place.path)
+      case 'pr':
+        return true
+    }
+  }
+  /**
+   * What a question asked in a thread about `place` is about: that place while the canvas has it,
+   * else the whole PR.
+   * @param {ChatContext | undefined} place
+   * @returns {ChatContext}
+   */
+  const askedIn = place => (place !== undefined && onCanvas(place) ? place : WHOLE_PR)
   /**
    * What a sent message names above its text, so a reader scrolling back sees what each question
    * was about. A message about the whole PR, about the thread's own place, or one saved before
    * turns kept a context, names none.
    * @param {ChatContext | undefined} about
    */
-  const turnContext = about => {
-    const anchor = openAnchor()
-    return about === undefined ||
-      about.kind === 'pr' ||
-      (anchor !== undefined && sameChatContext(anchor, about))
+  const turnContext = about =>
+    about === undefined ||
+    about.kind === 'pr' ||
+    (openPlace !== undefined && sameChatContext(openPlace, about))
       ? {}
       : { context: chatContextLabel(about, layerTitle, pointTitle) }
-  }
   /**
    * A place as a thread's head names it: a point by its own title, since the head already says
    * it is a thread about that point.
@@ -662,18 +679,28 @@ export function wireChat(options) {
   const placeName = anchor =>
     (anchor.kind === 'point' ? pointTitle(anchor.fingerprint) : undefined) ??
     chatContextLabel(anchor, layerTitle, pointTitle)
-  /** @param {(typeof threads)[number]} thread */
+  /**
+   * A thread as the head and the index name it: by its place while the canvas has it, by the title
+   * it was saved with otherwise.
+   * @param {(typeof threads)[number]} thread
+   */
   const shownTitle = thread =>
-    thread.anchor?.kind === 'point' ? (pointTitle(thread.anchor.fingerprint) ?? thread.title) : thread.title
+    thread.anchor !== undefined && onCanvas(thread.anchor) ? placeName(thread.anchor) : thread.title
 
   const drawHead = () => {
     const thread = currentThread()
-    const anchor = openAnchor()
-    threadTitleEl.textContent =
-      thread !== undefined ? shownTitle(thread) : anchor !== undefined ? placeName(anchor) : 'New thread'
+    const title =
+      thread !== undefined
+        ? shownTitle(thread)
+        : openPlace !== undefined
+          ? placeName(openPlace)
+          : 'New thread'
+    const gone = openPlace !== undefined && !onCanvas(openPlace)
+    threadTitleEl.textContent = gone ? `${title} · not on this canvas` : title
     threadTitleEl.title = threadTitleEl.textContent
-    gotoButton.hidden = anchor === undefined
-    box.placeholder = anchor === undefined ? 'Ask AI Chat about this PR…' : 'Ask about this, in this thread…'
+    gotoButton.hidden = askedIn(openPlace).kind === 'pr'
+    box.placeholder =
+      askedIn(openPlace).kind === 'pr' ? 'Ask AI Chat about this PR…' : 'Ask about this, in this thread…'
   }
 
   /** Shows the open thread, in the AI Chat tab. */
@@ -691,10 +718,6 @@ export function wireChat(options) {
   ])
 
   const drawIndex = () => {
-    for (const count of Array.from(root.querySelectorAll('.thread-count'))) {
-      count.textContent = String(threads.length)
-      count.toggleAttribute('data-empty', threads.length === 0)
-    }
     if (threads.length === 0) {
       index.innerHTML =
         '<p class="empty">No threads yet. Use ask on an attention point, a selection of lines, a file or a layer, or start a thread about the whole PR.</p>'
@@ -707,8 +730,10 @@ export function wireChat(options) {
         .map(t => {
           const status =
             t.name === answering ? 'answering…' : t.turns === 1 ? '1 question' : `${t.turns} questions`
+          // While an answer comes in, it is drawn into its own thread, so no other one opens.
+          const waiting = streaming && t.name !== activeThread ? ' disabled' : ''
           return (
-            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current' : ''}" data-thread-open="${esc(t.name)}">` +
+            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current' : ''}" data-thread-open="${esc(t.name)}"${waiting}>` +
             `<span class="thread-item-t">${esc(shownTitle(t))}</span>` +
             `<span class="muted small">${esc(status)}</span></button></li>`
           )
@@ -719,11 +744,6 @@ export function wireChat(options) {
   }
 
   /**
-   * A quoted CSS string, with what would end it escaped.
-   * @param {string} value
-   */
-  const cssString = value => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\a ')}"`
-  /**
    * @param {ChatContext} anchor
    * @returns {string | null}
    */
@@ -731,14 +751,14 @@ export function wireChat(options) {
     const ask = '[data-act="ask"]'
     switch (anchor.kind) {
       case 'point':
-        return `${ask}[data-ask-point=${cssString(anchor.fingerprint)}]`
+        return `${ask}[data-ask-point="${cssEscape(anchor.fingerprint)}"]`
       case 'layer':
-        return `${ask}[data-ask-layer=${cssString(anchor.layerId)}]`
+        return `${ask}[data-ask-layer="${cssEscape(anchor.layerId)}"]`
       case 'file':
-        return `${ask}[data-ask-path=${cssString(anchor.path)}]:not([data-ask-start])`
+        return `${ask}[data-ask-path="${cssEscape(anchor.path)}"]:not([data-ask-start])`
       case 'lines':
         return (
-          `${ask}[data-ask-path=${cssString(anchor.path)}][data-ask-side="${anchor.side}"]` +
+          `${ask}[data-ask-path="${cssEscape(anchor.path)}"][data-ask-side="${anchor.side}"]` +
           `[data-ask-start="${anchor.start}"][data-ask-end="${anchor.end}"]`
         )
       case 'pr':
@@ -753,7 +773,11 @@ export function wireChat(options) {
     }
     marks.textContent = threads
       .flatMap(t => {
-        const selector = t.anchor === undefined || t.turns === 0 ? null : askSelector(t.anchor)
+        // Only the thread an ask would open counts: this agent's, as `threadOfPlace` picks it.
+        const selector =
+          t.anchor === undefined || t.turns === 0 || threadOfPlace(threads, agentName, t.anchor) !== t
+            ? null
+            : askSelector(t.anchor)
         return selector === null ? [] : [`${selector}::after { content: "${t.turns}"; }`]
       })
       .join('\n')
@@ -865,8 +889,12 @@ export function wireChat(options) {
     clearTimeout(handle)
   }
 
-  const drawThreads = /** @param {import('./contract-types.js').ChatThreadsResponse} data */ data => {
-    activeThread = data.activeThread
+  /**
+   * Takes the review's thread list. The open thread stays the pane's own: a draft is in no list,
+   * and a turn names its thread before the list is fetched again.
+   * @param {import('./contract-types.js').ChatThreadsResponse} data
+   */
+  const drawThreads = data => {
     threads = data.threads
     agentName = data.agent
     drawIndex()
@@ -931,6 +959,7 @@ export function wireChat(options) {
     if (newThread instanceof HTMLButtonElement) {
       newThread.disabled = on
     }
+    drawIndex()
   }
 
   /**
@@ -951,11 +980,6 @@ export function wireChat(options) {
     const message = box.value.trim()
     if (message === '' || streaming) {
       return
-    }
-    // A new thread about the whole PR is made before its first question: the server would
-    // otherwise send it to the thread it last had open.
-    if (activeThread === null && context.kind === 'pr') {
-      await startGeneralThread()
     }
     box.value = ''
     // The turn owns the log from here on, so a history load still on its way lands nowhere.
@@ -1092,15 +1116,14 @@ export function wireChat(options) {
     if (seq !== logSeq) {
       return
     }
-    drawThreads(data)
-    if (data.activeThread === null) {
-      drawHead()
-      return
-    }
-    context = currentThread()?.anchor ?? WHOLE_PR
+    activeThread = data.activeThread
+    openPlace = data.threads.find(t => t.name === activeThread)?.anchor
+    context = askedIn(openPlace)
     drawContext()
-    drawHead()
-    await loadHistory(data.activeThread)
+    drawThreads(data)
+    if (activeThread !== null) {
+      await loadHistory(activeThread)
+    }
   }
 
   /**
@@ -1109,7 +1132,8 @@ export function wireChat(options) {
    */
   const openThread = async name => {
     activeThread = name
-    context = currentThread()?.anchor ?? WHOLE_PR
+    openPlace = currentThread()?.anchor
+    context = askedIn(openPlace)
     drawContext()
     showThread()
     drawIndex()
@@ -1125,6 +1149,7 @@ export function wireChat(options) {
   const openDraft = anchor => {
     claimLog()
     activeThread = null
+    openPlace = anchor.kind === 'pr' ? undefined : anchor
     context = anchor
     drawContext()
     proposed.clear()
@@ -1135,21 +1160,6 @@ export function wireChat(options) {
     dispatch({ type: 'thread-switch', pinned: true })
     showThread()
     drawIndex()
-  }
-
-  const startGeneralThread = async () => {
-    const seq = claimLog()
-    const data = await api.createThread(prNumber)
-    if (seq !== logSeq) {
-      return
-    }
-    drawThreads(data)
-    context = WHOLE_PR
-    drawContext()
-    proposed.clear()
-    log.innerHTML = '<p class="empty">A new thread about the whole PR.</p>'
-    dispatch({ type: 'thread-switch', pinned: true })
-    showThread()
   }
 
   /** While an answer comes in, its thread keeps the pane: the answer is drawn into this transcript. */
@@ -1167,11 +1177,7 @@ export function wireChat(options) {
    * @returns {Promise<boolean>}
    */
   const goToThread = async next => {
-    const here =
-      next.kind === 'pr'
-        ? openAnchor() === undefined && (activeThread === null || currentThread()?.anchor === undefined)
-        : sameChatContext(context, next)
-    if (here) {
+    if (sameChatContext(openPlace ?? WHOLE_PR, next)) {
       showThread()
       return true
     }
@@ -1179,13 +1185,7 @@ export function wireChat(options) {
       refuseWhileAnswering()
       return false
     }
-    if (next.kind === 'pr') {
-      openDraft(WHOLE_PR)
-      return true
-    }
-    const placed = threads.find(
-      t => t.agent === agentName && t.anchor !== undefined && sameChatContext(t.anchor, next)
-    )
+    const placed = next.kind === 'pr' ? undefined : threadOfPlace(threads, agentName, next)
     if (placed === undefined) {
       openDraft(next)
     } else {
@@ -1215,11 +1215,7 @@ export function wireChat(options) {
       return
     }
     if (el.id === 'new-thread') {
-      if (streaming) {
-        refuseWhileAnswering()
-      } else {
-        openDraft(WHOLE_PR)
-      }
+      openDraft(WHOLE_PR)
       return
     }
     if (el.id === 'thread-goto') {
@@ -1230,8 +1226,6 @@ export function wireChat(options) {
     if (picked !== null) {
       if (picked === activeThread) {
         showThread()
-      } else if (streaming) {
-        refuseWhileAnswering()
       } else {
         void openThread(picked)
       }
@@ -1291,8 +1285,10 @@ export function wireChat(options) {
    */
   const onPaneWheel = event => {
     const target = event.target instanceof Element ? event.target : null
-    // The tab on screen owns the wheel: the transcript, or the list of the review being written.
-    const scroller = (pane.getAttribute('data-tab') === 'review' ? reviewPanel : null) ?? log
+    // The tab on screen owns the wheel: the transcript, the list of threads, or the list of the
+    // review being written.
+    const tab = pane.getAttribute('data-tab')
+    const scroller = (tab === 'review' ? reviewPanel : tab === 'threads' ? index : null) ?? log
     const insideOwnScroller =
       target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement
         ? canScrollBy(target, event.deltaY)
@@ -1337,14 +1333,14 @@ export function wireChat(options) {
   })
   const stopTabs = wireSideTabs(pane)
 
-  /** Leads the canvas to the open thread's place. */
+  /** Leads the canvas to the open thread's place, while the canvas has it. */
   const goToAnchor = () => {
-    const anchor = openAnchor()
-    if (anchor === undefined || anchor.kind === 'pr') {
+    const anchor = askedIn(openPlace)
+    if (anchor.kind === 'pr') {
       return
     }
     if (anchor.kind === 'point') {
-      const el = root.querySelector(`[data-point][data-fingerprint=${cssString(anchor.fingerprint)}]`)
+      const el = root.querySelector(`[data-point][data-fingerprint="${cssEscape(anchor.fingerprint)}"]`)
       if (el instanceof HTMLElement) {
         scrollIntoViewSafe(el)
         flash(el)
@@ -1360,8 +1356,7 @@ export function wireChat(options) {
       navigateLink(`#file:${anchor.path}`, root)
       return
     }
-    const range = anchor.start === anchor.end ? `${anchor.start}` : `${anchor.start}-${anchor.end}`
-    navigateLink(`#line:${anchor.path}:${range}${anchor.side === 'old' ? ':old' : ''}`, root)
+    navigateLink(lineLink(anchor), root)
   }
   // Whatever asks the chat for something shows its tab first.
   const openChat = () => {
@@ -1400,13 +1395,19 @@ export function wireChat(options) {
       }
     },
     /**
-     * Follows a change of the reader's `chatThreadPerPlace` without a reload.
-     * @param {boolean} on
+     * Follows the settings the reader saved, without a reload: whether an ask opens its place's
+     * thread, and the chat agent, whose threads are the ones an ask continues.
+     * @param {import('./contract-types.js').Settings} settings
      */
-    setThreadPerPlace(on) {
-      threadPerPlace = on
-      contextLine.hidden = on
+    followSettings(settings) {
+      threadPerPlace = settings.chatThreadPerPlace
+      contextLine.hidden = threadPerPlace
+      if (threadPerPlace) {
+        context = askedIn(openPlace)
+        drawContext()
+      }
       drawMarks()
+      void refreshThreads().catch(() => undefined)
     },
     /**
      * Draws each card again where the state changed it: a comment just posted, joined the review,

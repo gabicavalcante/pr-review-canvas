@@ -35,8 +35,8 @@ test('each ask opens the thread of its place, and the Threads tab lists them', a
   await expect(page.locator('#chat-log')).not.toContainText('Is the sum intended?')
 
   const threadsTab = page.locator('#side-tab-threads')
-  await expect(threadsTab).toHaveText('Threads 2')
   await threadsTab.click()
+  await expect(page.locator('#thread-index [data-thread-open]')).toHaveCount(2)
   await page.locator('#thread-index').getByText('Sum instead of product').click()
   await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
   await expect(page.locator('#chat-log')).toContainText('Is the sum intended?')
@@ -68,8 +68,10 @@ test('with a thread per place off, every ask goes to the open thread until the r
     'about point · Sum instead of product',
     'about layer · Run path',
   ])
-  await expect(page.locator('#side-tab-threads')).toHaveText('Threads 1')
+  await page.locator('#side-tab-threads').click()
+  await expect(page.locator('#thread-index [data-thread-open]')).toHaveCount(1)
   expect(await pointAsk.evaluate(el => getComputedStyle(el, '::after').content)).toBe('none')
+  await page.locator('#side-tab-chat').click()
 
   await page.locator('#settings').click()
   await page.locator('dialog').getByRole('tab', { name: 'AI Chat' }).click()
@@ -81,4 +83,40 @@ test('with a thread per place off, every ask goes to the open thread until the r
   await page.getByText('ask something else…', { exact: true }).first().click()
   await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
   await expect(page.locator('#chat-log')).toContainText('A new thread about point · Sum instead of product')
+})
+
+test('the wheel scrolls a long Threads list, and the page under a short one', async ({
+  page,
+  chatServer,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  let threads = 25
+  const { url, ctx } = await chatServer({
+    setup: async t => {
+      for (let made = 0; made < threads; made += 1) {
+        await t.ctx.chat.createThread(42)
+      }
+    },
+  })
+  await page.goto(url)
+  await page.locator('#side-tab-threads').click()
+  const index = page.locator('#thread-index')
+  await expect(index.locator('[data-thread-open]')).toHaveCount(threads)
+  await index.hover()
+  await page.mouse.wheel(0, 400)
+  await expect.poll(() => index.evaluate(el => el.scrollTop)).toBeGreaterThan(0)
+
+  // One thread leaves the list nothing to scroll, so the wheel moves the page.
+  threads = 1
+  await ctx.state.update(42, current => ({
+    ...current,
+    chat: { ...current.chat, threads: current.chat.threads.slice(0, threads) },
+  }))
+  await page.reload()
+  await page.locator('#side-tab-threads').click()
+  await expect(index.locator('[data-thread-open]')).toHaveCount(threads)
+  const box = await index.boundingBox()
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + 40)
+  await page.mouse.wheel(0, 400)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
 })

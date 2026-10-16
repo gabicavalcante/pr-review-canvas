@@ -10,6 +10,7 @@ export {
   chatContextFromElement,
   chatContextLabel,
   sameChatContext,
+  threadOfPlace,
   WHOLE_PR,
 } from '../../static/js/chat-context.js'
 
@@ -33,7 +34,10 @@ export const CHAT_MESSAGE_MAX = 8000
 export const ChatSendSchema = z.object({
   message: z.string().min(1).max(CHAT_MESSAGE_MAX),
   context: ChatContextSchema,
-  /** The thread to answer in; the active one when absent. */
+  /**
+   * The thread to answer in, while it is the chat agent's. Absent, the question goes to its
+   * place's thread when the reader keeps a thread per place, or starts a new thread.
+   */
   thread: z.string().min(1).max(200).optional(),
 })
 export type ChatSendInput = z.infer<typeof ChatSendSchema>

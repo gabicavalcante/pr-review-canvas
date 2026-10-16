@@ -2,10 +2,12 @@
 // @vitest-environment happy-dom
 // The live AI Chat pane: the context chip, streaming, the comment cards, threads, and the width.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_SETTINGS } from '../../src/contract/settings.js'
 import { emptyState } from '../../src/contract/state.js'
 import { UNKNOWN_CAPABILITIES } from '../../src/host/capabilities.js'
 import { mapReviewComment } from '../../src/github/comments.js'
 import { GH_REVIEW_COMMENTS, syntheticArtifact } from '../../src/testing/synthetic.js'
+import { cssEscape } from './anchors.js'
 import { setChatEnabled } from './ask.js'
 import {
   answerHtml,
@@ -46,24 +48,12 @@ function session() {
   })
 }
 
-/** The thread the server makes for a first question about the whole PR. */
-const CREATED = {
-  threads: [
-    { name: 'pr-review-a-b-42-claude-t1', agent: 'claude', title: 'New thread', createdAt: '', turns: 0 },
-  ],
-  activeThread: 'pr-review-a-b-42-claude-t1',
-  agent: 'claude',
-}
-
 /**
  * @param {Partial<Parameters<typeof wireChat>[0]['api']>} [api]
  * @param {Partial<Parameters<typeof wireChat>[0]>} [extra]
  */
 function mount(api = {}, extra = {}) {
   setChatEnabled(true)
-  // The server's list as the pane last changed it: empty until a first question makes a thread.
-  /** @type {import('./contract-types.js').ChatThreadsResponse} */
-  let listed = { threads: [], activeThread: null, agent: 'claude' }
   const root = document.createElement('div')
   root.innerHTML = `<div class="layout">${renderChatShell({ enabled: true })}</div>`
   document.body.replaceChildren(root)
@@ -74,13 +64,9 @@ function mount(api = {}, extra = {}) {
     storage: null,
     reducedMotion: true,
     api: {
-      fetchThreads: async () => listed,
-      createThread: async () => {
-        listed = CREATED
-        return CREATED
-      },
+      fetchThreads: async () => ({ threads: [], activeThread: null, agent: 'claude' }),
       fetchThreadHistory: async () => ({ name: 't', turns: [] }),
-      selectThread: async () => CREATED,
+      selectThread: async (_pr, name) => ({ activeThread: name }),
       cancelChat: async () => ({ cancelled: true }),
       streamChat: async () => undefined,
       ...api,
@@ -556,22 +542,17 @@ describe('threads', () => {
     ])
     expect(entries.map(entry => entry.classList.contains('current'))).toEqual([false, true])
     expect(el(root, '#thread-title').textContent).toBe('second')
-    const count = el(root, '#side-tab-threads .thread-count')
-    expect(count.textContent).toBe('2')
-    expect(count.hasAttribute('data-empty')).toBe(false)
   })
 
-  it('counts no threads, and says how one starts', async () => {
+  it('says how a thread starts while there is none', async () => {
     const { root } = mount()
     await flush()
-    expect(el(root, '#side-tab-threads .thread-count').hasAttribute('data-empty')).toBe(true)
     expect(el(root, '#thread-index').textContent).toContain('No threads yet')
   })
 
   it('starts a thread about the whole PR as a draft, made by its first question', async () => {
     /** @type {Array<{ message: string, thread?: string }>} */
     const sent = []
-    let created = 0
     const { root } = mount({
       fetchThreads: async () => ({
         threads: [
@@ -584,22 +565,6 @@ describe('threads', () => {
         name,
         turns: [{ role: 'user', text: 'an old question', at: '' }],
       }),
-      createThread: async () => {
-        created += 1
-        return {
-          threads: [
-            {
-              name: 'pr-review-a-b-42-claude-t2',
-              agent: 'claude',
-              title: 'New thread',
-              createdAt: '',
-              turns: 0,
-            },
-          ],
-          activeThread: 'pr-review-a-b-42-claude-t2',
-          agent: 'claude',
-        }
-      },
       streamChat: async (_pr, input) => {
         sent.push(input)
       },
@@ -613,7 +578,6 @@ describe('threads', () => {
     expect(el(root, '#chat-log').textContent).toContain('A new thread about the whole PR.')
     expect(el(root, '#chat-log').textContent).not.toContain('an old question')
     expect(el(root, '#thread-title').textContent).toBe('New thread')
-    expect(created).toBe(0)
     const box = el(root, '#msg')
     if (!(box instanceof HTMLTextAreaElement)) {
       throw new Error('no box')
@@ -621,10 +585,8 @@ describe('threads', () => {
     box.value = 'what changed?'
     el(root, '#chat-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await flush()
-    expect(created).toBe(1)
-    expect(sent).toEqual([
-      { message: 'what changed?', context: { kind: 'pr' }, thread: 'pr-review-a-b-42-claude-t2' },
-    ])
+    // It names no thread: the server starts one, instead of using the thread left open.
+    expect(sent).toEqual([{ message: 'what changed?', context: { kind: 'pr' } }])
   })
 
   it('loads the transcript of the thread the reader picks', async () => {
@@ -850,25 +812,34 @@ describe('a place’s thread, in its corners', () => {
       }),
     })
     await flush()
+    const path = cssEscape('src/app.ts')
     expect((el(root, '#chat-thread-marks').textContent ?? '').split('\n')).toEqual([
       '[data-act="ask"][data-ask-layer="run-path"]::after { content: "1"; }',
-      '[data-act="ask"][data-ask-path="src/app.ts"]:not([data-ask-start])::after { content: "2"; }',
-      '[data-act="ask"][data-ask-path="src/app.ts"][data-ask-side="old"][data-ask-start="3"][data-ask-end="4"]::after { content: "3"; }',
+      `[data-act="ask"][data-ask-path="${path}"]:not([data-ask-start])::after { content: "2"; }`,
+      `[data-act="ask"][data-ask-path="${path}"][data-ask-side="old"][data-ask-start="3"][data-ask-end="4"]::after { content: "3"; }`,
     ])
   })
 
-  it('names a point’s thread by the point while it is on the canvas, and by its saved title after', async () => {
+  it('keeps a thread whose place left the canvas readable, asking its questions about the whole PR', async () => {
+    /** @type {unknown[]} */
+    const sent = []
     const { root } = mount({
       fetchThreads: async () => ({
         threads: [placed('t1', POINT, 1), placed('t2', { kind: 'point', fingerprint: 'gone' }, 1)],
         activeThread: 't2',
         agent: 'claude',
       }),
+      streamChat: async (_pr, input) => {
+        sent.push(input)
+      },
     })
     await flush()
-    expect(el(root, '#thread-title').textContent).toBe('saved t2')
+    expect(el(root, '#thread-title').textContent).toBe('saved t2 · not on this canvas')
+    expect(el(root, '#thread-goto').hidden).toBe(true)
     const titles = [...root.querySelectorAll('#thread-index .thread-item-t')].map(item => item.textContent)
     expect(titles).toEqual(['Sum instead of product', 'saved t2'])
+    await sendMessage(root, 'still there?')
+    expect(sent).toEqual([{ message: 'still there?', context: { kind: 'pr' }, thread: 't2' }])
   })
 
   it('counts questions in the index, and says which thread an answer is coming into', async () => {
@@ -986,6 +957,28 @@ describe('with a thread per place off', () => {
     ])
   })
 
+  it('starts a new thread with a question about a place asked after new thread', async () => {
+    /** @type {unknown[]} */
+    const sent = []
+    const { root, chat } = mount(
+      {
+        fetchThreads: async () => PLACED,
+        streamChat: async (_pr, input) => {
+          sent.push(input)
+        },
+      },
+      { threadPerPlace: false }
+    )
+    await flush()
+    el(root, '#side-tab-threads').click()
+    el(root, '#new-thread').click()
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    // It names no thread, so the server starts one rather than use the thread the reader left.
+    expect(sent).toEqual([{ message: 'is the sum intended?', context: POINT }])
+  })
+
   it('sends a quick question to the open thread', async () => {
     /** @type {unknown[]} */
     const sent = []
@@ -1007,14 +1000,50 @@ describe('with a thread per place off', () => {
   })
 
   it('follows the setting when the reader changes it, without a reload', async () => {
-    const { root, chat } = mount({ fetchThreads: async () => PLACED }, { threadPerPlace: false })
+    /** @type {unknown[]} */
+    const sent = []
+    const { root, chat } = mount(
+      {
+        fetchThreads: async () => PLACED,
+        streamChat: async (_pr, input) => {
+          sent.push(input)
+        },
+      },
+      { threadPerPlace: false }
+    )
     await flush()
-    chat.setThreadPerPlace(true)
+    // Off, an ask about the point only set the context of the open thread.
+    chat.ask(POINT)
+    chat.followSettings({ ...DEFAULT_SETTINGS, chatThreadPerPlace: true })
+    await flush()
     expect(el(root, '#chat-ctx-line').hidden).toBe(true)
     expect(el(root, '#chat-thread-marks').textContent).toContain('data-ask-point="fp-1"')
-    chat.setThreadPerPlace(false)
+    // The open thread is about the whole PR again, so the next question is too.
+    await sendMessage(root, 'overall?')
+    // And an ask about the point opens the point's thread.
+    chat.ask(POINT)
+    await flush()
+    expect(el(root, '#thread-title').textContent).toBe('Sum instead of product')
+    expect(sent).toEqual([
+      { message: 'overall?', context: { kind: 'pr' }, thread: 'pr-review-a-b-42-claude-t2' },
+    ])
+    chat.followSettings({ ...DEFAULT_SETTINGS, chatThreadPerPlace: false })
     expect(el(root, '#chat-ctx-line').hidden).toBe(false)
     expect(el(root, '#chat-thread-marks').textContent).toBe('')
+  })
+
+  it('continues the new agent’s threads once the reader switches agents', async () => {
+    let agent = 'claude'
+    const { root, chat } = mount({ fetchThreads: async () => ({ ...PLACED, agent }) })
+    await flush()
+    agent = 'codex'
+    chat.followSettings({ ...DEFAULT_SETTINGS, chatAgent: 'codex' })
+    await flush()
+    // The point's thread is claude's: its badge goes, and an ask starts codex's thread.
+    expect(el(root, '#chat-thread-marks').textContent).toBe('')
+    chat.ask(POINT)
+    await flush()
+    expect(el(root, '#chat-log').textContent).toContain('A new thread about point · Sum instead of product')
   })
 })
 
@@ -1922,15 +1951,21 @@ describe('what the review round found', () => {
     el(root, '#chat-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await flush()
     const newThread = el(root, '#new-thread')
-    expect(newThread instanceof HTMLButtonElement && newThread.disabled).toBe(true)
-    // Another thread is refused: the answer is drawn into this transcript.
+    const other = el(root, '[data-thread-open="pr-review-a-b-42-claude-t2"]')
+    const open = el(root, '[data-thread-open="pr-review-a-b-42-claude-t1"]')
+    // The answer is drawn into its own thread, so no other one opens until it ends.
+    expect([newThread, other, open].map(button => button.hasAttribute('disabled'))).toEqual([
+      true,
+      true,
+      false,
+    ])
     pickThread(root, 'pr-review-a-b-42-claude-t2')
     await flush()
     expect(asked).toEqual(['pr-review-a-b-42-claude-t1'])
-    expect(root.textContent).toContain('An answer is still coming in “first”')
     done.run?.()
     await flush()
-    expect(newThread instanceof HTMLButtonElement && newThread.disabled).toBe(false)
+    expect(newThread.hasAttribute('disabled')).toBe(false)
+    expect(el(root, '[data-thread-open="pr-review-a-b-42-claude-t2"]').hasAttribute('disabled')).toBe(false)
   })
 
   it('stops the request when the pane is taken down mid-answer', async () => {
@@ -2236,8 +2271,6 @@ it('animates preparation, tracks elapsed time, and collapses updated tool calls'
   const box = /** @type {HTMLTextAreaElement} */ (el(root, 'textarea'))
   box.value = 'Explain'
   el(root, 'form').dispatchEvent(new Event('submit', { cancelable: true }))
-  // The first question makes its thread before it is sent.
-  await vi.advanceTimersByTimeAsync(0)
   expect(el(root, '.chat-activity').textContent).toBe('Preparing answer. · 0s')
   await vi.advanceTimersByTimeAsync(800)
   expect(el(root, '.chat-activity').textContent).toBe('Preparing answer... · 0s')

@@ -81,11 +81,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* No `overscroll-behavior: contain`, as on the review list: a short list would swallow the wheel. */
 .thread-index {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  overscroll-behavior: contain;
   padding: 8px 14px 14px;
 }
 .thread-index .empty {
@@ -230,8 +230,9 @@ textarea {
 }
 
 /* ---- The side pane's tabs: AI Chat and the review being written ---- */
-/* Three tabs and minimize fit the default width; a pane dragged narrower scrolls them sideways
-   instead of breaking a label over two lines. */
+/* At the default width the three tabs and minimize fit while the review holds fewer than ten
+   comments. A narrower pane, or a longer count, scrolls the tabs sideways under minimize instead
+   of breaking a label over two lines. */
 .side-tabs {
   display: flex;
   flex-shrink: 0;
@@ -272,8 +273,7 @@ textarea {
   padding-left: 6px;
   background: var(--panel-2);
 }
-.review-count,
-.thread-count {
+.review-count {
   min-width: 18px;
   padding: 0 5px;
   border-radius: 9px;
@@ -283,14 +283,9 @@ textarea {
   line-height: 18px;
   text-align: center;
 }
-/* A thread is not something left to do, so its count stays quiet, and is gone while there is none. */
-.review-count[data-empty],
-.thread-count {
+.review-count[data-empty] {
   background: var(--line);
   color: var(--fg-muted);
-}
-.thread-count[data-empty] {
-  display: none;
 }
 /* The review tab hides the chat's parts without unmounting them, so a draft message survives. */
 .chat[data-tab='review'] > :is(.chat-h, .transcript, .chat-composer) {

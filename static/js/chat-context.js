@@ -15,6 +15,20 @@
 export const WHOLE_PR = { kind: 'pr' }
 
 /**
+ * The thread an ask about a place continues: the one this agent keeps for that place. A thread of
+ * another agent is not continued, since its session belongs to that agent, and a thread with no
+ * place, from before threads had one or about the whole PR, is no place's.
+ * @template {{ agent: string, anchor?: ChatContext | undefined }} Thread
+ * @param {readonly Thread[]} threads
+ * @param {string} agent
+ * @param {ChatContext} place
+ * @returns {Thread | undefined}
+ */
+export function threadOfPlace(threads, agent, place) {
+  return threads.find(t => t.agent === agent && t.anchor !== undefined && sameChatContext(t.anchor, place))
+}
+
+/**
  * True when two contexts name the same target, so setting the second one changes nothing.
  * @param {ChatContext} a
  * @param {ChatContext} b

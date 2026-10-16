@@ -9,7 +9,7 @@ import {
   type ChatThreadsResponse,
   type ChatTurn,
   chatContextLabel,
-  sameChatContext,
+  threadOfPlace,
 } from '../contract/chat.js'
 import type { FileEntry, Repo, ReviewArtifact } from '../contract/review-artifact.js'
 import type { Settings, SettingsOverrides } from '../contract/settings.js'
@@ -23,7 +23,6 @@ import { type CodeSource, renderSeed, type SeedPaths } from './seed.js'
 import {
   NEW_THREAD_TITLE,
   nextThreadIndex,
-  THREAD_TITLE_MAX,
   type TranscriptStore,
   threadName,
   threadTitle,
@@ -173,9 +172,10 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
   }
 
   /**
-   * The thread a message goes to: the one asked for; for a message about a place, when the reader
-   * keeps a thread per place, that place's thread, made the first time; otherwise the active one,
-   * or a fresh one.
+   * The thread a message goes to: the one it names, while it is this agent's; else, when the
+   * reader keeps a thread per place, the thread of the place it is about; else a new thread, named
+   * after that place when it has one. A thread of another agent is not continued: its session
+   * belongs to that agent.
    */
   const resolveThread = async (
     key: ReviewKey,
@@ -186,38 +186,35 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
   ): Promise<ChatThread> => {
     const agent = settings.chatAgent
     const state = await deps.state.read(key)
-    const byName = wanted === undefined ? undefined : state.chat.threads.find(t => t.name === wanted)
-    if (byName === undefined && context.kind !== 'pr' && settings.chatThreadPerPlace) {
-      const placed = state.chat.threads.find(
-        t => t.agent === agent && t.anchor !== undefined && sameChatContext(t.anchor, context)
+    const place = settings.chatThreadPerPlace && context.kind !== 'pr' ? context : undefined
+    const thread =
+      state.chat.threads.find(t => t.name === wanted && t.agent === agent) ??
+      (place === undefined ? undefined : threadOfPlace(state.chat.threads, agent, place))
+    if (thread === undefined) {
+      return newThread(
+        key,
+        agent,
+        place === undefined
+          ? undefined
+          : {
+              anchor: place,
+              title: threadTitle(
+                chatContextLabel(
+                  place,
+                  id => artifact.layers.find(layer => layer.id === id)?.title,
+                  fingerprint => artifact.points.find(point => point.fingerprint === fingerprint)?.title
+                )
+              ),
+            }
       )
-      if (placed === undefined) {
-        return newThread(key, agent, { anchor: context, title: anchorTitle(context, artifact) })
-      }
-      if (state.chat.activeThread !== placed.name) {
-        await deps.state.update(key, current => ({
-          ...current,
-          chat: { ...current.chat, activeThread: placed.name },
-        }))
-      }
-      return placed
     }
-    const active =
-      byName ??
-      (state.chat.activeThread === undefined
-        ? undefined
-        : state.chat.threads.find(t => t.name === state.chat.activeThread))
-    // Changing the agent starts a new thread: the old session belongs to the old agent.
-    if (active === undefined || active.agent !== agent) {
-      return newThread(key, agent)
-    }
-    if (state.chat.activeThread !== active.name) {
+    if (state.chat.activeThread !== thread.name) {
       await deps.state.update(key, current => ({
         ...current,
-        chat: { ...current.chat, activeThread: active.name },
+        chat: { ...current.chat, activeThread: thread.name },
       }))
     }
-    return active
+    return thread
   }
 
   /**
@@ -546,16 +543,6 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         return review !== null && folderOf(review.key) === folder ? [review.key] : []
       }),
   }
-}
-
-/** An anchored thread's title: its place, named the way the composer names a context. */
-function anchorTitle(context: ChatContext, artifact: ReviewArtifact): string {
-  const title = chatContextLabel(
-    context,
-    id => artifact.layers.find(layer => layer.id === id)?.title,
-    fingerprint => artifact.points.find(point => point.fingerprint === fingerprint)?.title
-  )
-  return title.length <= THREAD_TITLE_MAX ? title : `${title.slice(0, THREAD_TITLE_MAX - 1)}…`
 }
 
 function seedPaths(deps: ChatManagerDeps, target: ChatTarget, code: CodeSource): SeedPaths {

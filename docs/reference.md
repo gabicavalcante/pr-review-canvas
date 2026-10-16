@@ -974,15 +974,19 @@ that server run. Canvas generation models are configured separately in
 first ask about a place starts one, titled after it; a later ask about the same place comes back to
 it, history and all. A thread is made by its first question, so an ask you do not follow up leaves
 nothing behind. Lines match on their exact range: a different selection starts another thread.
-Each thread is a session of its own with the agent, sent the canvas on its first question only. The
-ask command of a place with a thread shows how many questions it holds, and **go to code** at the
-top of a thread leads back to its place. The `a` key asks about the focused target, and `/`
-focuses the message box.
+Each thread is a session of its own with the agent. The canvas goes with a thread's first question,
+and again when the PR's head, the folder the agent reads, or your right to resolve points changes.
+A place's thread belongs to the chat agent it was made with: after you switch agents, an ask about
+the place starts a new thread. The ask command of a place with a thread shows how many questions
+it holds, and **go to code** at the top of a thread leads back to its place. The `a` key asks about
+the focused target, and `/` focuses the message box.
 
 The **Threads** tab lists the review's threads by kind of place (attention points, lines, files,
 layers, whole PR) with the number of questions in each; pick one to open it in **AI Chat**. **new
-thread** starts one about the whole PR. Threads from before a thread per place have no place and
-are listed under whole PR.
+thread** starts one about the whole PR. Threads saved before threads had a place still appear in
+the Threads tab, under whole PR. When the canvas is generated again without a thread's place, the
+thread's head says the place is no longer on this canvas, and its questions are about the whole
+PR.
 
 To send every ask to the open thread instead, clear **A thread per place** under **AI Chat** in
 **settings**, or set `chatThreadPerPlace: false` in [`settings.yml`](#local-settings-and-storage).
@@ -992,9 +996,10 @@ names; choosing another target replaces it, and **clear** returns to the whole P
 Chat can propose an inline comment. A valid proposal appears with controls to post, edit,
 or copy it. A proposal outside the current diff remains text with an explanation.
 
-Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time: an ask about another
-place, or a new thread, waits until the answer coming in ends. A timeout or incomplete answer can
-be retried; increase `chatTimeoutSec` if replies need more time.
+Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time. While an answer is
+coming in, an ask about another place is refused, and **new thread** and the other threads in the
+Threads tab are disabled; ask again once the answer ends. A timeout or incomplete answer can be
+retried; increase `chatTimeoutSec` if replies need more time.
 
 ### Review checkouts
 

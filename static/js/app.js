@@ -365,7 +365,7 @@ export class PrAppElement extends HTMLElement {
           void openSettingsDialog(this, el, {
             onSaved: data => {
               this.layerView?.setView(data.settings.layerView)
-              this.chat?.setThreadPerPlace(data.settings.chatThreadPerPlace)
+              this.chat?.followSettings(data.settings)
             },
           }),
       })

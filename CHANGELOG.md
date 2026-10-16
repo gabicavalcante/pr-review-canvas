@@ -15,7 +15,8 @@
 - The open thread comes back when the page is reloaded.
 - `chatThreadPerPlace: false` in `settings.yml`, or **A thread per place** cleared in the settings
   dialog, sends every ask to the open thread as before.
-- Threads from earlier versions keep working; they have no place and are listed under whole PR.
+- Threads saved by earlier versions still appear in the Threads tab, under whole PR, since they have
+  no place.
 
 ### Generating from the terminal
 

@@ -35,8 +35,7 @@ export function sideTabsHtml(opts) {
   return (
     '<div class="side-tabs" role="tablist" aria-label="Side pane">' +
     (opts.chat
-      ? tab('chat', 'AI Chat', 'chat-log', true) +
-        tab('threads', 'Threads <span class="thread-count" data-empty>0</span>', THREADS_PANEL_ID, false)
+      ? tab('chat', 'AI Chat', 'chat-log', true) + tab('threads', 'Threads', THREADS_PANEL_ID, false)
       : '') +
     tab('review', 'Your review <span class="review-count" data-empty>0</span>', REVIEW_PANEL_ID, !opts.chat) +
     `<button class="cmd chat-minimize" type="button" id="chat-minimize" aria-label="Minimize ${opts.chat ? 'AI Chat' : 'your review'}">minimize</button>` +

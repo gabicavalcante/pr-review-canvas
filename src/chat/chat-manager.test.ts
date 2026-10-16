@@ -168,33 +168,43 @@ describe('a thread per place', () => {
     expect((await manager.threads(42)).threads.map(thread => thread.turns)).toEqual([2, 1])
   })
 
-  it('does not continue a place’s thread with another agent', async () => {
+  it('takes a question about a place to this agent’s thread of it, even one that names the other agent’s', async () => {
     await ask(POINT)
     await settings.write({ chatAgent: 'codex' })
-    await ask(POINT)
+    // A follow-up in the thread made with the agent the reader just left.
+    await ask(POINT, 'and now?', T1)
+    await ask(POINT, 'again?')
     const { threads } = await manager.threads(42)
-    expect(threads.map(thread => [thread.agent, thread.anchor])).toEqual([
-      ['claude', POINT],
-      ['codex', POINT],
+    expect(threads.map(thread => [thread.agent, thread.anchor, thread.title, thread.turns])).toEqual([
+      ['claude', POINT, 'point · Sum instead of product', 1],
+      ['codex', POINT, 'point · Sum instead of product', 2],
     ])
   })
 
-  it('keeps a question about the whole PR in the open thread, and a named thread over the place', async () => {
+  it('continues the thread a question names, and starts one for a question about the whole PR that names none', async () => {
     await ask(POINT)
-    await ask({ kind: 'pr' }, 'and overall?')
     await ask(LAYER, 'here instead', T1)
-    const { threads } = await manager.threads(42)
-    expect(threads.map(thread => [thread.name, thread.turns])).toEqual([[T1, 3]])
+    await ask({ kind: 'pr' }, 'and overall?')
+    const { threads, activeThread } = await manager.threads(42)
+    expect(threads.map(thread => [thread.name, thread.anchor, thread.turns])).toEqual([
+      [T1, POINT, 2],
+      [T2, undefined, 1],
+    ])
+    expect(activeThread).toBe(T2)
   })
 
-  it('sends every question to the open thread when the reader turns it off', async () => {
+  it('with a thread per place off, continues the thread a question names and starts one for a question that names none', async () => {
     await settings.write({ chatThreadPerPlace: false })
     await ask(POINT, 'first')
-    await ask(LAYER, 'second')
-    const { threads } = await manager.threads(42)
-    expect(threads).toEqual([
-      { name: T1, agent: 'claude', title: 'first', createdAt: '2026-09-11T10:00:00.000Z', turns: 2 },
+    await ask(LAYER, 'second', T1)
+    // The reader started a new thread, then asked about a place in it.
+    await ask(POINT, 'third')
+    const { threads, activeThread } = await manager.threads(42)
+    expect(threads.map(thread => [thread.name, thread.title, thread.anchor, thread.turns])).toEqual([
+      [T1, 'first', undefined, 2],
+      [T2, 'third', undefined, 1],
     ])
+    expect(activeThread).toBe(T2)
   })
 
   it('cuts a long place name to the title’s length', async () => {
@@ -232,11 +242,13 @@ describe('createChatManager().send', () => {
 
   it('seeds once per thread, and again after the head moves', async () => {
     await collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.runs[1]?.prompt).not.toContain('SEED for')
 
     const moved = { ...target(), headSha: 'c'.repeat(40) }
-    const events = await collect(manager.send(moved, { message: 'three', context: { kind: 'pr' } }))
+    const events = await collect(
+      manager.send(moved, { message: 'three', context: { kind: 'pr' }, thread: T1 })
+    )
     expect(events.find(e => e.event === 'turn')).toEqual({
       event: 'turn',
       thread: T1,
@@ -252,10 +264,10 @@ describe('createChatManager().send', () => {
     expect(runner.runs[0]?.prompt).toContain('may resolve its attention points')
 
     // The author pushed, and the canvas on screen is now outdated: same commit, no resolving.
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.runs[1]?.prompt).toContain('may not resolve attention points here')
 
-    await collect(manager.send(target(), { message: 'three', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'three', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.runs[2]?.prompt).not.toContain('SEED for')
   })
 
@@ -351,7 +363,7 @@ describe('createChatManager().send', () => {
 
   it('keeps the first message as the title when more are sent', async () => {
     await collect(manager.send(target(), { message: 'first', context: { kind: 'pr' } }))
-    await collect(manager.send(target(), { message: 'second', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'second', context: { kind: 'pr' }, thread: T1 }))
     expect((await manager.threads(42)).threads[0]?.title).toBe('first')
   })
 
@@ -528,7 +540,7 @@ describe('createChatManager() threads and settings', () => {
   it('starts a new thread when the agent changes', async () => {
     await collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
     await settings.write({ chatAgent: 'codex' })
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     const { threads } = await manager.threads(42)
     expect(threads.map(t => t.agent)).toEqual(['claude', 'codex'])
     expect(threads[1]?.name).toBe('pr-review-acme-widgets-42-codex-t2')
@@ -632,14 +644,14 @@ describe('the acpx session behind a thread', () => {
   it('is created before the first turn and not again after it', async () => {
     await collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
     expect(runner.ensured).toEqual([T1])
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.ensured).toEqual([T1])
   })
 
   it('is created for each new thread', async () => {
     await collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
     const second = await manager.createThread(42)
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: second.name }))
     expect(runner.ensured).toEqual([T1, second.name])
   })
 })
@@ -693,7 +705,7 @@ describe('a turn the agent never took', () => {
     const after = await manager.threads(42)
     expect(after.threads[0]?.title).toBe('New thread')
 
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.ensured).toEqual([T1, T1])
     expect(runner.runs[1]?.prompt).toContain('SEED for')
   })
@@ -760,7 +772,7 @@ describe('a stop that arrives before the agent has started', () => {
         break
       }
     }
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.runs[0]?.prompt).toContain('SEED for')
     expect((await manager.threads(42)).threads[0]?.title).toBe('two')
   })
@@ -792,12 +804,14 @@ describe('a thread whose acpx session is gone', () => {
       }),
     })
     await collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
-    await collect(manager.send(target(), { message: 'the session went away', context: { kind: 'pr' } }))
+    await collect(
+      manager.send(target(), { message: 'the session went away', context: { kind: 'pr' }, thread: T1 })
+    )
     // The second turn found the session already there, so it neither ensured nor seeded.
     expect(runner.ensured).toEqual([T1])
     expect(runner.runs[1]?.prompt).not.toContain('SEED for')
 
-    await collect(manager.send(target(), { message: 'three', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'three', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.ensured).toEqual([T1, T1])
     expect(runner.runs[2]?.prompt).toContain('SEED for')
     // The thread keeps the title its first message gave it.
@@ -808,7 +822,9 @@ describe('a thread whose acpx session is gone', () => {
 describe('a thread whose first message reads like the placeholder', () => {
   it('keeps that title, instead of taking the next message as its first', async () => {
     await collect(manager.send(target(), { message: 'New thread', context: { kind: 'pr' } }))
-    await collect(manager.send(target(), { message: 'and now a real question', context: { kind: 'pr' } }))
+    await collect(
+      manager.send(target(), { message: 'and now a real question', context: { kind: 'pr' }, thread: T1 })
+    )
     expect((await manager.threads(42)).threads[0]?.title).toBe('New thread')
   })
 
@@ -825,8 +841,12 @@ describe('a thread whose first message reads like the placeholder', () => {
       }),
     })
     await collect(manager.send(target(), { message: 'New thread', context: { kind: 'pr' } }))
-    await collect(manager.send(target(), { message: 'the session went away', context: { kind: 'pr' } }))
-    await collect(manager.send(target(), { message: 'and now a real question', context: { kind: 'pr' } }))
+    await collect(
+      manager.send(target(), { message: 'the session went away', context: { kind: 'pr' }, thread: T1 })
+    )
+    await collect(
+      manager.send(target(), { message: 'and now a real question', context: { kind: 'pr' }, thread: T1 })
+    )
     expect(runner.runs[2]?.prompt).toContain('SEED for')
     expect((await manager.threads(42)).threads[0]?.title).toBe('New thread')
   })
@@ -838,7 +858,9 @@ describe('the review checkout a turn reads', () => {
 
   it('creates it on the first turn and moves it only when the commit changes', async () => {
     await collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
-    const second = await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    const second = await collect(
+      manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 })
+    )
     expect(second.filter(e => e.event === 'checkout')).toEqual([])
     const moved = 'c'.repeat(40)
     const third = await collect(
@@ -910,7 +932,7 @@ describe('the review checkout a turn reads', () => {
       collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
     ).rejects.toThrow(CheckoutBusyError)
     await held.release()
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     const again = await checkouts.lease(42, 'chat')
     await again.release()
   })
@@ -926,13 +948,13 @@ describe('the review checkout a turn reads', () => {
         threads: current.chat.threads.map(({ seededCwd: _cwd, ...thread }) => thread),
       },
     }))
-    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.ensured).toEqual([T1])
     expect(runner.runs[1]?.prompt).not.toContain('SEED for')
     // Turning review checkouts on moves it to a new session in the checkout, once.
     await settings.write({ checkoutEnabled: true })
-    await collect(manager.send(target(), { message: 'three', context: { kind: 'pr' } }))
-    await collect(manager.send(target(), { message: 'four', context: { kind: 'pr' } }))
+    await collect(manager.send(target(), { message: 'three', context: { kind: 'pr' }, thread: T1 }))
+    await collect(manager.send(target(), { message: 'four', context: { kind: 'pr' }, thread: T1 }))
     expect(runner.ensured).toEqual([T1, T1])
     expect(runner.runs[2]?.prompt).toContain('SEED for')
     expect(runner.runs[3]?.prompt).not.toContain('SEED for')
@@ -942,7 +964,9 @@ describe('the review checkout a turn reads', () => {
     await settings.write({ checkoutEnabled: false })
     await collect(manager.send(target(), { message: 'one', context: { kind: 'pr' } }))
     await settings.write({ checkoutEnabled: true })
-    const events = await collect(manager.send(target(), { message: 'two', context: { kind: 'pr' } }))
+    const events = await collect(
+      manager.send(target(), { message: 'two', context: { kind: 'pr' }, thread: T1 })
+    )
     expect(events.find(e => e.event === 'turn')).toMatchObject({ seeded: true })
     expect(runner.ensured).toEqual([T1, T1])
     expect(runner.runs[1]?.prompt).toContain('SEED for')
