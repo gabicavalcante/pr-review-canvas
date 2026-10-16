@@ -399,6 +399,7 @@ body:not(:has(.point-statuses [data-act='toggle-resolved'][aria-pressed='true'])
 .pr-desc {
   border-top: 1px solid var(--ink);
 }
+.pr-conversation,
 .review-history {
   border-top: 1px solid var(--line);
 }

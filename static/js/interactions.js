@@ -302,18 +302,20 @@ export function wireReview(root, session, opts = {}) {
   const onState = (/** @type {PrState} */ state) => {
     updateRenderState(state)
     if (session.issueComments !== null && session.issueComments !== drawnIssues) {
-      const conversation = root.querySelector('.conversation')
-      if (conversation !== null) {
+      const conversation = root.querySelector('.pr-conversation')
+      if (conversation instanceof HTMLDetailsElement) {
         const replacement = doc.createElement('template')
         replacement.innerHTML = conversationHtml(session.issueComments, new Date())
+        const next = /** @type {HTMLDetailsElement} */ (replacement.content.firstElementChild)
+        // The block stays open or closed as the reader left it.
+        next.open = conversation.open
         const composer = conversation.querySelector('.pr-composer-host')
         const focused = doc.activeElement
         if (composer !== null) {
-          const slot = /** @type {Element} */ (replacement.content.querySelector('.pr-composer-host'))
+          const slot = /** @type {Element} */ (next.querySelector('.pr-composer-host'))
           slot.replaceWith(composer)
         }
-        conversation.previousElementSibling?.remove()
-        conversation.replaceWith(replacement.content)
+        conversation.replaceWith(next)
         if (focused instanceof HTMLElement && composer?.contains(focused)) focused.focus()
       }
       drawnIssues = session.issueComments

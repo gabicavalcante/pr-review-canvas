@@ -2982,21 +2982,25 @@ it('updates the existing Conversation card from a resolution without reloading t
       }),
     },
   })
+  const conversation = /** @type {HTMLDetailsElement} */ (root.querySelector('.pr-conversation'))
+  conversation.open = true
   click(root, '[data-act="pr-comment"]')
   const draft = /** @type {HTMLTextAreaElement} */ (root.querySelector('.pr-composer-host textarea'))
   draft.value = 'Keep this unfinished comment'
   draft.focus()
   await session.settle('fp-1', { settled: true, reason: 'verified' })
+  expect(root.querySelector('.pr-conversation')).not.toBe(conversation)
+  expect(/** @type {HTMLDetailsElement} */ (root.querySelector('.pr-conversation')).open).toBe(true)
   expect(root.querySelector('.pr-composer-host textarea')).toBe(draft)
   expect(draft.value).toBe('Keep this unfinished comment')
   expect(document.activeElement).toBe(draft)
   expect(root.querySelector('.conversation')?.textContent).toContain('Not yet resolved by the author: 2')
   expect(root.querySelectorAll('.conversation')).toHaveLength(1)
-  expect(root.querySelector('.conversation')?.previousElementSibling?.textContent).toBe('Conversation · 1')
+  expect(root.querySelector('.pr-conversation > summary')?.textContent).toBe('Conversation · 1')
   root.querySelector('.pr-composer-host')?.remove()
   await session.settle('fp-1', { settled: false })
   expect(root.querySelector('.conversation')?.textContent).toContain('Not yet resolved by the author: 2')
-  root.querySelector('.conversation')?.remove()
+  root.querySelector('.pr-conversation')?.remove()
   await session.settle('fp-1', { settled: false })
   expect(root.querySelector('.conversation')).toBeNull()
 })
