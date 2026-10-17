@@ -390,6 +390,8 @@ afterEach(() => {
     wiring.stop()
   }
   setRenderContext(null)
+  // A test that picks the points' density leaves the page at the default, compact.
+  delete document.documentElement.dataset['points']
 })
 
 describe('card toggles', () => {
@@ -521,7 +523,7 @@ describe('reviewed state', () => {
     expect(root.querySelector('.cmd-err')?.textContent).toBe('offline')
   })
 
-  it('opens the file cards the server reopened with their layer', async () => {
+  it('opens the layer the reader unmarks, and leaves the files the server reopened with it closed', async () => {
     const reviewed = {
       ...BASE,
       reviewedCanvasSha: artifact.pr.headSha,
@@ -541,8 +543,9 @@ describe('reviewed state', () => {
     expect(card?.classList.contains('is-reviewed')).toBe(true)
     click(root, '.layer-end [data-act="mark-layer"]')
     await flush()
+    expect(root.querySelector('#layer-run-path > .layer-body')?.hasAttribute('hidden')).toBe(false)
     expect(card?.classList.contains('is-reviewed')).toBe(false)
-    expect(card?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
+    expect(card?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(true)
   })
 
   it('leaves a layer that is reviewed through its files alone when something else changes', async () => {
@@ -686,7 +689,6 @@ describe('attention points', () => {
     expect(card?.hasAttribute('data-expanded')).toBe(false)
     click(root, '[data-act="points-density"]')
     expect(document.documentElement.dataset['points']).toBe('compact')
-    delete document.documentElement.dataset['points']
   })
 
   it('switches the points acted on off the page and back from the overview', () => {
@@ -1467,6 +1469,22 @@ describe('keyboard', () => {
     expect(root.querySelector('.is-focused')?.id).toBe('file-src_app_ts')
   })
 
+  it('steps with n into a layer not opened yet and opens it, but past a layer marked reviewed', () => {
+    const { root } = setup({ artifact: withSecondLayer() })
+    const second = root.querySelector('#layer-second > .layer-body')
+    expect(second?.hasAttribute('hidden')).toBe(true)
+    key('j')
+    for (const press of ['n', 'n', 'n', 'n']) key(press)
+    expect(root.querySelector('.is-focused')?.id).toBe('file-src_new_ts')
+    expect(second?.hasAttribute('hidden')).toBe(false)
+
+    const reviewed = { ...BASE, reviewed: { 'layer:second': /** @type {const} */ (true) } }
+    const again = setup({ artifact: withSecondLayer(), state: reviewed })
+    key('j')
+    for (const press of ['n', 'n', 'n', 'n']) key(press)
+    expect(again.root.querySelector('.is-focused')?.id).toBe('file-src_app_test_ts')
+  })
+
   it('dismisses the point in focus with d, then opens and collapses it with o', async () => {
     const { root, calls } = setup()
     key(']')
@@ -1651,7 +1669,6 @@ describe('keyboard', () => {
     key('o')
     expect(root.querySelector('#file-src_app_ts .file-body')?.hasAttribute('hidden')).toBe(true)
     expect(root.querySelector('#layer-run-path .layer-body')?.hasAttribute('hidden')).toBe(false)
-    delete document.documentElement.dataset['points']
     key('R')
     await flush()
     expect(calls).toEqual([['reviewed', { id: 'layer:run-path', reviewed: true }]])

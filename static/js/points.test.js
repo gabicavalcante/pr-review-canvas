@@ -115,6 +115,11 @@ describe('points', () => {
 })
 
 describe('where a point stands', () => {
+  // A test that picks the points' density leaves the page at the default, compact.
+  afterEach(() => {
+    delete document.documentElement.dataset['points']
+  })
+
   const artifact = syntheticArtifact()
   const BASE = emptyState('2026-09-10T12:00:00.000Z')
   const dismissed = { ...BASE, dismissed: { 'fp-1': { at: BASE.updatedAt } } }
@@ -269,7 +274,6 @@ describe('where a point stands', () => {
     document.documentElement.dataset['points'] = 'detailed'
     setPointExpanded(open, true)
     expect(open.hasAttribute('data-expanded')).toBe(false)
-    delete document.documentElement.dataset['points']
     document.body.innerHTML = `<table><tbody>${pointRowHtml(first, ctx)}</tbody></table>`
     const row = document.querySelector('tr.ifind')
     if (row === null) throw new Error('no row')
@@ -299,7 +303,6 @@ describe('where a point stands', () => {
     setPointsDensity(page, 'compact')
     expect(readPageDensity(page)).toBe('compact')
     expect(store[POINTS_DENSITY_KEY]).toBe('detailed')
-    delete page.dataset['points']
   })
 
   it('leaves a page that holds none of its parts alone', () => {
@@ -454,7 +457,17 @@ describe('where a point stands', () => {
     if (el === null || !(dismiss instanceof HTMLElement)) throw new Error('no point')
     dismiss.focus()
     refreshPoint(el, first, { ...ctx, state: dismissed })
-    expect(document.activeElement?.getAttribute('data-act')).toBe('point-expand')
+    expect(document.activeElement?.classList.contains('p-toggle')).toBe(true)
+
+    // Restored in a detailed list, the point is whole and its toggle hidden: the focus goes to its
+    // first command.
+    document.documentElement.dataset['points'] = 'detailed'
+    setPointExpanded(el, true)
+    const restore = el.querySelector('[data-act="point-restore"]')
+    if (!(restore instanceof HTMLElement)) throw new Error('no restore')
+    restore.focus()
+    refreshPoint(el, first, { ...ctx, state })
+    expect(document.activeElement).toBe(el.querySelector('.tbtns button'))
   })
 
   it('redraws a row in the diff in place', () => {

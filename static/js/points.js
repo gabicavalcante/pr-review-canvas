@@ -529,7 +529,7 @@ export function refreshPoint(el, p, ctx) {
   el.replaceChildren(...Array.from(next.childNodes))
   setPointExpanded(el, expanded)
   // The command the reader used is gone; the focus goes to what now stands for the point.
-  const target = focused ? el.querySelector('.p-toggle, .tbtns button') : null
+  const target = focused ? el.querySelector(pointCollapses(el) ? '.p-toggle' : '.tbtns button') : null
   if (target instanceof HTMLElement) {
     target.focus()
   }

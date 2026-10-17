@@ -166,6 +166,20 @@ test.describe('a first visit', () => {
     await expect(card.locator('[data-act="point-dismiss"]')).toBeVisible()
     await card.locator('.p-title').click()
     await expect(card.locator('.prose')).toBeHidden()
+    // Selecting the title to copy it leaves the point as it was.
+    await card.locator('.p-title').dblclick()
+    await expect(card.locator('.prose')).toBeHidden()
+    await page.evaluate(() => window.getSelection()?.removeAllRanges())
+    // A point acted on keeps its one-line summary in the compact list.
+    await card.locator('.p-title').click()
+    await card.locator('[data-act="point-dismiss"]').click()
+    await expect(card).toHaveAttribute('data-status', 'dismissed')
+    await expect(card.locator('.p-summary')).toBeVisible()
+    await expect(card.locator('.prose')).toBeHidden()
+    await card.locator('.p-toggle').click()
+    await card.locator('[data-act="point-restore"]').click()
+    await expect(card).toHaveAttribute('data-status', 'open')
+    await expect(card.locator('.prose')).toBeHidden()
 
     const density = page.locator('section.layer[data-layer="run-path"] [data-act="points-density"]')
     await expect(density).toHaveText('show details', { useInnerText: true })

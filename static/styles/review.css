@@ -344,19 +344,19 @@
   color: var(--fg-muted);
 }
 /* In a compact list (anything but `data-points="detailed"`, as `readPageDensity` reads it) each
-   point shows its title line until the reader opens it, as a point acted on does. A detailed list
-   shows open points whole, with no toggle to hide them. */
+   open point shows its title line until the reader opens it; a point acted on keeps the rules
+   above, with its one-line summary. A detailed list shows open points whole, with no toggle. */
 :root:not([data-points='detailed'])
   .findings
-  > li[data-point]:not([data-expanded])
-  :is(.prose, .p-outcome, .tbtns, .settle-box, .p-summary) {
+  > li[data-point]:not(.is-handled, [data-expanded])
+  :is(.prose, .tbtns, .settle-box) {
   display: none;
 }
-:root:not([data-points='detailed']) .findings > li:not([data-expanded]) {
+:root:not([data-points='detailed']) .findings > li:not(.is-handled, [data-expanded]) {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-:root:not([data-points='detailed']) .findings > li:not([data-expanded]) .f-title {
+:root:not([data-points='detailed']) .findings > li:not(.is-handled, [data-expanded]) .f-title {
   margin-bottom: 0;
 }
 :root[data-points='detailed'] .findings > li:not(.is-handled) .p-toggle,

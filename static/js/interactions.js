@@ -50,7 +50,7 @@ import {
   updateRenderState,
 } from './layers.js'
 import { buildNavOrder, layerOf, readingItem, step } from './nav.js'
-import { hiddenOnlyBySection, inHiddenSection } from './one-layer.js'
+import { inHiddenSection, isPageSection } from './one-layer.js'
 import { issueCommentHtml } from './overview.js'
 import { pendingCount, refreshPendingBar } from './pending.js'
 import { refreshReviewPanel } from './review-panel.js'
@@ -108,12 +108,22 @@ function drawnTop(el) {
 }
 
 /**
- * False for an element inside a collapsed card or a closed details, which a key should not stop at.
- * A layer the page is not showing does not count: the key shows it.
+ * False for an element a key should not stop at: inside a closed details, a closed file card, or
+ * a layer marked reviewed. A layer the page is not showing, or one not opened yet, does not count:
+ * the key lands there and `reveal-code` opens it.
  * @param {Element} el
  */
 function isShown(el) {
-  return hiddenOnlyBySection(el) && (el.parentElement?.closest('details:not([open])') ?? null) === null
+  for (
+    let hider = el.closest('[hidden]');
+    hider !== null;
+    hider = hider.parentElement?.closest('[hidden]') ?? null
+  ) {
+    if (!isPageSection(hider) && !hider.matches('section.layer:not(.is-reviewed) > .layer-body')) {
+      return false
+    }
+  }
+  return (el.parentElement?.closest('details:not([open])') ?? null) === null
 }
 
 /**
@@ -359,11 +369,13 @@ export function wireReview(root, session, opts = {}) {
       }
       const reviewed = isCardReviewed(id, state)
       input.checked = reviewed
-      // A card the server reopened (marking a layer reopens its files) opens here as well.
+      // A card marked reviewed closes. One the server reopened (unmarking a layer reopens its
+      // files) stays as it is, closed like every file at first; markReviewed opens the card whose
+      // box the reader unticked.
       const parts = cardOf(input)
       if (parts !== null && parts.card.classList.contains('is-reviewed') !== reviewed) {
         parts.card.classList.toggle('is-reviewed', reviewed)
-        setCardCollapsed(parts.card, reviewed)
+        if (reviewed) setCardCollapsed(parts.card, true)
       }
     }
     refreshPendingBar(root, state, session)
@@ -960,37 +972,44 @@ export function wireReview(root, session, opts = {}) {
     }
   }
 
+  /**
+   * A click on a file's or a point's title, or its toggle, flips what it heads. A double or triple
+   * click selects the title to copy it: its first click already flipped it, so the second flips it
+   * back and the third does nothing. The click that ends a drag selecting the title flips nothing.
+   * @param {HTMLElement} el the title or toggle clicked
+   * @param {MouseEvent} event
+   * @param {() => void} flip
+   */
+  const toggleFromTitle = (el, event, flip) => {
+    if (event.detail > 1) {
+      if (event.detail === 2 && toggledByClick === el) {
+        flip()
+      }
+      toggledByClick = null
+      return
+    }
+    const picked = window.getSelection()
+    if (picked !== null && !picked.isCollapsed && el.contains(picked.anchorNode)) {
+      toggledByClick = null
+      return
+    }
+    flip()
+    toggledByClick = el
+  }
+
   /** @type {Record<string, (el: HTMLElement, event: MouseEvent) => void>} */
   const actions = {
-    'toggle-card': (el, event) => {
-      // A double or triple click selects the file name. Its first click already flipped the card,
-      // so the second one flips it back and the third does nothing.
-      if (event.detail > 1) {
-        if (event.detail === 2 && toggledByClick === el) {
-          setCardCollapsed(el)
-        }
-        toggledByClick = null
-        return
-      }
-      // A file's title toggles its card too, but not at the end of a drag that selected its text.
-      const picked = window.getSelection()
-      if (picked !== null && !picked.isCollapsed && el.contains(picked.anchorNode)) {
-        toggledByClick = null
-        return
-      }
-      setCardCollapsed(el)
-      toggledByClick = el
-    },
+    'toggle-card': (el, event) => toggleFromTitle(el, event, () => setCardCollapsed(el)),
     'mark-layer': el => {
       const id = el.getAttribute('data-reviewed-id') ?? ''
       markReviewed(el, id, !session.isReviewed(id), 'layer')
     },
     'point-dismiss': el => setDismissed(el, el.getAttribute('data-fingerprint') ?? '', true),
     'point-restore': el => setDismissed(el, el.getAttribute('data-fingerprint') ?? '', false),
-    'point-expand': el => {
+    'point-expand': (el, event) => {
       const point = el.closest('[data-point]')
       if (point !== null) {
-        setPointExpanded(point)
+        toggleFromTitle(el, event, () => setPointExpanded(point))
       }
     },
     'points-density': () => {

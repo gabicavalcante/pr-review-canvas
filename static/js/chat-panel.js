@@ -44,7 +44,8 @@ export function wireChatPanel(root, pane, opts = {}) {
 
   function open() {
     if (!shown()) {
-      // A chat opened while floating stays open when the window widens past the breakpoint.
+      // Opened or closed while floating, the chat stays so when the window widens past the
+      // breakpoint; only a wide screen stores it.
       if (narrow.matches) {
         floating = true
         docked = true
@@ -59,8 +60,10 @@ export function wireChatPanel(root, pane, opts = {}) {
   }
 
   function close() {
-    if (narrow.matches) floating = false
-    else {
+    if (narrow.matches) {
+      floating = false
+      docked = false
+    } else {
       docked = false
       opts.onMinimizedChange?.(true)
     }

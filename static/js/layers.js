@@ -435,29 +435,8 @@ export function wireCardReveal(root) {
       }
     }
   }
-  // The rail's anchors, and the `#layer-…` fragment `j` and `k` leave in the URL, scroll natively
-  // and raise no `reveal-code`, so the layer they name opens here.
-  /** @param {string | null} fragment */
-  const openLayerAt = fragment => {
-    const section = fragment?.startsWith('#layer-')
-      ? root.ownerDocument.getElementById(fragment.slice(1))
-      : null
-    if (section instanceof HTMLElement && section.matches('section.layer') && root.contains(section)) {
-      setCardCollapsed(section, false)
-    }
-  }
-  /** @param {Event} event */
-  const openLinkedLayer = event => {
-    const link = event.target instanceof Element ? event.target.closest('a[href^="#layer-"]') : null
-    openLayerAt(link?.getAttribute('href') ?? null)
-  }
-  openLayerAt(root.ownerDocument.defaultView?.location.hash ?? null)
   root.addEventListener('reveal-code', reveal)
-  root.addEventListener('click', openLinkedLayer)
-  return () => {
-    root.removeEventListener('reveal-code', reveal)
-    root.removeEventListener('click', openLinkedLayer)
-  }
+  return () => root.removeEventListener('reveal-code', reveal)
 }
 
 /**
