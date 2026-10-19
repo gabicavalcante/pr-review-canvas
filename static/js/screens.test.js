@@ -296,15 +296,35 @@ describe('header', () => {
     expect(step?.querySelector('a')?.getAttribute('href')).toBe(artifact.pr.url)
   })
 
-  it('keeps the verdicts from the author when the canvas is not current and settling is off', () => {
-    document.body.innerHTML = renderHeader(bundle({ readerIsAuthor: true, selfReview: false }), {
-      host: 'h',
-      theme: 'auto',
-      skin: 'terminal',
-      now: NOW,
-    })
-    expect(document.querySelector('#approve, #request-changes')).toBeNull()
-    expect(document.querySelector('.author-next')).not.toBeNull()
+  it('draws no sign-off for the author of an outdated canvas, where nothing is posted', () => {
+    document.body.innerHTML = renderHeader(
+      bundle({ status: 'stale', readerIsAuthor: true, selfReview: false }),
+      {
+        host: 'h',
+        theme: 'auto',
+        skin: 'terminal',
+        now: NOW,
+      }
+    )
+    expect(document.querySelector('.signoff')).toBeNull()
+    expect(document.querySelector('#approve, #request-changes, .author-next')).toBeNull()
+  })
+
+  it('words the step of the author from the state of the pull request', () => {
+    const opts = /** @type {const} */ ({ host: 'h', theme: 'auto', skin: 'terminal', now: NOW })
+    const artifact = syntheticArtifact()
+    const settled = { at: NOW.toISOString(), reason: 'Answered.' }
+    const done = { ...artifact, settled: { 'fp-2': settled, 'fp-3': settled } }
+    const draft = { ...artifact.pr, draft: true }
+    document.body.innerHTML = renderHeader(bundle({ readerIsAuthor: true, artifact: done, pr: draft }), opts)
+    expect(document.querySelector('.author-next')?.textContent).toBe(
+      'ready to mark it ready for review on github'
+    )
+    // Merged, the pull request asks nothing more of its author, who can still comment.
+    const merged = { ...artifact.pr, state: 'merged' }
+    document.body.innerHTML = renderHeader(bundle({ readerIsAuthor: true, pr: merged }), opts)
+    expect(document.querySelector('.author-next, #approve, #request-changes')).toBeNull()
+    expect([...document.querySelectorAll('.signoff .cmd')].map(b => b.textContent)).toEqual(['comment'])
   })
 
   it('says the canvas was capped when the change set is large, on every screen', () => {

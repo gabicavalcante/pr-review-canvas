@@ -122,11 +122,7 @@ export function renderHeader(bundle, opts) {
     ? 'Snapshot the working tree again and redraw'
     : `Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}`
   const progress = ready
-    ? progressHtml(artifact, bundle.state, {
-        on: pr,
-        readerIsAuthor: bundle.readerIsAuthor,
-        prUrl: pr.url,
-      })
+    ? progressHtml(artifact, bundle.state, { pr, readerIsAuthor: bundle.readerIsAuthor })
     : ''
   const level = getFoldLevel()
   const reading = ready
@@ -174,17 +170,17 @@ export function renderHeader(bundle, opts) {
  * forge refuses on one's own change, but their next step in their place, and keeps comment.
  * @param {import('./contract-types.js').ReviewArtifact} artifact
  * @param {import('./contract-types.js').PrState} state
- * @param {{ on?: import('./pending.js').DiffOnScreen, readerIsAuthor?: boolean, prUrl?: string }} [opts]
- *   `on` the diff the page's drafts belong to; `readerIsAuthor` as the bundle says it, whether or
- *   not the canvas is current; `prUrl` the page their step links to
+ * @param {{ pr?: PrBundle['pr'], readerIsAuthor?: boolean }} [opts] `pr` the pull request as the
+ *   page has it now, whose diff the drafts belong to and whose state words the author's step;
+ *   `readerIsAuthor` as the bundle says it
  */
 export function progressHtml(artifact, state, opts = {}) {
-  const { on = artifact.pr, readerIsAuthor = false, prUrl = artifact.pr.url } = opts
+  const { pr = artifact.pr, readerIsAuthor = false } = opts
   const p = progressSummary(artifact, state)
   const blocked = approveBlockedReason(artifact, state)
   const approveTitle = `Write and preview an approving review on ${esc(hostLabel())}`
   const verdicts = readerIsAuthor
-    ? authorNextStepHtml(pointsStillYours(artifact.points, artifact.settled ?? {}), prUrl)
+    ? authorNextStepHtml(pointsStillYours(artifact.points, artifact.settled ?? {}), pr)
     : `<button class="cmd" type="button" id="approve" data-tooltip="${approveTitle}" data-act="signoff" data-event="APPROVE" data-needs-post` +
       `${blocked === null ? ` title="${approveTitle}"` : ` disabled data-disabled-reason="${esc(blocked)}" title="${esc(blocked)}"`}>approve on ${esc(currentHost().kind)}</button>` +
       `<button class="cmd" type="button" id="request-changes" data-tooltip="Write and preview a review requesting changes on ${esc(hostLabel())}" title="Write and preview a review requesting changes on ${esc(hostLabel())}" data-act="signoff" data-event="REQUEST_CHANGES" data-needs-post>request changes</button>`
@@ -194,7 +190,7 @@ export function progressHtml(artifact, state, opts = {}) {
     `<span class="ptext">${p.done} of ${p.total} layers reviewed</span></div>` +
     `<div class="pending-bar-host${pendingCount(state) > 0 ? ' has-pending' : ''}">${pendingBarHtml(
       pendingCount(state),
-      draftsByCommit(state, on).earlier.length
+      draftsByCommit(state, pr).earlier.length
     )}</div>` +
     `<div class="signoff">${verdicts}` +
     `<button class="cmd" type="button" id="comment-review" data-tooltip="${commentTitle}" title="${commentTitle}" data-act="signoff" data-event="COMMENT" data-needs-post>comment</button>` +

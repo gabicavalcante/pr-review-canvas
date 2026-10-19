@@ -927,11 +927,12 @@ commit.
 
 The author of the pull request or merge request, the login that runs `pr-review serve`, gets no
 **approve** or **request changes**: GitHub refuses both on one's own pull request, and GitLab may,
-depending on the project. This holds on an outdated canvas too. In their place the header shows the
-author's next step: **N points still yours** while points marked yours are open, then **ready to
-request review on GitHub**, which links to the pull request. **comment**, the progress line, and
-the pending review stay. On a local review the three commands stay disabled, since there is no
-forge.
+depending on the project. In their place the header shows the author's next step on an open pull
+request: **N points still yours** while points marked yours are open, then **ready to request
+review on GitHub**, or **ready to mark it ready for review on GitHub** for a draft, which links to
+the pull request. A merged or closed one shows no step. **comment**, the progress line, and the
+pending review stay. An outdated canvas posts nothing, so its header shows no sign-off for anyone.
+On a local review the three commands stay disabled, since there is no forge.
 
 ### Outdated canvases
 

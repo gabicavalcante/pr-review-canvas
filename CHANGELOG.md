@@ -42,8 +42,8 @@
 
 - The author of the pull request or merge request no longer sees **approve** or **request
   changes**, which the forge refuses on one's own change. The header shows their next step instead:
-  **N points still yours**, then **ready to request review**, linking to the pull request.
-  **comment** stays.
+  **N points still yours**, then **ready to request review**, or to mark a draft ready for review,
+  linking to the pull request; a merged or closed one shows no step. **comment** stays.
 
 ### Upgrade
 

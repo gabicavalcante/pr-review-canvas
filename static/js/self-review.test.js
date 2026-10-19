@@ -38,13 +38,27 @@ describe('the next step of the author', () => {
 
   it('names the points still theirs, then links to the pull request to ask for review', () => {
     const url = 'https://github.com/acme/widgets/pull/42'
-    expect(authorNextStepHtml(2, url)).toContain('>2 points still yours<')
-    expect(authorNextStepHtml(1, url)).toContain('>1 point still yours<')
-    document.body.innerHTML = authorNextStepHtml(0, url)
+    const open = { url, state: 'open', draft: false }
+    expect(authorNextStepHtml(2, open)).toContain('>2 points still yours<')
+    expect(authorNextStepHtml(1, open)).toContain('>1 point still yours<')
+    document.body.innerHTML = authorNextStepHtml(0, open)
     const step = document.querySelector('.author-next')
     expect(step?.textContent).toBe('ready to request review on github')
     expect(step?.querySelector('a')?.getAttribute('href')).toBe(url)
     expect(step?.getAttribute('data-pr-url')).toBe(url)
+    expect(step?.hasAttribute('data-draft')).toBe(false)
+  })
+
+  it('has a draft marked ready for review first, and gives a merged or closed pull request no step', () => {
+    const url = 'https://github.com/acme/widgets/pull/42'
+    document.body.innerHTML = authorNextStepHtml(0, { url, state: 'open', draft: true })
+    expect(document.querySelector('.author-next')?.textContent).toBe(
+      'ready to mark it ready for review on github'
+    )
+    expect(document.querySelector('.author-next')?.hasAttribute('data-draft')).toBe(true)
+    expect(authorNextStepHtml(1, { url, state: 'open', draft: true })).toContain('>1 point still yours<')
+    expect(authorNextStepHtml(1, { url, state: 'merged', draft: false })).toBe('')
+    expect(authorNextStepHtml(0, { url, state: 'closed', draft: false })).toBe('')
   })
 })
 

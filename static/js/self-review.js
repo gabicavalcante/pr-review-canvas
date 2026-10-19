@@ -133,19 +133,26 @@ export function pointsStillYours(points, settledPoints = settled) {
 }
 
 /**
- * Where reviewers approve or request changes, the author of the pull request sees their next step:
- * the points still theirs to answer, then asking for review on the forge, which refuses both
- * verdicts on one's own change. The pull request's page rides on the element, so the step is drawn
- * again from it when a settlement changes the count.
+ * Where reviewers approve or request changes, the author of an open pull request sees their next
+ * step: the points still theirs to answer, then, on the forge, marking a draft ready for review or
+ * asking for review, since the forge refuses both verdicts on one's own change. A merged or closed
+ * pull request has no next step. The page and the draft flag ride on the element, so the step is
+ * drawn again from it when a settlement changes the count.
  * @param {number} yours points still the author's, as `pointsStillYours` counts them
- * @param {string} prUrl the pull request's page on the forge
+ * @param {Pick<import('./contract-types.js').Pr, 'url' | 'state' | 'draft'>} pr
  */
-export function authorNextStepHtml(yours, prUrl) {
+export function authorNextStepHtml(yours, pr) {
+  if (pr.state !== 'open') {
+    return ''
+  }
+  const forge = esc(currentHost().kind)
+  const link = (/** @type {string} */ label) =>
+    `ready to <a href="${esc(pr.url)}" target="_blank" rel="noopener noreferrer">${label} on ${forge}</a>`
   const step =
     yours > 0
       ? `${yours} ${yours === 1 ? 'point' : 'points'} still yours`
-      : `ready to <a href="${esc(prUrl)}" target="_blank" rel="noopener noreferrer">request review on ${esc(currentHost().kind)}</a>`
-  return `<span class="author-next" role="status" data-pr-url="${esc(prUrl)}">${step}</span>`
+      : link(pr.draft ? 'mark it ready for review' : 'request review')
+  return `<span class="author-next" role="status" data-pr-url="${esc(pr.url)}"${pr.draft ? ' data-draft' : ''}>${step}</span>`
 }
 
 /**
