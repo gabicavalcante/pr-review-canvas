@@ -1397,6 +1397,10 @@ export function wireChat(options) {
     openReview() {
       openReviewTab(pane, panel)
     },
+    /** Minimizes the pane while it floats over the canvas, so the canvas under it can be used. */
+    uncover() {
+      panel.uncover()
+    },
     /** @param {ChatContext} next */
     ask(next) {
       openChat()

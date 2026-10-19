@@ -290,7 +290,7 @@ it('posting a multiline settlement preserves the attention point range', async (
   const artifact = syntheticArtifact()
   artifact.points[0] = { ...artifact.points[0]!, audience: 'author', line: 3, endLine: 5 }
   await t.ctx.canvases.write(HEAD_SHA, artifact, manifest, 42)
-  await t.ctx.derived.ensure(HEAD_SHA, BASE_SHA)
+  await t.ctx.derived.ensure({ headSha: HEAD_SHA, mergeBaseSha: BASE_SHA })
   const response = await createApp(t.ctx).request('/api/prs/42/points/fp-1/settled', {
     method: 'PUT',
     headers,
@@ -354,7 +354,7 @@ it('GitLab self-review posts the reason and shares the revised canvas, then reop
   const t = await makeTestContext({ git, gh: forge, host: gitlabHost('gitlab.example.com') })
   contexts.push(t)
   await t.ctx.canvases.write(HEAD_SHA, syntheticArtifact(), manifest, 42)
-  await t.ctx.derived.ensure(HEAD_SHA, BASE_SHA)
+  await t.ctx.derived.ensure({ headSha: HEAD_SHA, mergeBaseSha: BASE_SHA })
   const app = createApp(t.ctx)
   const response = await app.request('/api/prs/42/points/fp-2/settled', {
     method: 'PUT',

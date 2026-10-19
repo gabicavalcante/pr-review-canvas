@@ -128,14 +128,16 @@ export function fetchState(prNumber, opts = {}) {
  * @param {ReviewKey} prNumber
  * @param {string} id `layer:<id>` or `layer:<id>/file:<key>`
  * @param {boolean} reviewed
- * @param {{ headSha?: string, canvasSha?: string, fetchImpl?: typeof fetch }} [opts]
+ * @param {{ headSha?: string, mergeBaseSha?: string, canvasSha?: string, canvasMergeBaseSha?: string, fetchImpl?: typeof fetch }} [opts]
  * @returns {Promise<import('./contract-types.js').StateResponse>}
  */
 export function putReviewed(prNumber, id, reviewed, opts = {}) {
   const body = {
     reviewed,
     ...(opts.headSha === undefined ? {} : { headSha: opts.headSha }),
+    ...(opts.mergeBaseSha === undefined ? {} : { mergeBaseSha: opts.mergeBaseSha }),
     ...(opts.canvasSha === undefined ? {} : { canvasSha: opts.canvasSha }),
+    ...(opts.canvasMergeBaseSha === undefined ? {} : { canvasMergeBaseSha: opts.canvasMergeBaseSha }),
   }
   return fetchJson(`/api/prs/${prNumber}/reviewed/${id}`, {
     method: 'PUT',
@@ -280,7 +282,7 @@ export function fetchReviewBody(prNumber, opts = {}) {
 
 /**
  * @param {ReviewKey} prNumber
- * @param {{ event: import('./contract-types.js').ReviewEvent, body?: string, headSha?: string, includePending?: boolean }} input
+ * @param {{ event: import('./contract-types.js').ReviewEvent, body?: string, headSha?: string, mergeBaseSha?: string, includePending?: boolean }} input
  * @param {{ fetchImpl?: typeof fetch }} [opts]
  * @returns {Promise<import('./contract-types.js').PostReviewResponse>}
  */

@@ -211,7 +211,9 @@ test('keeps a layer open when a draft is added or deleted, whatever marks an old
   // A mark made on another canvas does not count for this one, so the layer is drawn unread.
   const { url } = await chatServer({
     setup: async t => {
-      await t.ctx.state.setReviewed(42, 'layer:run-path', true, { canvasSha: 'f'.repeat(40) })
+      await t.ctx.state.setReviewed(42, 'layer:run-path', true, {
+        canvas: { headSha: 'f'.repeat(40), mergeBaseSha: 'b'.repeat(40) },
+      })
     },
   })
   await page.goto(url)

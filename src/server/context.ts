@@ -263,7 +263,7 @@ export function createContextGeneration(
       publish: (canvasDir, opts) => publish(whole(), canvasDir, opts),
       fix: async (canvasDir, modelPath, text) => {
         const context = await readContext(canvasDir)
-        const { patches } = await ctx.derived.ensure(context.headSha, context.mergeBaseSha)
+        const { patches } = await ctx.derived.ensure(context)
         return describeFixes(await fixModel(modelPath, text, context, patches))
       },
     },

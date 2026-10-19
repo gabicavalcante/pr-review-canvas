@@ -19,6 +19,10 @@
 - Threads saved by earlier versions still appear in the Threads tab, under whole PR, since they have
   no place.
 
+## 0.9.0
+
+Changes since 0.8.0.
+
 ### Generating from the terminal
 
 - `pr-review generate [<n>|branch|uncommitted]` generates a canvas from a terminal, with no skill
@@ -43,6 +47,67 @@
   layers counts only the chunks of each layer.
 - Hover the totals of the rail and the header for the split between code and tests, as in
   `code +3 −2 · tests +2 −1`.
+
+### Attention points
+
+- Each attention point has one status: open, in your review, posted, resolved, or dismissed. A
+  point that is not open stays in its layer and on its diff line, collapsed to its title, a status
+  pill, and one line. **show** expands it with its outcome and the command that undoes it, and a
+  point in your review shows its drafts with **edit** and **delete**.
+- The overview's dismissed and resolved lists give way to one status line, with a switch that hides
+  the points acted on. Counts, the rail, and `]`/`[` cover open points only; `o` expands a
+  collapsed point.
+
+### Your review
+
+- The side pane has a **Your review** tab next to AI Chat. It lists every pending draft by file,
+  with where it came from, a link to its line, **edit**, **delete**, **finish your review**, and
+  **discard**. The pending bar's **see the list** opens it. Drafts written on earlier commits are
+  listed there too. With AI Chat off, the pane holds the review alone, minimized until opened.
+- A draft being edited in the tab keeps its text, focus, and selection while other drafts are
+  added, saved, or deleted.
+- **finish your review** and the header's sign-off commands wait while a draft edit on screen
+  differs from the saved draft: they say to save or cancel it first, and put the focus on it.
+- On a phone, or wherever the pane floats over the canvas, a line link in the pane minimizes the
+  pane so the line is not left under it. Posting a review minimizes it too, so the receipt and its
+  link to the forge are on top.
+
+### AI Chat
+
+- The context chip sits above the message box, and each question in the transcript names the
+  context it was asked with, after a reload too.
+- A proposed comment can name the attention point it acts on: its card says "about the point …",
+  with **unlink** until the comment is sent. Queuing, posting, or editing it acts on that point,
+  as the point's own **add to review** does.
+- When the reader wrote the pull request, AI Chat can propose resolving a point with a reason.
+  **resolve** saves the reason, posting nothing. **edit** opens the point's reason box with it,
+  where it can change and also be posted on the line. The box opens for a point of a collapsed
+  layer or a hidden acted-on point too, and a pane floating over the canvas steps aside for it.
+
+### Fixes
+
+- Reloading the page shows the canvas as outdated after a push made since the last load, and after
+  the pull request moved to another base branch. A canvas of the head itself is outdated when it
+  was generated against another merge base and the diff changed: it is shown with the diff it was
+  generated from, and the bar names both merge bases. A new base that leaves the diff identical
+  keeps the canvas, as a push with an identical diff does, unless `canvas.keepForIdenticalDiff`
+  is off.
+- After a move to another base, review marks and pending drafts follow the diff they were made
+  on: marks made on the old diff do not count for a canvas generated again on the new base, drafts
+  written on it are listed as written on an earlier diff and are refused on submit unless the diff
+  is unchanged, and a page drawn before the move cannot post or mark until it is reloaded.
+  `pr-review import` and a generation that finished after the move say so too.
+- The generation dialog says when the agent is correcting the issues validation found, so they no
+  longer read as errors to act on, and hides them once the canvas is published. They stay shown
+  when the generation fails or is stopped.
+
+### Upgrade from 0.8.0
+
+1. Run `pr-review upgrade` in a project. The skill did not change, so it only installs the new
+   version, and each project's skill copy stays as it is.
+2. Restart the running `pr-review serve`. `pr-review generate` needs the new server, and the
+   server moves each earlier diff into its merge base's folder the first time it is read.
+3. The canvas format did not change, so teammates on 0.8.0 can still open the canvases.
 
 ## 0.8.0
 

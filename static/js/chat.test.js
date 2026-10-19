@@ -45,6 +45,7 @@ function session() {
     state: emptyState('2026-09-11T10:00:00.000Z'),
     capabilities: UNKNOWN_CAPABILITIES,
     headSha: artifact.pr.headSha,
+    mergeBaseSha: artifact.pr.mergeBaseSha,
   })
 }
 
@@ -2429,6 +2430,7 @@ it('upgrades a submitted proposal to its link when a normalized receipt arrives'
     side: /** @type {const} */ ('new'),
     body: 'Rename this.',
     headSha: artifact.pr.headSha,
+    mergeBaseSha: artifact.pr.mergeBaseSha,
     createdAt: '',
     updatedAt: '',
   }

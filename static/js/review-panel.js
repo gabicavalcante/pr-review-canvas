@@ -26,7 +26,7 @@ function draftLink(p) {
  * @param {PendingComment} p
  */
 function draftAttrs(p) {
-  return `data-pending-id="${esc(p.id)}" data-sig="${esc(JSON.stringify([p.body, p.headSha]))}"`
+  return `data-pending-id="${esc(p.id)}" data-sig="${esc(JSON.stringify([p.body, p.headSha, p.mergeBaseSha]))}"`
 }
 
 /**
@@ -47,11 +47,11 @@ function draftOrigin(p, points) {
 /**
  * Everything the review tab holds, drawn from the state.
  * @param {PrState | null | undefined} state
- * @param {{ headSha?: string | undefined, points: ReadonlyArray<Point>, now: Date }} ctx
+ * @param {{ on?: import('./pending.js').DiffOnScreen | undefined, points: ReadonlyArray<Point>, now: Date }} ctx
  */
 export function reviewPanelHtml(state, ctx) {
   const all = pendingComments(state)
-  const { current, earlier } = draftsByCommit(state, ctx.headSha)
+  const { current, earlier } = draftsByCommit(state, ctx.on)
   if (all.length === 0) {
     return (
       '<p class="muted review-empty">Nothing waits in your review. Use <b>add to review</b> on an attention ' +
@@ -83,14 +83,14 @@ export function reviewPanelHtml(state, ctx) {
   const old =
     earlier.length === 0
       ? ''
-      : '<h3 class="lbl review-path">Written on earlier commits</h3>' +
+      : '<h3 class="lbl review-path">Written on an earlier diff</h3>' +
         '<p class="muted small">These can be submitted only if the diff is unchanged. Otherwise copy the text, delete the draft, and comment on the current code.</p>' +
         '<ol class="review-drafts">' +
         earlier
           .map(
             p =>
               `<li class="review-draft earlier" ${draftAttrs(p)}>` +
-              `<p class="review-where">${esc(pendingRange(p))} <span class="muted">· commit ${esc(p.headSha.slice(0, 7))} · ${draftOrigin(p, ctx.points)}</span></p>` +
+              `<p class="review-where">${esc(pendingRange(p))} <span class="muted">· commit ${esc(p.headSha.slice(0, 7))}${p.mergeBaseSha === undefined ? '' : ` from ${esc(p.mergeBaseSha.slice(0, 7))}`} · ${draftOrigin(p, ctx.points)}</span></p>` +
               `<div class="prose">${renderMarkdown(p.body, { github: true })}</div>` +
               '<span class="tbtns">' +
               `<button class="cmd" type="button" data-copy="${esc(p.body)}">copy</button>` +
@@ -114,7 +114,7 @@ export function reviewPanelHtml(state, ctx) {
  * survives a change to any other draft.
  * @param {ParentNode} root
  * @param {PrState} state
- * @param {{ headSha?: string | undefined, points: ReadonlyArray<Point> }} ctx
+ * @param {{ on: import('./pending.js').DiffOnScreen, points: ReadonlyArray<Point> }} ctx
  */
 export function refreshReviewPanel(root, state, ctx) {
   const drafts = pendingComments(state)
@@ -132,10 +132,20 @@ export function refreshReviewPanel(root, state, ctx) {
   if (panel === null) {
     return
   }
-  const signature = JSON.stringify([ctx.headSha ?? null, drafts.map(d => [d.id, d.body, d.headSha])])
+  const signature = JSON.stringify([
+    [ctx.on.headSha, ctx.on.mergeBaseSha],
+    drafts.map(d => [d.id, d.body, d.headSha, d.mergeBaseSha]),
+  ])
   if (panel.getAttribute('data-drafts') === signature) {
     return
   }
+  // Moving a kept row out of the page and back drops the focus, so the box being typed in takes
+  // it back, with the caret and the selection where they were.
+  const focused = panel.contains(document.activeElement) ? document.activeElement : null
+  const caret =
+    focused instanceof HTMLTextAreaElement
+      ? { start: focused.selectionStart, end: focused.selectionEnd, direction: focused.selectionDirection }
+      : null
   const template = document.createElement('template')
   template.innerHTML = reviewPanelHtml(state, { ...ctx, now: new Date() })
   const drawn = new Map(
@@ -149,4 +159,10 @@ export function refreshReviewPanel(root, state, ctx) {
   }
   panel.replaceChildren(template.content)
   panel.setAttribute('data-drafts', signature)
+  if (focused instanceof HTMLElement && focused !== document.activeElement && panel.contains(focused)) {
+    focused.focus({ preventScroll: true })
+    if (caret !== null && focused instanceof HTMLTextAreaElement) {
+      focused.setSelectionRange(caret.start, caret.end, caret.direction)
+    }
+  }
 }
