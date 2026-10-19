@@ -100,12 +100,21 @@ test('opens and closes file and layer bodies', async ({ page, reviewUrl }) => {
   await expect(fileToggle).toHaveAttribute('aria-expanded', 'false')
   await fileTitle.click()
   await expect(fileBody).toBeVisible()
-  // Double and triple clicks select the name to copy it, and leave the card as it was. It is
-  // closed here: the first click opens it and the page grows below the name. Closing it would
-  // shrink this short page, the browser would pull the scroll up, and the second click would land
-  // on whatever moved under the pointer.
+  // At the end of this short page the browser's scroll anchoring would push the name up as the
+  // card opens, so the reader would land on the end of the file; the name stays under the pointer.
+  // Closing it there shrinks the page below the scroll, which the browser has to give back.
   await fileTitle.click()
   await expect(fileBody).toBeHidden()
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  const nameTop = () => fileTitle.evaluate(el => Math.round(el.getBoundingClientRect().top))
+  const top = await nameTop()
+  await fileTitle.click()
+  await expect(fileBody).toBeVisible()
+  expect(await nameTop()).toBe(top)
+  // Double and triple clicks select the name to copy it, and leave the card as it was.
+  await fileTitle.click()
+  await expect(fileBody).toBeHidden()
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
   const onName = { position: { x: 4, y: 4 } }
   await fileTitle.dblclick(onName)
   expect(await page.evaluate(() => window.getSelection()?.toString())).not.toBe('')

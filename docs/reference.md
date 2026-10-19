@@ -643,6 +643,9 @@ The page opens with the first layer open and the others closed; a layer marked r
 closed. Every file starts closed under its name, its counts, and its **reviewed** box: click the
 name or the chevron, or press `o` on it, to read its diff. The rail, the keys that step through
 layers and files (`j`, `k`, `n`, `p`), and any link into a layer or a file open what they land on.
+A click that opens or closes a file or a point keeps its title where you clicked it, so the file
+reads from its start; only closing one at the very end of the page moves it, as the page gets
+shorter than the scroll.
 
 Import-only changes, whitespace changes, moved code, and ranges selected by the generator may
 start collapsed. Click the summary to expand them. Moves are detected within a file; moves

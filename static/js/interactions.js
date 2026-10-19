@@ -983,7 +983,7 @@ export function wireReview(root, session, opts = {}) {
   const toggleFromTitle = (el, event, flip) => {
     if (event.detail > 1) {
       if (event.detail === 2 && toggledByClick === el) {
-        flip()
+        flipInPlace(el, flip)
       }
       toggledByClick = null
       return
@@ -993,8 +993,25 @@ export function wireReview(root, session, opts = {}) {
       toggledByClick = null
       return
     }
-    flip()
+    flipInPlace(el, flip)
     toggledByClick = el
+  }
+
+  /**
+   * Flips what a title heads and keeps the title where it was on screen. Near the end of the page
+   * the browser's scroll anchoring would otherwise move it as the body opens or closes: the reader
+   * would see the end of a file instead of its start, and the second click of a double click would
+   * land on whatever moved under the pointer.
+   * @param {HTMLElement} el the title or toggle clicked
+   * @param {() => void} flip
+   */
+  const flipInPlace = (el, flip) => {
+    const before = el.getBoundingClientRect().top
+    flip()
+    const moved = el.getBoundingClientRect().top - before
+    if (moved !== 0) {
+      window.scrollBy(0, moved)
+    }
   }
 
   /** @type {Record<string, (el: HTMLElement, event: MouseEvent) => void>} */

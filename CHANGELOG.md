@@ -56,8 +56,9 @@
   its line in the diff. The GitHub skin drops the colored squares before the Tests and Attention
   points headings, which named nothing the heading did not.
 - The page opens with only the first layer open, and every file closed under its name. The rail,
-  `j`, `k`, `n`, `p`, and links open the layer or file they land on. Raising **Hide code** closes the files it hides
-  whole; lowering it no longer reopens them.
+  `j`, `k`, `n`, `p`, and links open the layer or file they land on. A click that opens a file or
+  a point keeps its title where you clicked it, also at the end of the page. Raising **Hide code**
+  closes the files it hides whole; lowering it no longer reopens them.
 
 ### AI Chat
 
