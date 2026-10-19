@@ -46,6 +46,7 @@ describe('createSettingsStore', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
+      pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: 'gpt-5.2',
       chatTimeoutSec: 900,
@@ -72,6 +73,7 @@ describe('createSettingsStore', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
+      pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,
       chatTimeoutSec: 120,
@@ -208,6 +210,15 @@ describe('applySettings', () => {
     expect(text).toContain('layerView: one')
     expect(parseSettings('layerView: some\n')).toEqual(DEFAULT_SETTINGS)
   })
+
+  it('saves the point colors under their comment, reads a file without them as classic, and refuses one it does not know', () => {
+    const { text, settings } = applySettings(SETTINGS_TEMPLATE, { pointColors: 'action' })
+    expect(settings.pointColors).toBe('action')
+    expect(text).toContain('# The colors of the attention point level icons')
+    expect(text).toContain('pointColors: action')
+    expect(parseSettings('layerView: one\n').pointColors).toBe('classic')
+    expect(parseSettings('pointColors: neon\n')).toEqual(DEFAULT_SETTINGS)
+  })
 })
 
 describe('the review checkout settings', () => {
@@ -250,6 +261,7 @@ describe('two saves that arrive together', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
+      pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,
       chatTimeoutSec: 900,

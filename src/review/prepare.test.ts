@@ -363,6 +363,8 @@ describe('prepare with a basis canvas', () => {
     const context = GenerationContextSchema.parse(JSON.parse(await readFile(forced.contextPath, 'utf8')))
     expect(context.basis).toBeUndefined()
     expect(await readFile(forced.promptPath, 'utf8')).not.toContain('Update the review canvas')
+    // A blank page still starts from the author's answers.
+    expect(context.resolutions).toEqual({ canvasSha: OLD, points: [] })
     await t.cleanup()
     await withOldCanvas(false)
     const off = await prepare(t.ctx, { kind: 'pr', number: 42 }, opts())
@@ -392,5 +394,99 @@ describe('prepare with a basis canvas', () => {
     const result = await prepare(t.ctx, { kind: 'pr', number: 42 }, opts())
     const context = GenerationContextSchema.parse(JSON.parse(await readFile(result.contextPath, 'utf8')))
     expect(context.basis).toBeUndefined()
+  })
+
+  it('takes the resolutions of the pull request’s newest canvas, on a commit a rebase left behind too', async () => {
+    t = await makeTestContext({ git: gitFor42(), gh: ghFor42() })
+    const settlement = { reason: 'Nothing imports it.', at: '2026-09-10T12:00:00.000Z' }
+    const manifest = (headSha: string, generatedAt: string) => ({
+      formatVersion: 1 as const,
+      tool: { name: 'pr-review', version: '0.9.0' },
+      repo: syntheticArtifact().pr.repo,
+      prNumber: 42,
+      headSha,
+      mergeBaseSha: BASE_SHA,
+      baseRef: 'main',
+      headRef: 'feat/b',
+      generatedAt,
+      generator: { agent: 'claude' as const, harness: 'claude-code' as const, attempts: 1 },
+    })
+    const older = 'd'.repeat(40)
+    // The older canvas still holds a resolution the author took back on the newer one.
+    await t.ctx.canvases.write(
+      older,
+      {
+        ...syntheticArtifact(),
+        generatedAt: '2026-09-10T10:00:00.000Z',
+        settled: { 'fp-1': settlement, 'fp-3': settlement },
+      },
+      manifest(older, '2026-09-10T10:00:00.000Z'),
+      42
+    )
+    await t.ctx.canvases.write(
+      OLD,
+      { ...syntheticArtifact(), settled: { 'fp-3': settlement } },
+      manifest(OLD, '2026-09-10T11:00:00.000Z'),
+      42
+    )
+    const result = await prepare(t.ctx, { kind: 'pr', number: 42 }, opts())
+    const context = GenerationContextSchema.parse(JSON.parse(await readFile(result.contextPath, 'utf8')))
+    expect(context.basis).toBeUndefined()
+    expect(context.resolutions).toEqual({
+      canvasSha: OLD,
+      points: [
+        {
+          kind: 'debt',
+          path: 'src/gone.ts',
+          title: 'Deleted file had no owner',
+          origin: 'model',
+          reason: 'Nothing imports it.',
+        },
+      ],
+    })
+    expect(await readFile(result.promptPath, 'utf8')).toContain('### Points the author already resolved')
+  })
+
+  it('leaves a settled decision’s point out of the resolutions, since publish writes it again', async () => {
+    t = await makeTestContext({ git: gitFor42(), gh: ghFor42() })
+    const artifact = syntheticArtifact()
+    const decisionPoint = {
+      id: 'p-4',
+      fingerprint: 'fp-4',
+      kind: 'decision' as const,
+      level: 'fyi' as const,
+      title: 'keep the sum',
+      path: 'src/app.ts',
+      line: 4,
+      side: 'new' as const,
+      body: 'The author settled this in commit `abc1234` on 2026-10-13.',
+      layerId: 'other',
+      origin: 'decision' as const,
+      audience: 'author' as const,
+    }
+    await t.ctx.canvases.write(
+      OLD,
+      {
+        ...artifact,
+        points: [...artifact.points, decisionPoint],
+        settled: { 'fp-4': { reason: 'the spec says sum', at: '2026-10-13T10:00:00.000Z' } },
+      },
+      {
+        formatVersion: 1 as const,
+        tool: { name: 'pr-review', version: '0.9.0' },
+        repo: artifact.pr.repo,
+        prNumber: 42,
+        headSha: OLD,
+        mergeBaseSha: BASE_SHA,
+        baseRef: 'main',
+        headRef: 'feat/b',
+        generatedAt: '2026-09-10T11:00:00.000Z',
+        generator: { agent: 'claude' as const, harness: 'claude-code' as const, attempts: 1 },
+      },
+      42
+    )
+    const result = await prepare(t.ctx, { kind: 'pr', number: 42 }, opts())
+    const context = GenerationContextSchema.parse(JSON.parse(await readFile(result.contextPath, 'utf8')))
+    expect(context.resolutions).toEqual({ canvasSha: OLD, points: [] })
   })
 })

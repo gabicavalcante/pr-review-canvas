@@ -109,6 +109,28 @@ export const BasisSplitSchema = z.object({
 })
 export type BasisSplit = z.infer<typeof BasisSplitSchema>
 
+/** A point the author resolved on an earlier canvas, with the reason every reviewer read. */
+export const ResolvedPointSchema = z.object({
+  kind: z.enum(POINT_KINDS),
+  path: z.string().min(1),
+  title: z.string(),
+  /** `tests` when a missing-test entry generated the point, so its entry's title is the one to keep. */
+  origin: z.enum(['model', 'tests']),
+  reason: z.string(),
+})
+export type ResolvedPoint = z.infer<typeof ResolvedPointSchema>
+
+/**
+ * The canvas this run takes the author's resolutions from (see `findResolutionSource`), with the
+ * points resolved on it when `prepare` ran. `publish` reads that canvas again, so a point resolved
+ * while the generator worked is kept too.
+ */
+export const ResolutionsSchema = z.object({
+  canvasSha: z.string().regex(/^[0-9a-f]{40}$/),
+  points: z.array(ResolvedPointSchema),
+})
+export type Resolutions = z.infer<typeof ResolutionsSchema>
+
 /**
  * A decision the author already took about this change, read from a `Settled-decision` line in the
  * message of one of its commits. `line` is where the decision's code sits at the head, inside a
@@ -171,6 +193,9 @@ export const GenerationContextSchema = z.object({
   largePr: z.boolean(),
   /** Absent when this canvas is generated from a blank page: no basis, `--force`, or turned off. */
   basis: BasisSplitSchema.optional(),
+  /** Absent when no earlier canvas of this review exists. `--force` keeps it: a resolution is not
+   * the basis's wording, it is the author's answer. */
+  resolutions: ResolutionsSchema.optional(),
   /** The author's settled decisions on these commits. Defaulted, so an older context still reads. */
   decisions: z.array(SettledDecisionSchema).default([]),
   preparedAt: z.string(),
