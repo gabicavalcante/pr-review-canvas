@@ -782,8 +782,7 @@ kind, audience, and location. Click the title or **show** to read it and use its
 list shows every open point whole, in every layer, and **compact** goes back; the browser remembers
 the choice. A point on its line in the diff is always drawn whole while it is open.
 
-The counts in the rail, the layer headings, and the overview's level counts include only open
-points. The overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author ·
+The counts in the layer headings and the overview's level counts include only open points. The overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author ·
 …** counts each status. Resolved points start off the page for every reader, the author too: **show
 the N resolved** brings them back, collapsed in place, until you click it again. A layer whose
 points are all resolved drops its **Attention points** heading while they are hidden. A link to a
