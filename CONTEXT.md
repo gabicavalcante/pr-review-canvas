@@ -23,6 +23,10 @@ _Avoid_: Excluded code, deleted context
 A concern anchored to changed code that asks the reviewer to decide, check, or take note.
 _Avoid_: Proven bug, automatic finding
 
+**Level**:
+What an attention point asks of the reader: decide, check, or take note (fyi). It says what to do, not how bad something is.
+_Avoid_: Severity, priority
+
 **Missing-test point**:
 An attention point generated from a behavior with no test. It belongs to the reviewer unless the
 writer assigns it to the author, and counts alongside explicitly written attention points.

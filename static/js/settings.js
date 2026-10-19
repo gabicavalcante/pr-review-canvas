@@ -1,6 +1,6 @@
 // @ts-check
 // The settings dialog: the personal settings this browser can change, the reading level a review
-// opens at, how layers show, and the AI Chat settings, and a read-only look at the project config,
+// opens at, how layers show, the colors of points, and the AI Chat settings, and a read-only look at the project config,
 // which is committed and belongs to the repository. The chat agent and model are personal and run
 // AI Chat only; the canvas generation models come from the project config.
 /** @typedef {import('./contract-types.js').AgentsResponse} AgentsResponse */
@@ -10,6 +10,7 @@ import { runCommand } from './commands.js'
 import { esc, qs } from './dom.js'
 import { isFoldLevel } from './fold-levels.js'
 import { isLayerView, LAYER_VIEW_LABELS, LAYER_VIEWS } from './layer-views.js'
+import { isPointColors, POINT_COLORS, POINT_COLORS_LABELS } from './point-colors.js'
 import { foldLevelOptionsHtml } from './reading-level.js'
 
 export const SETTINGS_DIALOG_ID = 'settings-dialog'
@@ -26,6 +27,17 @@ const CHAT_MODEL_LIST_ID = 'chat-model-list'
 function layerViewOptionsHtml(view) {
   return LAYER_VIEWS.map(
     v => `<option value="${esc(v)}"${v === view ? ' selected' : ''}>${esc(LAYER_VIEW_LABELS[v])}</option>`
+  ).join('')
+}
+
+/**
+ * The point palettes as options, with one selected.
+ * @param {import('./point-colors.js').PointColors} colors
+ * @returns {string}
+ */
+function pointColorsOptionsHtml(colors) {
+  return POINT_COLORS.map(
+    c => `<option value="${esc(c)}"${c === colors ? ' selected' : ''}>${esc(POINT_COLORS_LABELS[c])}</option>`
   ).join('')
 }
 
@@ -194,7 +206,10 @@ export function settingsDialogHtml(data, agents, tab = 'reading') {
       '<p class="muted small">The level every review opens at. The Hide code control and the <span class="mono">f</span> key change it for one page.</p>' +
       '<div class="field"><label for="set-layer-view">Show layers</label>' +
       `<select id="set-layer-view">${layerViewOptionsHtml(settings.layerView)}</select></div>` +
-      '<p class="muted small">One at a time shows the overview or a single layer. The rail and the <span class="mono">j</span> and <span class="mono">k</span> keys move between them.</p>',
+      '<p class="muted small">One at a time shows the overview or a single layer. The rail and the <span class="mono">j</span> and <span class="mono">k</span> keys move between them.</p>' +
+      '<div class="field"><label for="set-point-colors">Point colors</label>' +
+      `<select id="set-point-colors">${pointColorsOptionsHtml(settings.pointColors)}</select></div>` +
+      '<p class="muted small">The colors of the attention point icons. The shapes say the level in both: a diamond to decide, a checked box to check, an i for context.</p>',
     chat: agents === null ? '' : chatFieldsHtml(settings, agents),
     checkouts: agents === null ? '' : checkoutFieldsHtml(settings),
     project:
@@ -312,6 +327,7 @@ export async function openSettingsDialog(root, opener, opts = {}) {
 export function readSettingsForm(/** @type {ParentNode} */ dialog) {
   const foldLevel = qs('#set-fold-level', dialog)
   const layerView = qs('#set-layer-view', dialog)
+  const pointColors = qs('#set-point-colors', dialog)
   const agent = qs(`#${CHAT_AGENT_ID}`, dialog)
   const model = qs(`#${CHAT_MODEL_ID}`, dialog)
   const timeout = qs('#set-timeout', dialog)
@@ -326,6 +342,9 @@ export function readSettingsForm(/** @type {ParentNode} */ dialog) {
   }
   if (layerView instanceof HTMLSelectElement && isLayerView(layerView.value)) {
     input.layerView = layerView.value
+  }
+  if (pointColors instanceof HTMLSelectElement && isPointColors(pointColors.value)) {
+    input.pointColors = pointColors.value
   }
   if (agent instanceof HTMLSelectElement && agent.value !== '') {
     input.chatAgent = /** @type {import('./contract-types.js').ChatAgent} */ (agent.value)

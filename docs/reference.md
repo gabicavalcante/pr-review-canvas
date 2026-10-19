@@ -547,22 +547,23 @@ placed in Other while its source is in a regular layer.
 
 The data directory's `settings.yml` accepts these keys and values:
 
-| Key                    | Default  | Accepted values                                                                  |
-| ---------------------- | -------- | -------------------------------------------------------------------------------- |
-| `version`              | `1`      | `1`                                                                              |
-| `skin`                 | `github` | `terminal`, `github`, `olive`                                                    |
-| `theme`                | `auto`   | `auto`, `light`, `dark`                                                          |
-| `foldLevel`            | `light`  | `light`, `moderate`, `aggressive`                                                |
-| `layerView`            | `all`    | `all`, `one`                                                                     |
-| `chatAgent`            | `claude` | `claude`, `codex` (2)                                                            |
-| `chatModel`            | `null`   | A model ID, or `null` for the agent's default (1) (2)                            |
-| `chatTimeoutSec`       | `600`    | Integer seconds, 30–3600                                                         |
-| `maxTurns`             | `null`   | Integer 1–100, or `null` for the agent's default                                 |
-| `checkoutEnabled`      | `true`   | `true` reads a [review checkout](#review-checkouts); `false` reads your checkout |
-| `checkoutIdleDays`     | `7`      | Integer 1–365, or `-1` to never remove an idle checkout                          |
-| `checkoutSweepMinutes` | `60`     | Integer minutes, 5–1440, between `serve`'s idle sweeps                           |
-| `canvasComment`        | `null`   | `true`, `false`, or `null` to follow the project (3)                             |
-| `mentionCanvas`        | `null`   | `true`, `false`, or `null` to follow the project (3)                             |
+| Key                    | Default   | Accepted values                                                                  |
+| ---------------------- | --------- | -------------------------------------------------------------------------------- |
+| `version`              | `1`       | `1`                                                                              |
+| `skin`                 | `github`  | `terminal`, `github`, `olive`                                                    |
+| `theme`                | `auto`    | `auto`, `light`, `dark`                                                          |
+| `foldLevel`            | `light`   | `light`, `moderate`, `aggressive`                                                |
+| `layerView`            | `all`     | `all`, `one`                                                                     |
+| `pointColors`          | `classic` | `classic`, `action`                                                              |
+| `chatAgent`            | `claude`  | `claude`, `codex` (2)                                                            |
+| `chatModel`            | `null`    | A model ID, or `null` for the agent's default (1) (2)                            |
+| `chatTimeoutSec`       | `600`     | Integer seconds, 30–3600                                                         |
+| `maxTurns`             | `null`    | Integer 1–100, or `null` for the agent's default                                 |
+| `checkoutEnabled`      | `true`    | `true` reads a [review checkout](#review-checkouts); `false` reads your checkout |
+| `checkoutIdleDays`     | `7`       | Integer 1–365, or `-1` to never remove an idle checkout                          |
+| `checkoutSweepMinutes` | `60`      | Integer minutes, 5–1440, between `serve`'s idle sweeps                           |
+| `canvasComment`        | `null`    | `true`, `false`, or `null` to follow the project (3)                             |
+| `mentionCanvas`        | `null`    | `true`, `false`, or `null` to follow the project (3)                             |
 
 (1) A model ID names a family; see [Model families](#model-families).
 (2) `chatAgent` also picks the agent that [generates canvases from the review
@@ -718,6 +719,21 @@ refused.
 
 When automatic download fails, download the archive in GitHub or GitLab and use the page's drop
 zone or `pr-review import <zip> --pr <n>`.
+
+### Attention point levels
+
+Each attention point has a level, which says what it asks of you rather than how bad it is. Its
+icon shows the level by shape:
+
+- **decide** (a diamond): a choice only a person can make, or a structural problem that holds the
+  merge until the author justifies it.
+- **check** (a checked box): a real problem that does not hold the merge, or something to verify
+  by hand.
+- **fyi** (an info circle): context worth knowing.
+
+The icons are red, amber, and gray by default. Set **Point colors** in the settings dialog to
+**action** for purple, blue, and gray instead, so no level reads as a warning. The choice is saved
+as `pointColors` in `settings.yml`.
 
 ### Attention point status
 

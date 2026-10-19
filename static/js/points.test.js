@@ -46,7 +46,7 @@ describe('points', () => {
     expect(pointLocation({ ...p, endLine: 6 })).toBe('src/app.ts:4-6')
   })
 
-  it('renders a card with square, kind tag, location link, body, and its four commands', () => {
+  it('renders a card with level icon, kind tag, location link, body, and its four commands', () => {
     const p = points[0]
     if (!p) {
       throw new Error('no point')
@@ -54,7 +54,7 @@ describe('points', () => {
     document.body.innerHTML = `<ol>${pointCardHtml(p, ctx)}</ol>`
     const li = document.querySelector('li.finding')
     expect(li?.id).toBe('point-p-1')
-    expect(li?.querySelector('.sq.decide')?.getAttribute('aria-label')).toBe('decide')
+    expect(li?.querySelector('.lv.decide')?.getAttribute('aria-label')).toBe('decide')
     expect(li?.querySelector('.pill.kind')?.textContent).toBe('decision')
     expect(li?.querySelector('a.loc')?.getAttribute('href')).toBe('#line:src/app.ts:4')
     expect(li?.querySelector('.prose p')?.textContent).toContain('Look at the operator')
@@ -79,7 +79,7 @@ describe('points', () => {
     const tr = document.querySelector('tr.ifind')
     expect(tr?.classList.contains('check')).toBe(true)
     expect(tr?.getAttribute('data-point')).toBe('p-2')
-    expect(tr?.querySelector('.f-title span:not(.sq):not(.pill)')?.textContent).toBe(p.title)
+    expect(tr?.querySelector('.f-title span:not(.lv):not(.pill)')?.textContent).toBe(p.title)
     document.body.innerHTML = sevsumHtml(points)
     expect(document.querySelector('.sevsum')?.textContent).toBe('111decidecheckfyi')
     expect(document.querySelector('.sevsum a')).toBeNull()
@@ -89,7 +89,8 @@ describe('points', () => {
       '#layer-other',
       '#layer-other',
     ])
-    expect(document.querySelector('.sq.decide')?.getAttribute('aria-label')).toBe('1 decide')
+    expect(document.querySelector('.lv.decide')?.getAttribute('aria-label')).toBe('1 decide')
+    expect(document.querySelectorAll('.legend .lv[aria-hidden="true"]')).toHaveLength(3)
     document.body.innerHTML = sevsumHtml([], syntheticArtifact().layers)
     expect(document.querySelector('.sevsum a')).toBeNull()
     expect(document.querySelector('.sevsum')?.textContent).toBe('000decidecheckfyi')
