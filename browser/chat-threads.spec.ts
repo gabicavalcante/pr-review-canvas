@@ -155,3 +155,18 @@ test('the other threads wait, and look it, while an answer comes in', async ({
   await expect(waiting).toBeEnabled()
   await expect(waiting).toHaveCSS('cursor', 'pointer')
 })
+
+test('go to code steps the phone modal aside and shows the place', async ({ page, chatServer }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  await page.setViewportSize({ width: 390, height: 900 })
+  const { url } = await chatServer()
+  await page.goto(url)
+  const point = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
+  // On a phone, ask opens the pane as a modal, on the point's thread.
+  await point.locator('[data-act="ask"]').first().click()
+  await expect(page.locator('#chat-dialog')).toHaveAttribute('open')
+  await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
+  await page.locator('#thread-goto').click()
+  await expect(page.locator('#chat-dialog')).not.toHaveAttribute('open')
+  await expect(point).toHaveClass(/is-target/)
+})

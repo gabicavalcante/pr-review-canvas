@@ -1346,12 +1346,16 @@ export function wireChat(options) {
   })
   const stopTabs = wireSideTabs(pane)
 
-  /** Leads the canvas to the open thread's place, while the canvas has it. */
+  /**
+   * Leads the canvas to the open thread's place, while the canvas has it. A pane floating over the
+   * canvas steps aside first, as it does for a canvas link.
+   */
   const goToAnchor = () => {
     const anchor = askedIn(openPlace)
     if (anchor.kind === 'pr') {
       return
     }
+    panel.uncover()
     if (anchor.kind === 'point') {
       const el = root.querySelector(`[data-point][data-fingerprint="${cssEscape(anchor.fingerprint)}"]`)
       if (el instanceof HTMLElement) {
