@@ -1,6 +1,11 @@
 /* ---- Layout: rail | main | AI chat, column lines painted once ---- */
+/* On a wide screen the columns stay side by side in the middle: the reading column stops at
+   --main-max, and the grid is only as wide as its columns. */
 .layout {
   display: grid;
+  max-width: calc(var(--rail-w) + var(--main-max) + var(--chat-w));
+  width: 100%;
+  margin-inline: auto;
   grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--chat-w);
   flex: 1;
   align-items: start;
@@ -10,6 +15,7 @@
     linear-gradient(var(--ink), var(--ink)) 100% 0 / 1px 100% no-repeat;
 }
 .layout.no-chat {
+  max-width: calc(var(--rail-w) + var(--main-max));
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
   background: linear-gradient(var(--ink), var(--ink)) calc(var(--rail-w) - 1px) 0 / 1px 100% no-repeat;
 }

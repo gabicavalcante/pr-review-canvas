@@ -118,7 +118,8 @@ test('spans the reading column like the overview on a wide screen', async ({ pag
   const note = await page.locator('#main > .stale-bar').boundingBox()
   const overview = await page.locator('#overview').boundingBox()
   if (!note || !overview) throw new Error('missing bar or overview')
-  expect(overview.width).toBeGreaterThan(1100)
+  // The reading column stops at its max-width on a wide screen, so the bar matches that width.
+  expect(overview.width).toBeGreaterThan(900)
   expect(Math.abs(note.x - overview.x)).toBeLessThan(1)
   expect(Math.abs(note.width - overview.width)).toBeLessThan(1)
 })

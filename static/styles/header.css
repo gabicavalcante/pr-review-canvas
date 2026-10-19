@@ -74,6 +74,15 @@
   padding: 16px 20px 18px;
   border-bottom: 1px solid var(--ink);
 }
+/* The header's content starts and ends where the columns below it do, so the title lines up with
+   the rail on a wide screen. */
+:is(.hdr-bar, .hdr-title) {
+  --page-w: calc(var(--rail-w) + var(--main-max) + var(--chat-w));
+  padding-inline: max(20px, calc((100% - var(--page-w)) / 2 + 20px));
+}
+body:has(.layout.no-chat) :is(.hdr-bar, .hdr-title) {
+  --page-w: calc(var(--rail-w) + var(--main-max));
+}
 .title {
   display: flex;
   flex-wrap: wrap;
