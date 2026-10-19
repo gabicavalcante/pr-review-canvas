@@ -10,6 +10,7 @@ import {
   fetchSharedCanvas,
   importCanvas,
   pollBundle,
+  pollSettled,
   setApiBase,
 } from './api.js'
 import { setChatEnabled } from './ask.js'
@@ -134,6 +135,11 @@ async function settlePatches(prNumber, started, headSha) {
 export class PrAppElement extends HTMLElement {
   /** @type {{ stop: () => void } | null} */
   poller = null
+  /**
+   * Reads the author's resolutions back on a reviewer's page.
+   * @type {{ stop: () => void } | null}
+   */
+  settledPoller = null
   /** @type {Bootstrap | null} */
   bootstrap = null
   /** @type {{ stop: () => void } | null} */
@@ -176,6 +182,8 @@ export class PrAppElement extends HTMLElement {
 
   disconnectedCallback() {
     this.stopPolling()
+    this.settledPoller?.stop()
+    this.settledPoller = null
     this.generation?.stop()
     this.generation = null
     this.diagrams?.stop()
@@ -256,6 +264,8 @@ export class PrAppElement extends HTMLElement {
       return
     }
     this.stopPolling()
+    this.settledPoller?.stop()
+    this.settledPoller = null
     const showsCanvas = bundle.artifact !== undefined && (bundle.status === 'ready' || this.viewStale)
     const staleSha = bundle.status === 'stale' ? bundle.stale?.canvasHeadSha : undefined
     const patches = showsCanvas
@@ -396,6 +406,31 @@ export class PrAppElement extends HTMLElement {
       }
       if (bundle.status === 'stale') {
         this.startPolling(next => next.status === 'ready')
+      }
+      // A reviewer's page follows the author's resolutions while it stays open. The author's own
+      // page has them from the server's answer to each settlement.
+      if (
+        typeof boot.prNumber === 'number' &&
+        bundle.status === 'ready' &&
+        !bundle.selfReview &&
+        bundle.canvas
+      ) {
+        this.settledPoller = pollSettled(boot.prNumber, bundle.canvas.headSha, answer => {
+          if (answer.generatedAt !== artifact.generatedAt) {
+            // A newer generation for this commit was imported; its resolutions belong to it.
+            this.settledPoller?.stop()
+            this.settledPoller = null
+            toast(this, 'the author shared a newer canvas for this commit; refresh to load it')
+            return
+          }
+          const added = session.takeSettled(answer)
+          if (added.length > 0) {
+            toast(
+              this,
+              `the author resolved ${added.length === 1 ? 'a point' : `${added.length} points`}; show the resolved ones from the overview`
+            )
+          }
+        })
       }
     } else {
       const screen = bundle.status === 'stale' ? renderStaleState(bundle) : renderEmptyState(bundle)

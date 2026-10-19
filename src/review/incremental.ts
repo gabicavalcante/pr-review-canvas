@@ -11,8 +11,9 @@ import type {
 } from '../contract/generation-context.js'
 import { extractLinks, parseLink } from '../contract/links.js'
 import type { Point, ReviewArtifact } from '../contract/review-artifact.js'
+import type { ReviewKey } from '../contract/review-key.js'
 import type { Git } from '../git/git.js'
-import type { CanvasStore } from '../store/canvas-store.js'
+import type { CanvasEntry, CanvasStore } from '../store/canvas-store.js'
 import type { Derived } from '../store/derived-store.js'
 
 /**
@@ -120,16 +121,50 @@ export async function findBasisCanvas(
   prNumber: number | undefined,
   headSha: string
 ): Promise<string | null> {
-  const index = await canvases.readIndex()
-  const candidates = Object.entries(index.canvases)
-    .filter(
-      ([sha, entry]) => sha !== headSha && (entry.prNumber === undefined || entry.prNumber === prNumber)
-    )
-    .sort(([, a], [, b]) => (a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0))
-  for (const [sha] of candidates) {
-    if (await git.isAncestor(sha, headSha)) {
+  for (const [sha, entry] of await newestFirst(canvases)) {
+    const ownedHere = entry.prNumber === undefined || entry.prNumber === prNumber
+    if (ownedHere && sha !== headSha && (await git.isAncestor(sha, headSha))) {
       return sha
     }
   }
   return null
+}
+
+/**
+ * The canvas a new canvas takes the author's resolutions from. Only the newest counts, because a
+ * point the author reopened there, or the generator dropped, is open now whatever an older canvas
+ * says. A pull request takes its newest numbered canvas, on any commit, so its resolutions survive a
+ * rebase, and a later branch review of the same work, which carries no number and none of them,
+ * cannot replace them. Otherwise it is the newest canvas of this review (by the store's
+ * `belongsTo`; a refs run owns the canvases with no number) on a commit the head was built on, or
+ * the head's own canvas whoever owned it, since this run replaces it.
+ */
+export async function findResolutionSource(
+  canvases: CanvasStore,
+  git: Git,
+  key: ReviewKey | undefined,
+  headSha: string
+): Promise<string | null> {
+  const entries = await newestFirst(canvases)
+  const numbered = entries.find(
+    ([, entry]) => typeof key === 'number' && entry.prNumber === key && canvases.belongsTo(entry, key)
+  )
+  if (numbered !== undefined) {
+    return numbered[0]
+  }
+  for (const [sha, entry] of entries) {
+    const owned = key === undefined ? entry.prNumber === undefined : canvases.belongsTo(entry, key)
+    if (sha === headSha || (owned && (await git.isAncestor(sha, headSha)))) {
+      return sha
+    }
+  }
+  return null
+}
+
+/** Every stored canvas, newest generation first. */
+async function newestFirst(canvases: CanvasStore): Promise<Array<[string, CanvasEntry]>> {
+  const index = await canvases.readIndex()
+  return Object.entries(index.canvases).sort(([, a], [, b]) =>
+    a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0
+  )
 }

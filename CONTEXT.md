@@ -37,7 +37,7 @@ The author's pass over their own canvas before asking for review, resolving the 
 _Avoid_: Self-approval, pre-review
 
 **Resolved point**:
-An attention point the author answered with a reason saved in the canvas. The author may resolve any point, a reviewer point too when it does not apply. It leaves the open-point list and stays in place, collapsed with its reason, for anyone loading that canvas.
+An attention point the author answered with a reason saved in the canvas. The author may resolve any point, a reviewer point too when it does not apply. It leaves the open-point list and starts hidden for every reader, who can show it in place, collapsed with its reason. The resolution follows the pull request to every later canvas while the point comes back with the same kind, path, and title; the generator reopens it under a new title only when the reason no longer holds.
 _Avoid_: Dismissed, approved, closed
 
 **Dismissal**:

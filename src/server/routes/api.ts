@@ -88,7 +88,7 @@ async function readUpload(request: Request): Promise<{ file: unknown; force: unk
   return { file: form.get('file'), force: form.get('force') }
 }
 
-function parseHeadShaQuery(raw: string | undefined): string | undefined {
+export function parseHeadShaQuery(raw: string | undefined): string | undefined {
   if (raw !== undefined && !SHA_RE.test(raw)) {
     throw new AppError('BAD_REQUEST', 'headSha must be a 40-character lowercase hex sha', 400)
   }

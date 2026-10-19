@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+### Self-review
+
+- A resolution now lasts. Every later canvas of the pull request starts from the resolutions of its
+  newest canvas, after a push that changes the code under a point, a rebase, or `--force` too. The
+  generator keeps a resolved concern under its title, so it stays resolved, and reopens it under a
+  new title only when the author's reason no longer holds. Before, a push that touched a resolved
+  point's lines, or any `--force`, brought the point back open.
+- Resolved points start hidden for every reader. The overview line counts them as **resolved by the
+  author** and its **show the N resolved** command brings them back, collapsed in place. A layer
+  whose points are all resolved drops its points heading while they are hidden.
+- A reviewer's page reads the author's resolutions back from the canvas comment when it opens and
+  every two minutes after while its tab is in view, hides the newly resolved points, and says so.
+  Before, a reviewer who had already loaded the canvas saw them only after **refresh**.
+
+### Prompt templates
+
+- `pr-review upgrade` checks the project's own prompt templates once pr-review moves: each token
+  the new release added to a bundled template that a custom copy lacks is named, with the heading
+  to add it under. `pr-review doctor` has the same check as its `prompts` line, for any release up
+  to the running one.
+
+### Upgrade
+
+- A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled
+  template has it under **Attention points**; `pr-review upgrade` and `doctor` say so. Without it
+  the generator is not told which points the author resolved: a point that comes back with the same
+  title stays resolved unchecked, and one reworded comes back open.
+
 ## 0.9.0
 
 Changes since 0.8.0.
