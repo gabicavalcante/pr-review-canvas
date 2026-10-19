@@ -36,8 +36,9 @@ export interface ValidationInput {
   testPatterns?: readonly string[] | undefined
   /**
    * The output was read back from a stored `review.json`, whose generator may predate the rules
-   * about what a canvas must hide. Only the correctness rules apply then: coordinates, and the
-   * ranges no fold may cover. A fresh `model.json` is held to the full shape.
+   * about what a canvas must hide and about impact. Only the correctness rules apply then:
+   * coordinates, the ranges no fold may cover, and no impact on a point other than `decide`; a
+   * `decide` point may lack one. A fresh `model.json` is held to the full shape.
    */
   storedArtifact?: boolean | undefined
 }

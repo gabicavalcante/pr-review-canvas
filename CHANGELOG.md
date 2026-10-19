@@ -44,6 +44,11 @@
   template has it under **Attention points**; `pr-review upgrade` and `doctor` say so. Without it
   the generator is not told which points the author resolved: a point that comes back with the same
   title stays resolved unchecked, and one reworded comes back open.
+- A project with its own `generation-format.md`, `quality-standards.md`, `judging-strict.md`, or
+  `judging-surfacing.md` merges in the bundled copies' definitions of impact. `pr-review upgrade`
+  and `doctor` do not name this one, since it adds no token. Without them, every generated decide
+  point comes back with `POINT_IMPACT`, and the agent picks an impact without the definitions.
+- Teammates on 0.9.0 can still open new canvases; they do not see the impact.
 
 ## 0.9.0
 

@@ -36,7 +36,6 @@
   --point-red: light-dark(#a8432c, #e98a6f);
   --point-amber: light-dark(#b58a1f, #d4b25a);
   --point-gray: light-dark(#9a9e90, #6f7466);
-  --point-purple: var(--purple);
   /* The accent is green here, which reads as done, so the blue is its own. */
   --point-blue: light-dark(#3f6a8a, #8fb3cf);
 

@@ -72,7 +72,7 @@ describe('points', () => {
     expect(li?.getAttribute('data-fingerprint')).toBe('fp-1')
   })
 
-  it('shows an impact only on a decide point that has one', () => {
+  it('shows the impact of a point that has one', () => {
     const p = points[0]
     if (!p) {
       throw new Error('no point')
@@ -80,7 +80,6 @@ describe('points', () => {
     expect(impactPillHtml({ ...p, impact: 'critical' })).toContain('class="pill impact critical"')
     const { impact: _, ...older } = p
     expect(impactPillHtml(older)).toBe('')
-    expect(impactPillHtml(points[1] ?? p)).toBe('')
   })
 
   it('renders the inline row and the level summary', () => {

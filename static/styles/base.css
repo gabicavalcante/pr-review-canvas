@@ -61,8 +61,9 @@
   --bad: light-dark(#c40400, #ff657a);
   --warn: light-dark(#caa512, #ffd76d);
   --warn-bg: var(--annot-bg);
-  /* The colors attention points draw from, which each skin sets: the level icons through
-     --level-*, which the pointColors setting picks, and the impact pills. */
+  /* The colors attention points draw from: the level icons through --level-*, which the
+     pointColors setting picks, and the impact pills. A skin sets its red, amber, and gray; purple
+     and blue follow its own --purple and --accent unless it sets them. */
   --point-red: light-dark(#db0400, #ff657a);
   --point-amber: var(--warn);
   --point-gray: light-dark(#808080, #696d77);

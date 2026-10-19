@@ -7,39 +7,16 @@
 /** @typedef {import('./contract-types.js').SettingsResponse} SettingsResponse */
 import { fetchAgents, fetchCheckouts, fetchSettings, probeAgent, saveSettings } from './api.js'
 import { runCommand } from './commands.js'
-import { esc, qs } from './dom.js'
-import { isFoldLevel } from './fold-levels.js'
+import { esc, optionsHtml, qs } from './dom.js'
+import { FOLD_LEVELS, isFoldLevel } from './fold-levels.js'
 import { isLayerView, LAYER_VIEW_LABELS, LAYER_VIEWS } from './layer-views.js'
 import { isPointColors, POINT_COLORS, POINT_COLORS_LABELS } from './point-colors.js'
-import { foldLevelOptionsHtml } from './reading-level.js'
 
 export const SETTINGS_DIALOG_ID = 'settings-dialog'
 /** The AI Chat fields, named once so the markup, the form reader, and the probe agree. */
 const CHAT_AGENT_ID = 'set-chat-agent'
 const CHAT_MODEL_ID = 'set-chat-model'
 const CHAT_MODEL_LIST_ID = 'chat-model-list'
-
-/**
- * The layer views as options, with one selected.
- * @param {import('./layer-views.js').LayerView} view
- * @returns {string}
- */
-function layerViewOptionsHtml(view) {
-  return LAYER_VIEWS.map(
-    v => `<option value="${esc(v)}"${v === view ? ' selected' : ''}>${esc(LAYER_VIEW_LABELS[v])}</option>`
-  ).join('')
-}
-
-/**
- * The point palettes as options, with one selected.
- * @param {import('./point-colors.js').PointColors} colors
- * @returns {string}
- */
-function pointColorsOptionsHtml(colors) {
-  return POINT_COLORS.map(
-    c => `<option value="${esc(c)}"${c === colors ? ' selected' : ''}>${esc(POINT_COLORS_LABELS[c])}</option>`
-  ).join('')
-}
 
 /**
  * Chat model ids the input suggests per chat agent. Free text is allowed; this is only a shortcut. The
@@ -202,13 +179,13 @@ export function settingsDialogHtml(data, agents, tab = 'reading') {
   const panels = {
     reading:
       '<div class="field"><label for="set-fold-level">Hide code by default</label>' +
-      `<select id="set-fold-level">${foldLevelOptionsHtml(settings.foldLevel)}</select></div>` +
+      `<select id="set-fold-level">${optionsHtml(FOLD_LEVELS, settings.foldLevel)}</select></div>` +
       '<p class="muted small">The level every review opens at. The Hide code control and the <span class="mono">f</span> key change it for one page.</p>' +
       '<div class="field"><label for="set-layer-view">Show layers</label>' +
-      `<select id="set-layer-view">${layerViewOptionsHtml(settings.layerView)}</select></div>` +
+      `<select id="set-layer-view">${optionsHtml(LAYER_VIEWS, settings.layerView, LAYER_VIEW_LABELS)}</select></div>` +
       '<p class="muted small">One at a time shows the overview or a single layer. The rail and the <span class="mono">j</span> and <span class="mono">k</span> keys move between them.</p>' +
       '<div class="field"><label for="set-point-colors">Point colors</label>' +
-      `<select id="set-point-colors">${pointColorsOptionsHtml(settings.pointColors)}</select></div>` +
+      `<select id="set-point-colors">${optionsHtml(POINT_COLORS, settings.pointColors, POINT_COLORS_LABELS)}</select></div>` +
       '<p class="muted small">The colors of the attention point icons. The shapes say the level in both: a diamond to decide, a checked box to check, an i for context.</p>',
     chat: agents === null ? '' : chatFieldsHtml(settings, agents),
     checkouts: agents === null ? '' : checkoutFieldsHtml(settings),

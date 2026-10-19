@@ -8,6 +8,7 @@ import { esc } from './dom.js'
 import { hostLabel } from './host.js'
 import { pendingCommentHtml, pendingForPoint, pendingRange } from './pending.js'
 import { layerAnchorId, pointAnchorId } from './keys.js'
+import { LEVELS, levelIconHtml, pointLevelText } from './point-level.js'
 import { renderMarkdown } from './markdown.js'
 import {
   audiencePillHtml,
@@ -17,8 +18,6 @@ import {
   settleButtonHtml,
   settlementOf,
 } from './self-review.js'
-
-export const LEVELS = /** @type {const} */ (['decide', 'check', 'fyi'])
 
 /**
  * @param {ReadonlyArray<Point>} points
@@ -116,30 +115,6 @@ export function pointLocation(p) {
 }
 
 /**
- * Each level's shape, on a 16-unit grid: a diamond for a decision (the flowchart's), a checked box
- * for something to verify, and GitHub's info circle for context. The shape says the level in every
- * palette, so the `pointColors` setting only changes the fill.
- */
-const LEVEL_PATHS = {
-  decide: 'M8 1.25 14.75 8 8 14.75 1.25 8Z',
-  check:
-    'M2.75 1h10.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 13.25 15H2.75A1.75 1.75 0 0 1 1 13.25V2.75C1 1.784 1.784 1 2.75 1Zm0 1.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25V2.75a.25.25 0 0 0-.25-.25Zm8.53 3.78-4 4a.75.75 0 0 1-1.06 0l-2-2a.75.75 0 0 1 1.06-1.06l1.47 1.47 3.47-3.47a.75.75 0 0 1 1.06 1.06Z',
-  fyi: 'M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z',
-}
-
-/**
- * The icon of a level. `label` names it for screen readers and the tooltip; null hides it from
- * them, for an icon whose text already stands next to it.
- * @param {'decide' | 'check' | 'fyi'} level
- * @param {string | null} [label]
- */
-export function levelIconHtml(level, label = level) {
-  const named =
-    label === null ? 'aria-hidden="true"' : `role="img" aria-label="${esc(label)}" title="${esc(label)}"`
-  return `<span class="lv ${level}" ${named}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="${LEVEL_PATHS[level]}"/></svg></span>`
-}
-
-/**
  * Whether a point's comment names the canvas it came from. Off when `sharing.mentionCanvas` is
  * off; `app.js` sets it once per render, before the cards that read it are built.
  */
@@ -156,8 +131,7 @@ export function setMentionCanvas(on) {
  */
 export function pointToMarkdown(p) {
   const source = mentionCanvas ? ' · from the pr-review canvas' : ''
-  const level = p.impact === undefined ? p.level : `${p.level} (${p.impact} impact)`
-  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${p.kind} · ${level}${source}_`
+  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${p.kind} · ${pointLevelText(p)}${source}_`
 }
 
 /**
@@ -358,8 +332,8 @@ function pointSignature(p, status, ctx) {
 }
 
 /**
- * What a wrong call on a `decide` point would cost. Nothing for other points, or for a `decide`
- * point from a canvas written before impact existed.
+ * What a wrong call on the point would cost, for a point with an impact; nothing for one without,
+ * such as a `decide` point from a canvas written before impact existed.
  * @param {Point} p
  */
 export function impactPillHtml(p) {
@@ -588,9 +562,9 @@ export function sevsumHtml(points, layers = []) {
   const by = pointsByLevel(points)
   const cell = /** @param {'decide' | 'check' | 'fyi'} level */ level => {
     const n = by[level].length
-    const square = `${levelIconHtml(level, `${n} ${level}`)}${n}`
+    const icon = `${levelIconHtml(level, `${n} ${level}`)}${n}`
     const target = layers.find(l => by[level].some(p => p.layerId === l.id))
-    return target ? `<a href="#${esc(layerAnchorId(target.key))}">${square}</a>` : `<span>${square}</span>`
+    return target ? `<a href="#${esc(layerAnchorId(target.key))}">${icon}</a>` : `<span>${icon}</span>`
   }
   return (
     `<span class="sevsum" tabindex="0" role="group" aria-label="Attention points by level">${cell('decide')}${cell('check')}${cell('fyi')}` +

@@ -49,8 +49,6 @@
   --point-red: light-dark(#cf222e, #e5534b);
   --point-amber: light-dark(#bf8700, #c69026);
   --point-gray: light-dark(#818b98, #636e7b);
-  --point-purple: var(--purple);
-  --point-blue: var(--accent);
 
   --add-bg: light-dark(#e6ffec, #263834);
   --add-w: light-dark(#abf2bc, rgb(87 171 90 / 40%));
