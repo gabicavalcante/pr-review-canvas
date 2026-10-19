@@ -120,14 +120,9 @@
   text-align: left;
   cursor: pointer;
 }
-.thread-item:not(:disabled):hover,
+.thread-item:hover,
 .thread-item:focus-visible {
   background: var(--panel-2);
-}
-/* A thread waits while another one's answer comes in, dimmed the way a disabled command is. */
-.thread-item:disabled {
-  color: var(--fg-dim);
-  cursor: not-allowed;
 }
 .thread-item.current {
   border-color: var(--accent);

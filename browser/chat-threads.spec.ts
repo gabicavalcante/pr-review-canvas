@@ -121,13 +121,13 @@ test('the wheel scrolls a long Threads list, and the page under a short one', as
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
 })
 
-test('the other threads wait, and look it, while an answer comes in', async ({
+test('another thread opens while an answer comes in, and a question asked there goes next', async ({
   page,
   chatServer,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop')
-  // The question is held where the turn sets up, so the answer is still coming in for as long as
-  // the test looks.
+  // The first question is held where its turn sets up, so its answer is still coming in for as
+  // long as the test looks.
   let release = () => {}
   const held = new Promise<void>(resolve => {
     release = resolve
@@ -139,21 +139,29 @@ test('the other threads wait, and look it, while an answer comes in', async ({
     },
   })
   await page.goto(url)
-  const pointAsk = page
-    .locator('section.layer li.finding[data-fingerprint="fp-1"]')
-    .locator('[data-act="ask"]')
-    .first()
-  await pointAsk.click()
+  const point = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
+  await point.locator('[data-act="ask"]').first().click()
   await page.getByText('ask something else…', { exact: true }).first().click()
   await page.locator('#msg').fill('Is the sum intended?')
   await page.keyboard.press('Enter')
+  await expect(page.locator('#chat-stop')).toBeVisible()
+
   await page.locator('#side-tab-threads').click()
-  const waiting = page.locator('#thread-index [data-thread-open]').filter({ hasText: 'New thread' })
-  await expect(waiting).toBeDisabled()
-  await expect(waiting).toHaveCSS('cursor', 'not-allowed')
+  await page.locator('#thread-index').getByText('New thread').click()
+  await expect(page.locator('#thread-title')).toHaveText('New thread')
+  await page.locator('#msg').fill('And overall?')
+  await page.keyboard.press('Enter')
+  await expect(page.locator('#chat-log')).toContainText('Waiting for the answer in “Sum instead of product”.')
+
   release()
-  await expect(waiting).toBeEnabled()
-  await expect(waiting).toHaveCSS('cursor', 'pointer')
+  // The waiting question went once the first answer ended, and its answer arrives here.
+  await expect(page.locator('#chat-log')).toContainText('covered at')
+  await expect(page.locator('#chat-log')).not.toContainText('Waiting for the answer in')
+  // The first answer arrived in its own thread meanwhile.
+  await page.locator('#side-tab-threads').click()
+  await page.locator('#thread-index').getByText('Sum instead of product').click()
+  await expect(page.locator('#chat-log')).toContainText('Is the sum intended?')
+  await expect(page.locator('#chat-log')).toContainText('covered at')
 })
 
 test('go to code steps the phone modal aside and shows the place', async ({ page, chatServer }, testInfo) => {

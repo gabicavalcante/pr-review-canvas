@@ -997,8 +997,9 @@ Chat can propose an inline comment. A valid proposal appears with controls to po
 or copy it. A proposal outside the current diff remains text with an explanation.
 
 Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time. While an answer is
-coming in, an ask about another place is refused, and **new thread** and the other threads in the
-Threads tab are disabled; ask again once the answer ends. A timeout or incomplete answer can be
+coming in, ask, the Threads tab and **new thread** still open any thread, and the answer keeps
+arriving in its own. A question asked in another thread meanwhile waits, marked as waiting, and is
+sent once the answer ends; one question waits at a time. A timeout or incomplete answer can be
 retried; increase `chatTimeoutSec` if replies need more time.
 
 ### Review checkouts

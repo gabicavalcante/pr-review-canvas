@@ -13,6 +13,8 @@
   **new thread** starts one about the whole PR; an ask about the whole PR comes back to the latest
   of those. It replaces the thread list in the pane's head.
 - The ask command of a place with a thread shows how many questions that thread holds.
+- While an answer comes in, ask, the Threads tab and **new thread** still open any thread, and the
+  answer keeps arriving in its own. A question asked elsewhere meanwhile is sent once it ends.
 - The open thread comes back when the page is reloaded.
 - `chatThreadPerPlace: false` in `settings.yml`, or **A thread per place** cleared in the settings
   dialog, sends every ask to the open thread as before.

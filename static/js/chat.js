@@ -26,7 +26,7 @@ import {
   scrollBehavior,
   unseenLabel,
 } from './chat-scroll.js'
-import { runCommand, showCommandError } from './commands.js'
+import { runCommand } from './commands.js'
 import { isQueuedComment, postedCommentUrl, sendCommandsHtml } from './comment-link.js'
 import { esc, flash, qs, scrollIntoViewSafe } from './dom.js'
 import { cssEscape } from './anchors.js'
@@ -173,6 +173,12 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
  *   onProposed?: (what: ProposedAct, comment: ProposedComment, el: HTMLElement) => void,
  *   onResolution?: (what: 'save' | 'edit', resolution: ProposedResolution, el: HTMLElement) => void,
  * }} ChatOptions
+ */
+
+/**
+ * A question and the thread it goes to: the one open when it was asked, by name, or for a draft
+ * by its place.
+ * @typedef {{ message: string, context: ChatContext, thread: string | null, place: ChatContext | undefined }} Question
  */
 
 /**
@@ -590,9 +596,18 @@ export function wireChat(options) {
   let threads = []
   /** The agent a new thread would use: a thread of another agent is not continued. */
   let agentName = ''
-  /** The thread whose answer is coming in, for the index to say so. */
-  /** @type {string | null} */
-  let answering = null
+  /**
+   * The question whose answer is coming in. The answer keeps arriving while the reader reads
+   * another thread, drawn into its own turns, which go back on screen with their thread.
+   * @type {Question & { user: HTMLElement, answer: HTMLElement, shown: boolean } | null}
+   */
+  let live = null
+  /**
+   * A question asked in another thread while an answer comes in. The server answers one question
+   * of a review at a time, so it is sent once that answer ends; one waits at a time.
+   * @type {Question & { user: HTMLElement, shown: boolean } | null}
+   */
+  let queued = null
   /**
    * The badge on every ask command whose place has a thread, as CSS: cards drawn later, and the
    * selection toolbar, pick it up without being visited.
@@ -600,7 +615,6 @@ export function wireChat(options) {
   const marks = document.createElement('style')
   marks.id = 'chat-thread-marks'
   root.append(marks)
-  let streaming = false
   let stopActivity = () => {}
   /** The turn in flight, so taking the pane down stops its request too. */
   /** @type {AbortController | null} */
@@ -620,6 +634,9 @@ export function wireChat(options) {
   const claimLog = () => {
     logSeq += 1
     restoring = false
+    // What the log showed goes, the answer coming in and the waiting question with it.
+    if (live !== null) live.shown = false
+    if (queued !== null) queued.shown = false
     return logSeq
   }
 
@@ -699,8 +716,42 @@ export function wireChat(options) {
     threadTitleEl.textContent = gone ? `${title} · not on this canvas` : title
     threadTitleEl.title = threadTitleEl.textContent
     gotoButton.hidden = askedIn(openPlace).kind === 'pr'
+    drawComposer()
+  }
+
+  /**
+   * The thread whose answer is coming in, as the index names it, so a question that waits for it
+   * says which one it waits for.
+   */
+  const answeringName = () => {
+    if (live === null) {
+      return ''
+    }
+    const thread = threads.find(t => t.name === live?.thread)
+    return thread !== undefined
+      ? shownTitle(thread)
+      : live.place !== undefined
+        ? placeName(live.place)
+        : 'New thread'
+  }
+
+  /**
+   * The composer of the thread on screen: stop while its own answer comes in; while another
+   * thread's answer does, a box whose question waits for that answer, until one is waiting.
+   */
+  const drawComposer = () => {
+    const answeringHere = live !== null && live.shown
+    sendButton.hidden = answeringHere
+    stopButton.hidden = !answeringHere
+    box.disabled = answeringHere || queued !== null
     box.placeholder =
-      askedIn(openPlace).kind === 'pr' ? 'Ask AI Chat about this PR…' : 'Ask about this, in this thread…'
+      queued !== null
+        ? `A question already waits for the answer in “${answeringName()}”.`
+        : live !== null && !answeringHere
+          ? `AI Chat is answering in “${answeringName()}”. Ask here and it goes next…`
+          : askedIn(openPlace).kind === 'pr'
+            ? 'Ask AI Chat about this PR…'
+            : 'Ask about this, in this thread…'
   }
 
   /** Shows the open thread, in the AI Chat tab. */
@@ -729,14 +780,15 @@ export function wireChat(options) {
       const items = group
         .map(t => {
           const status =
-            t.name === answering ? 'answering…' : t.turns === 1 ? '1 question' : `${t.turns} questions`
-          // While an answer comes in, it is drawn into its own thread, so no other one opens.
-          const waiting =
-            streaming && t.name !== activeThread
-              ? ' disabled title="An answer is still coming in. Open this thread once it ends."'
-              : ''
+            t.name === live?.thread
+              ? 'answering…'
+              : t.name === queued?.thread
+                ? 'question waiting'
+                : t.turns === 1
+                  ? '1 question'
+                  : `${t.turns} questions`
           return (
-            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current' : ''}" data-thread-open="${esc(t.name)}"${waiting}>` +
+            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current' : ''}" data-thread-open="${esc(t.name)}">` +
             `<span class="thread-item-t">${esc(shownTitle(t))}</span>` +
             `<span class="muted small">${esc(status)}</span></button></li>`
           )
@@ -845,18 +897,29 @@ export function wireChat(options) {
    */
   const appendTurn = (role, html, opts = {}) => {
     emptyNote()
-    turnSeq += 1
-    const id = `chat-turn-${turnSeq}`
     const wasPinned = scroll.pinned
-    const turn = document.createElement('div')
-    turn.className = `turn ${role === 'assistant' ? 'a' : 'u'}`
-    turn.id = id
-    turn.innerHTML = turnInnerHtml(role, html, opts)
-    log.appendChild(turn)
-    dispatch({ type: 'append', id, belowFold: !wasPinned })
+    const made = makeTurn(role, html, opts)
+    log.appendChild(made.turn)
+    dispatch({ type: 'append', id: made.turn.id, belowFold: !wasPinned })
     if (scroll.pinned) {
       scrollToBottom('follow')
     }
+    return made
+  }
+
+  /**
+   * One turn, not yet on screen: an answer whose thread the reader left is drawn off screen.
+   * @param {ChatTurn['role']} role
+   * @param {string} html
+   * @param {TurnOpts} [opts]
+   * @returns {{ turn: HTMLElement, body: HTMLElement }}
+   */
+  const makeTurn = (role, html, opts = {}) => {
+    turnSeq += 1
+    const turn = document.createElement('div')
+    turn.className = `turn ${role === 'assistant' ? 'a' : 'u'}`
+    turn.id = `chat-turn-${turnSeq}`
+    turn.innerHTML = turnInnerHtml(role, html, opts)
     const body = turn.querySelector('.prose')
     return { turn, body: body instanceof HTMLElement ? body : turn }
   }
@@ -876,7 +939,8 @@ export function wireChat(options) {
     const run = () => {
       frame = 0
       body.innerHTML = html()
-      if (scroll.pinned) {
+      // An answer drawn off screen leaves the log on screen where it is.
+      if (scroll.pinned && body.isConnected) {
         scrollToBottom('follow')
       }
     }
@@ -951,6 +1015,7 @@ export function wireChat(options) {
               )
             )
             .join('')
+    putBackPending(turns)
     const saved = scrollTops.get(name)
     dispatch({ type: 'thread-switch', pinned: saved === undefined })
     if (saved === undefined) {
@@ -961,18 +1026,38 @@ export function wireChat(options) {
     restoring = false
   }
 
-  /** While a turn runs, the thread controls are locked: its callbacks draw into this transcript. */
-  /** @param {boolean} on */
-  const setStreaming = on => {
-    streaming = on
-    sendButton.hidden = on
-    stopButton.hidden = !on
-    box.disabled = on
-    const newThread = qs('#new-thread', root)
-    if (newThread instanceof HTMLButtonElement) {
-      newThread.disabled = on
+  /**
+   * Whether a question belongs to the thread on screen: the same saved thread, or the draft of
+   * the same place.
+   * @param {Question} question
+   */
+  const isHere = question =>
+    question.thread !== null
+      ? question.thread === activeThread
+      : activeThread === null && sameChatContext(question.place ?? WHOLE_PR, openPlace ?? WHOLE_PR)
+
+  /**
+   * Puts back the turns the saved transcript does not hold yet, when they belong to the thread on
+   * screen: the answer coming in, and the question waiting for it.
+   * @param {ReadonlyArray<ChatTurn>} [saved] the thread's saved turns
+   */
+  const putBackPending = (saved = []) => {
+    if (live !== null && isHere(live)) {
+      emptyNote()
+      // The server saves a question once its turn starts, so the transcript may hold it already.
+      const last = saved[saved.length - 1]
+      if (!(last?.role === 'user' && last.text === live.message)) {
+        log.append(live.user)
+      }
+      log.append(live.answer)
+      live.shown = true
     }
-    drawIndex()
+    if (queued !== null && isHere(queued)) {
+      emptyNote()
+      log.append(queued.user)
+      queued.shown = true
+    }
+    drawComposer()
   }
 
   /**
@@ -991,16 +1076,43 @@ export function wireChat(options) {
 
   const send = async () => {
     const message = box.value.trim()
-    if (message === '' || streaming) {
+    if (message === '' || box.disabled) {
       return
     }
     box.value = ''
-    // The turn owns the log from here on, so a history load still on its way lands nowhere.
-    claimLog()
-    appendTurn('user', renderMarkdown(message, { paths }), turnContext(context))
-    dispatch({ type: 'send' })
-    scrollToBottom('follow')
-    const answer = appendTurn('assistant', '')
+    /** @type {Question} */
+    const question = { message, context, thread: activeThread, place: openPlace }
+    const { turn } = appendTurn('user', renderMarkdown(message, { paths }), turnContext(context))
+    if (live !== null) {
+      turn.insertAdjacentHTML(
+        'beforeend',
+        `<p class="muted small chat-waiting">Waiting for the answer in “${esc(answeringName())}”. It is sent as soon as that answer ends.</p>`
+      )
+      queued = { ...question, user: turn, shown: true }
+      drawComposer()
+      drawIndex()
+      return
+    }
+    await runTurn(question, turn, true)
+  }
+
+  /**
+   * Sends a question and draws its answer as it comes in, on screen while its thread is, and off
+   * screen otherwise. A question that waited for it goes next.
+   * @param {Question} question
+   * @param {HTMLElement} user the question's turn
+   * @param {boolean} shown whether the question's thread is on screen
+   */
+  const runTurn = async (question, user, shown) => {
+    if (shown) {
+      // The turn owns the log from here on, so a history load still on its way lands nowhere.
+      claimLog()
+      dispatch({ type: 'send' })
+      scrollToBottom('follow')
+    }
+    const answer = shown ? appendTurn('assistant', '') : makeTurn('assistant', '')
+    const current = { ...question, user, answer: answer.turn, shown }
+    live = current
     const activity = document.createElement('p')
     activity.className = 'muted small chat-activity'
     activity.setAttribute('aria-live', 'off')
@@ -1021,13 +1133,18 @@ export function wireChat(options) {
     answer.turn.append(toolDetails)
     const tools = new Map()
     const turnKey = answer.turn.id
-    setStreaming(true)
+    drawComposer()
+    drawIndex()
     let text = ''
     inFlight = new AbortController()
     try {
       await api.streamChat(
         prNumber,
-        { message, context, ...(activeThread === null ? {} : { thread: activeThread }) },
+        {
+          message: question.message,
+          context: question.context,
+          ...(question.thread === null ? {} : { thread: question.thread }),
+        },
         {
           signal: inFlight.signal,
           onEvent: event => {
@@ -1035,8 +1152,11 @@ export function wireChat(options) {
             const field = /** @param {string} key */ key => data[key]
             const thread = field('thread')
             if (event.event === 'turn' && typeof thread === 'string') {
-              activeThread = thread
-              answering = thread
+              current.thread = thread
+              // A draft's question names its thread here; the reader may be reading another one.
+              if (current.shown) {
+                activeThread = thread
+              }
               void refreshThreads()
               // The checkout, if there was one, is done once the turn starts.
               phase = 'Preparing answer'
@@ -1079,14 +1199,18 @@ export function wireChat(options) {
               text += chunk
               // An answer growing out of sight is one thing to catch up on, however many chunks
               // it arrives in; catching up clears the count, so drifting away again counts anew.
-              if (!scroll.pinned && scroll.unseen === 0) {
+              if (current.shown && !scroll.pinned && scroll.unseen === 0) {
                 dispatch({ type: 'append', id: turnKey, belowFold: true })
               }
               scheduleRender(answer.body, () => renderAnswer(text, turnKey))
               return
             }
             if (event.event === 'error') {
-              showCommandError(stopButton, String(field('message') ?? 'the agent failed'))
+              // In the answer it belongs to, which may be off screen by now.
+              answer.turn.insertAdjacentHTML(
+                'beforeend',
+                `<p class="chat-warning small" role="alert">${esc(String(field('message') ?? 'the agent failed'))}</p>`
+              )
               return
             }
             if (event.event === 'cancelled') {
@@ -1097,7 +1221,7 @@ export function wireChat(options) {
       )
     } finally {
       inFlight = null
-      answering = null
+      live = null
       void refreshThreads().catch(() => undefined)
       stopActivity()
       toolDetails.open = false
@@ -1108,11 +1232,18 @@ export function wireChat(options) {
         cancelFrame(frame)
         frame = 0
       }
-      setStreaming(false)
       answer.body.innerHTML =
         text === '' ? '<span class="muted">no answer</span>' : renderAnswer(text, turnKey)
-      if (scroll.pinned) {
+      if (current.shown && scroll.pinned) {
         scrollToBottom('follow')
+      }
+      const next = queued
+      queued = null
+      drawComposer()
+      drawIndex()
+      if (next !== null) {
+        next.user.querySelector('.chat-waiting')?.remove()
+        void runCommand(sendButton, () => runTurn(next, next.user, next.shown), { pendingLabel: 'sending…' })
       }
     }
   }
@@ -1156,10 +1287,12 @@ export function wireChat(options) {
 
   /**
    * Opens a thread not made yet: a place's, or one about the whole PR. Nothing is saved until its
-   * first message, which the server files under that place.
+   * first message, which the server files under that place. A draft whose question is being
+   * answered, or waits, comes back with that question, unless the reader asked for a fresh one.
    * @param {ChatContext} anchor
+   * @param {{ fresh?: boolean }} [opts]
    */
-  const openDraft = anchor => {
+  const openDraft = (anchor, opts = {}) => {
     claimLog()
     activeThread = null
     openPlace = anchor.kind === 'pr' ? undefined : anchor
@@ -1171,32 +1304,22 @@ export function wireChat(options) {
         ? '<p class="empty">A new thread about the whole PR.</p>'
         : `<p class="empty">A new thread about ${esc(chatContextLabel(anchor, layerTitle, pointTitle))}. Asking about it again comes back here.</p>`
     dispatch({ type: 'thread-switch', pinned: true })
+    if (opts.fresh !== true) {
+      putBackPending()
+    }
     showThread()
     drawIndex()
   }
 
-  /** While an answer comes in, its thread keeps the pane: the answer is drawn into this transcript. */
-  const refuseWhileAnswering = () => {
-    const thread = currentThread()
-    showCommandError(
-      stopButton,
-      `An answer is still coming in ${thread === undefined ? 'this thread' : `“${shownTitle(thread)}”`}. Ask again once it ends.`
-    )
-  }
-
   /**
-   * Shows the thread of a place, the one it has or a new one, and says whether the pane is there.
+   * Shows the thread of a place: the one on screen, the one it has, or a new one. An answer coming
+   * in elsewhere keeps arriving in its own thread.
    * @param {ChatContext} next
-   * @returns {Promise<boolean>}
    */
   const goToThread = async next => {
     if (sameChatContext(openPlace ?? WHOLE_PR, next)) {
       showThread()
-      return true
-    }
-    if (streaming) {
-      refuseWhileAnswering()
-      return false
+      return
     }
     const placed = threadOfPlace(threads, agentName, next)
     if (placed === undefined) {
@@ -1204,7 +1327,6 @@ export function wireChat(options) {
     } else {
       await openThread(placed.name)
     }
-    return true
   }
 
   /** @param {Event} event */
@@ -1228,7 +1350,7 @@ export function wireChat(options) {
       return
     }
     if (el.id === 'new-thread') {
-      openDraft(WHOLE_PR)
+      openDraft(WHOLE_PR, { fresh: true })
       return
     }
     if (el.id === 'thread-goto') {
@@ -1469,10 +1591,10 @@ export function wireChat(options) {
     askQuestion(next, question) {
       openChat()
       void (async () => {
-        if (!threadPerPlace) {
+        if (threadPerPlace) {
+          await goToThread(next)
+        } else {
           setContext(next)
-        } else if (!(await goToThread(next))) {
-          return
         }
         box.value = question
         await runCommand(sendButton, send, { pendingLabel: 'sending…' })
