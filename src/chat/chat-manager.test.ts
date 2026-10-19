@@ -138,21 +138,23 @@ describe('a thread per place', () => {
         anchor: POINT,
       },
     ])
-    expect(activeThread).toBe(T1)
+    // The pane records the thread it shows; a question does not.
+    expect(activeThread).toBeNull()
     expect(runner.runs.map(run => run.session)).toEqual([T1, T1])
   })
 
   it('opens another thread for another place, and goes back to the first when it is asked again', async () => {
     await ask(POINT)
     await ask(LAYER)
-    expect((await manager.threads(42)).activeThread).toBe(T2)
+
     await ask(POINT)
     const { threads, activeThread } = await manager.threads(42)
     expect(threads.map(thread => [thread.name, thread.anchor, thread.turns])).toEqual([
       [T1, POINT, 2],
       [T2, LAYER, 1],
     ])
-    expect(activeThread).toBe(T1)
+    // The pane records the thread it shows; a question does not.
+    expect(activeThread).toBeNull()
     // Each thread is its own acpx session, seeded on its own first question only.
     expect(runner.runs.map(run => [run.session, run.prompt.startsWith('SEED')])).toEqual([
       [T1, true],
@@ -190,7 +192,8 @@ describe('a thread per place', () => {
       [T1, POINT, 2],
       [T2, undefined, 1],
     ])
-    expect(activeThread).toBe(T2)
+    // The pane records the thread it shows; a question does not.
+    expect(activeThread).toBeNull()
   })
 
   it('with a thread per place off, continues the thread a question names and starts one for a question that names none', async () => {
@@ -204,7 +207,8 @@ describe('a thread per place', () => {
       [T1, 'first', undefined, 2],
       [T2, 'third', undefined, 1],
     ])
-    expect(activeThread).toBe(T2)
+    // The pane records the thread it shows; a question does not.
+    expect(activeThread).toBeNull()
   })
 
   it('makes no thread for a question about a place the canvas does not have', async () => {
@@ -363,7 +367,7 @@ describe('createChatManager().send', () => {
         turns: 1,
       },
     ])
-    expect(threads.activeThread).toBe(T1)
+    expect(threads.activeThread).toBeNull()
   })
 
   it('keeps the first message as the title when more are sent', async () => {
@@ -551,12 +555,15 @@ describe('createChatManager() threads and settings', () => {
     expect(threads[1]?.name).toBe('pr-review-acme-widgets-42-codex-t2')
   })
 
-  it('answers in the thread the message names and makes it active again', async () => {
+  it('answers in the thread the message names, and leaves the open thread to the pane', async () => {
     const a = await manager.createThread(42)
-    await manager.createThread(42)
+    const b = await manager.createThread(42)
     await collect(manager.send(target(), { message: 'x', context: { kind: 'pr' }, thread: a.name }))
     expect(runner.runs[0]?.session).toBe(a.name)
-    expect((await manager.threads(42)).activeThread).toBe(a.name)
+    // The reader may be reading b while a's question is answered; a reload opens b.
+    expect((await manager.threads(42)).activeThread).toBe(b.name)
+    await collect(manager.send(target(), { message: 'y', context: { kind: 'point', fingerprint: 'fp-1' } }))
+    expect((await manager.threads(42)).activeThread).toBe(b.name)
   })
 
   it('selects a thread the reader picked, and says so when there is no such thread', async () => {

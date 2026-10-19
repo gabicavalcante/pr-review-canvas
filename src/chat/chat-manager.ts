@@ -145,11 +145,17 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     }
   }
 
+  /**
+   * Makes a thread. `opens` makes it the thread the pane opens next: new thread is the reader
+   * opening one. A question's thread is not, since the reader may be reading another thread by the
+   * time it is made; the pane records the thread it shows.
+   */
   const newThread = async (
     key: ReviewKey,
     agent: string,
-    anchored?: { anchor: ChatContext; title: string }
+    made: { opens: boolean; anchored?: { anchor: ChatContext; title: string } }
   ): Promise<ChatThread> => {
+    const { anchored } = made
     const at = deps.now().toISOString()
     let created: ChatThread | null = null
     await deps.state.update(key, state => {
@@ -163,7 +169,14 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         ...(anchored === undefined ? {} : { anchor: anchored.anchor }),
       }
       created = thread
-      return { ...state, chat: { threads: [...state.chat.threads, thread], activeThread: thread.name } }
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          threads: [...state.chat.threads, thread],
+          ...(made.opens ? { activeThread: thread.name } : {}),
+        },
+      }
     })
     if (created === null) {
       throw new Error('the thread was not created')
@@ -192,28 +205,23 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
       state.chat.threads.find(t => t.name === wanted && t.agent === agent) ??
       (place === undefined ? undefined : threadOfPlace(state.chat.threads, agent, place))
     if (thread === undefined) {
-      return newThread(
-        key,
-        agent,
-        place === undefined
-          ? undefined
+      return newThread(key, agent, {
+        opens: false,
+        ...(place === undefined
+          ? {}
           : {
-              anchor: place,
-              title: threadTitle(
-                chatContextLabel(
-                  place,
-                  id => artifact.layers.find(layer => layer.id === id)?.title,
-                  fingerprint => artifact.points.find(point => point.fingerprint === fingerprint)?.title
-                )
-              ),
-            }
-      )
-    }
-    if (state.chat.activeThread !== thread.name) {
-      await deps.state.update(key, current => ({
-        ...current,
-        chat: { ...current.chat, activeThread: thread.name },
-      }))
+              anchored: {
+                anchor: place,
+                title: threadTitle(
+                  chatContextLabel(
+                    place,
+                    id => artifact.layers.find(layer => layer.id === id)?.title,
+                    fingerprint => artifact.points.find(point => point.fingerprint === fingerprint)?.title
+                  )
+                ),
+              },
+            }),
+      })
     }
     return thread
   }
@@ -514,7 +522,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     },
     async createThread(key) {
       const settings = await effectiveSettings()
-      return newThread(key, settings.chatAgent)
+      return newThread(key, settings.chatAgent, { opens: true })
     },
     async selectThread(key, name) {
       const state = await deps.state.read(key)

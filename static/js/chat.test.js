@@ -1121,6 +1121,131 @@ describe('a place’s thread, in its corners', () => {
     expect(el(root, '#chat-send').hidden).toBe(false)
   })
 
+  it('brings a live answer back with proposal cards that work', async () => {
+    /** @type {Array<[string, string]>} */
+    const seen = []
+    /** @type {{ end: (() => void) | null }} */
+    const stream = { end: null }
+    const { root, chat } = mount(
+      {
+        fetchThreads: async () => PLACED,
+        streamChat: (_pr, _input, opts) =>
+          new Promise(resolve => {
+            opts.onEvent({
+              event: 'chunk',
+              data: { text: '```comment\n{"path":"src/app.ts","line":3,"body":"FIRST"}\n```\n' },
+            })
+            stream.end = () => resolve(undefined)
+          }),
+      },
+      { onProposed: (what, comment) => seen.push([what, comment.body]) }
+    )
+    await flush()
+    await sendMessage(root, 'overall?')
+    await new Promise(resolve => setTimeout(resolve, 30))
+    chat.ask(POINT)
+    await flush()
+    pickThread(root, 'pr-review-a-b-42-claude-t2')
+    await flush()
+    el(root, '[data-act="proposed-post"]').click()
+    expect(seen).toEqual([['post', 'FIRST']])
+    stream.end?.()
+    await flush()
+  })
+
+  it('keeps a question refused off screen with its thread, says so where the reader is, and marks no new answer', async () => {
+    /** @type {Array<{ end: () => void, fail: (error: Error) => void }>} */
+    const streams = []
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: () =>
+        new Promise((resolve, reject) => {
+          streams.push({ end: () => resolve(undefined), fail: reject })
+        }),
+    })
+    await flush()
+    await sendMessage(root, 'overall?')
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    chat.ask(LAYER)
+    await flush()
+    streams[0]?.end()
+    await flush()
+    streams[1]?.fail(new Error('a canvas generation holds the review checkout'))
+    await flush()
+    expect(root.querySelector('.toast')?.textContent).toBe(
+      'Your question in “Sum instead of product” was not sent: a canvas generation holds the review checkout'
+    )
+    expect(el(root, '#chat-thread-marks').textContent).not.toContain('new answer')
+    expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(true)
+    // In its thread, the question and the reason are there.
+    chat.ask(POINT)
+    await flush()
+    const log = el(root, '#chat-log').textContent ?? ''
+    expect(log).toContain('is the sum intended?')
+    expect(log).toContain('a canvas generation holds the review checkout')
+  })
+
+  it('says where the reader is that a quick question cannot go yet, and leaves the box alone', async () => {
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: () => new Promise(() => {}),
+    })
+    await flush()
+    await sendMessage(root, 'overall?')
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    chat.askQuestion(LAYER, 'What could break?')
+    await flush()
+    expect(/** @type {HTMLTextAreaElement} */ (el(root, '#msg')).value).toBe('')
+    expect(root.querySelector('.toast')?.textContent).toBe(
+      'A question already waits for the answer in “overall”. Ask this once it is sent.'
+    )
+  })
+
+  it('records the thread a draft on screen gets as the one a reload opens, and only that one', async () => {
+    /** @type {string[]} */
+    const selected = []
+    /** @type {Array<() => void>} */
+    const ends = []
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      selectThread: async (_pr, name) => {
+        selected.push(name)
+        return { activeThread: name }
+      },
+      streamChat: (_pr, input, opts) =>
+        new Promise(resolve => {
+          ends.push(() => {
+            opts.onEvent({
+              event: 'turn',
+              data: { thread: input.thread ?? 'pr-review-a-b-42-claude-t3', agent: 'claude', seeded: true },
+            })
+            resolve(undefined)
+          })
+        }),
+    })
+    await flush()
+    chat.ask(LAYER)
+    await flush()
+    await sendMessage(root, 'why this order?')
+    ends[0]?.()
+    await flush()
+    expect(selected).toEqual(['pr-review-a-b-42-claude-t3'])
+    // A draft's question named off screen does not take a reload away from the thread on screen.
+    chat.ask(LAYER)
+    chat.ask({ kind: 'file', path: 'src/app.ts' })
+    await flush()
+    await sendMessage(root, 'and this file?')
+    pickThread(root, 'pr-review-a-b-42-claude-t2')
+    await flush()
+    ends[1]?.()
+    await flush()
+    expect(selected).toEqual(['pr-review-a-b-42-claude-t3', 'pr-review-a-b-42-claude-t2'])
+  })
+
   it('sends a question asked elsewhere during an answer once that answer ends, to its own thread', async () => {
     /** @type {Array<() => void>} */
     const ends = []
@@ -2210,19 +2335,35 @@ describe('what the review round found', () => {
     await flush()
   })
 
-  it('stops the request when the pane is taken down mid-answer', async () => {
+  it('stops the request when the pane is taken down mid-answer, and drops the question waiting for it', async () => {
     /** @type {AbortSignal | undefined} */
     let signal
+    /** @type {string[]} */
+    const sent = []
     const { root, chat } = mount({
-      streamChat: (_pr, _input, opts) =>
-        new Promise(() => {
+      fetchThreads: async () => PLACED,
+      // As fetch does, the request fails once it is aborted.
+      streamChat: (_pr, input, opts) =>
+        new Promise((_resolve, reject) => {
+          sent.push(input.message)
           signal = opts.signal
+          opts.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
         }),
     })
+    await flush()
     await send(root, 'x')
+    chat.ask(POINT)
+    await flush()
+    await send(root, 'waiting')
+    expect(chat.holdsUnsent()).toBe(true)
     expect(signal?.aborted).toBe(false)
     chat.stop()
+    await flush()
     expect(signal?.aborted).toBe(true)
+    // The waiting question went nowhere, and the aborted turn drew nothing.
+    expect(sent).toEqual(['x'])
+    expect(chat.holdsUnsent()).toBe(false)
+    expect(root.querySelector('.chat-warning')).toBeNull()
   })
 
   it('writes the target onto the chip, so a quick question from it keeps the target', () => {

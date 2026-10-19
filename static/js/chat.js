@@ -26,7 +26,7 @@ import {
   scrollBehavior,
   unseenLabel,
 } from './chat-scroll.js'
-import { runCommand } from './commands.js'
+import { runCommand, toast } from './commands.js'
 import { isQueuedComment, postedCommentUrl, sendCommandsHtml } from './comment-link.js'
 import { esc, flash, qs, scrollIntoViewSafe } from './dom.js'
 import { cssEscape } from './anchors.js'
@@ -599,7 +599,7 @@ export function wireChat(options) {
   /**
    * The question whose answer is coming in. The answer keeps arriving while the reader reads
    * another thread, drawn into its own turns, which go back on screen with their thread.
-   * @type {Question & { user: HTMLElement, answer: HTMLElement, shown: boolean } | null}
+   * @type {Question & { user: HTMLElement, answer: HTMLElement, shown: boolean, redraw: () => void } | null}
    */
   let live = null
   /**
@@ -608,6 +608,14 @@ export function wireChat(options) {
    * @type {Question & { user: HTMLElement, shown: boolean } | null}
    */
   let queued = null
+  /**
+   * Questions that never reached the agent while their thread was off screen, with the reason in
+   * their answer. The server saved nothing of them, so they go back on screen with their thread.
+   * @type {Array<Question & { user: HTMLElement, answer: HTMLElement }>}
+   */
+  const refused = []
+  /** Set once the pane is taken down: a turn that ends after it starts nothing. */
+  let stopped = false
   /**
    * The threads whose answer ended while the reader was reading another one. An answer comes in
    * only while the page is open, so this lives as long as the page does.
@@ -729,15 +737,18 @@ export function wireChat(options) {
    * The thread whose answer is coming in, as the index names it, so a question that waits for it
    * says which one it waits for.
    */
-  const answeringName = () => {
-    if (live === null) {
-      return ''
-    }
-    const thread = threads.find(t => t.name === live?.thread)
+  const answeringName = () => (live === null ? '' : threadLabel(live))
+
+  /**
+   * A question's thread, as the index names it.
+   * @param {Question} question
+   */
+  const threadLabel = question => {
+    const thread = threads.find(t => t.name === question.thread)
     return thread !== undefined
       ? shownTitle(thread)
-      : live.place !== undefined
-        ? placeName(live.place)
+      : question.place !== undefined
+        ? placeName(question.place)
         : 'New thread'
   }
 
@@ -1072,6 +1083,14 @@ export function wireChat(options) {
       }
       log.append(live.answer)
       live.shown = true
+      // Opening the thread cleared the proposals the answer had drawn; drawing it again brings
+      // them back, against the state they are in now.
+      live.redraw()
+    }
+    for (const turn of refused.filter(isHere)) {
+      emptyNote()
+      log.append(turn.user, turn.answer)
+      refused.splice(refused.indexOf(turn), 1)
     }
     if (queued !== null && isHere(queued)) {
       emptyNote()
@@ -1136,8 +1155,10 @@ export function wireChat(options) {
       scrollToBottom('follow')
     }
     const answer = shown ? appendTurn('assistant', '') : makeTurn('assistant', '')
-    const current = { ...question, user, answer: answer.turn, shown }
+    const current = { ...question, user, answer: answer.turn, shown, redraw: () => {} }
     live = current
+    /** Whether the agent took the turn: until then there is no answer to have missed. */
+    let agentTookTurn = false
     const activity = document.createElement('p')
     activity.className = 'muted small chat-activity'
     activity.setAttribute('aria-live', 'off')
@@ -1161,6 +1182,11 @@ export function wireChat(options) {
     drawComposer()
     drawIndex()
     let text = ''
+    current.redraw = () => {
+      if (text !== '') {
+        answer.body.innerHTML = renderAnswer(text, turnKey)
+      }
+    }
     const request = new AbortController()
     inFlight = request
     try {
@@ -1179,9 +1205,12 @@ export function wireChat(options) {
             const thread = field('thread')
             if (event.event === 'turn' && typeof thread === 'string') {
               current.thread = thread
+              agentTookTurn = true
               // A draft's question names its thread here; the reader may be reading another one.
+              // The thread on screen is the one a reload opens, which only the pane knows.
               if (current.shown) {
                 activeThread = thread
+                void api.selectThread(prNumber, thread).catch(() => undefined)
               }
               void refreshThreads()
               // The checkout, if there was one, is done once the turn starts.
@@ -1249,40 +1278,49 @@ export function wireChat(options) {
       // A question the server refused, or that never reached it, says so in its own answer. One
       // the pane gave up on, as it was taken down, has nothing left to say it in.
       if (!request.signal.aborted) {
+        const reason = error instanceof Error ? error.message : String(error)
         answer.turn.insertAdjacentHTML(
           'beforeend',
-          `<p class="chat-warning small" role="alert">${esc(error instanceof Error ? error.message : String(error))}</p>`
+          `<p class="chat-warning small" role="alert">${esc(reason)}</p>`
         )
+        // Off screen, the reader hears of it where they are, and finds it in its thread.
+        if (!current.shown) {
+          refused.push(current)
+          toast(root, `Your question in “${threadLabel(current)}” was not sent: ${reason}`, { failed: true })
+        }
       }
     } finally {
       inFlight = null
       live = null
-      // An answer that ended off screen waits to be seen, marked on its place and in Threads.
-      if (!current.shown && current.thread !== null) {
-        unseen.add(current.thread)
-      }
-      void refreshThreads().catch(() => undefined)
-      stopActivity()
-      toolDetails.open = false
-      const toolSummary = toolDetails.querySelector('summary')
-      if (toolSummary) toolSummary.textContent = `${tools.size} tool calls`
-      activity.textContent = `Elapsed: ${Math.floor((Date.now() - started) / 1000)}s`
-      if (frame !== 0) {
-        cancelFrame(frame)
-        frame = 0
-      }
-      answer.body.innerHTML =
-        text === '' ? '<span class="muted">no answer</span>' : renderAnswer(text, turnKey)
-      if (current.shown && scroll.pinned) {
-        scrollToBottom('follow')
-      }
-      const next = queued
-      queued = null
-      drawComposer()
-      drawIndex()
-      if (next !== null) {
-        next.user.querySelector('.chat-waiting')?.remove()
-        void runTurn(next, next.user, next.shown)
+      // A pane taken down has nothing on screen to finish, and nothing to send after this turn.
+      if (!stopped) {
+        // An answer that ended off screen waits to be seen, marked on its place and in Threads.
+        if (!current.shown && current.thread !== null && agentTookTurn) {
+          unseen.add(current.thread)
+        }
+        void refreshThreads().catch(() => undefined)
+        stopActivity()
+        toolDetails.open = false
+        const toolSummary = toolDetails.querySelector('summary')
+        if (toolSummary) toolSummary.textContent = `${tools.size} tool calls`
+        activity.textContent = `Elapsed: ${Math.floor((Date.now() - started) / 1000)}s`
+        if (frame !== 0) {
+          cancelFrame(frame)
+          frame = 0
+        }
+        answer.body.innerHTML =
+          text === '' ? '<span class="muted">no answer</span>' : renderAnswer(text, turnKey)
+        if (current.shown && scroll.pinned) {
+          scrollToBottom('follow')
+        }
+        const next = queued
+        queued = null
+        drawComposer()
+        drawIndex()
+        if (next !== null) {
+          next.user.querySelector('.chat-waiting')?.remove()
+          void runTurn(next, next.user, next.shown)
+        }
       }
     }
   }
@@ -1637,11 +1675,26 @@ export function wireChat(options) {
         } else {
           setContext(next)
         }
+        if (box.disabled) {
+          toast(
+            root,
+            live?.shown === true
+              ? 'An answer is coming in here. Ask this once it ends.'
+              : `A question already waits for the answer in “${answeringName()}”. Ask this once it is sent.`
+          )
+          return
+        }
         box.value = question
         send()
       })()
     },
+    /** Whether a question asked here waits to be sent, which a re-render would drop. */
+    holdsUnsent() {
+      return queued !== null
+    },
     stop() {
+      stopped = true
+      queued = null
       stopActivity()
       inFlight?.abort()
       inFlight = null
