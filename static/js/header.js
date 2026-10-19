@@ -122,7 +122,7 @@ export function renderHeader(bundle, opts) {
     ? 'Snapshot the working tree again and redraw'
     : `Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}`
   const progress = ready
-    ? progressHtml(artifact, bundle.state, { pr, readerIsAuthor: bundle.readerIsAuthor })
+    ? progressHtml(artifact, bundle.state, { pr, readerIsAuthor: bundle.readerIsAuthor, local })
     : ''
   const level = getFoldLevel()
   const reading = ready
@@ -170,12 +170,13 @@ export function renderHeader(bundle, opts) {
  * forge refuses on one's own change, but their next step in their place, and keeps comment.
  * @param {import('./contract-types.js').ReviewArtifact} artifact
  * @param {import('./contract-types.js').PrState} state
- * @param {{ pr?: PrBundle['pr'], readerIsAuthor?: boolean }} [opts] `pr` the pull request as the
- *   page has it now, whose diff the drafts belong to and whose state words the author's step;
- *   `readerIsAuthor` as the bundle says it
+ * @param {{ pr?: PrBundle['pr'], readerIsAuthor?: boolean, local?: boolean }} [opts] `pr` the pull
+ *   request as the page has it now, whose diff the drafts belong to and whose state words the
+ *   author's step; `readerIsAuthor` as the bundle says it; `local` for work with no pull request,
+ *   which has nowhere to post a review, so it gets no sign-off at all
  */
 export function progressHtml(artifact, state, opts = {}) {
-  const { pr = artifact.pr, readerIsAuthor = false } = opts
+  const { pr = artifact.pr, readerIsAuthor = false, local = false } = opts
   const p = progressSummary(artifact, state)
   const blocked = approveBlockedReason(artifact, state)
   const approveTitle = `Write and preview an approving review on ${esc(hostLabel())}`
@@ -185,6 +186,11 @@ export function progressHtml(artifact, state, opts = {}) {
       `${blocked === null ? ` title="${approveTitle}"` : ` disabled data-disabled-reason="${esc(blocked)}" title="${esc(blocked)}"`}>approve on ${esc(currentHost().kind)}</button>` +
       `<button class="cmd" type="button" id="request-changes" data-tooltip="Write and preview a review requesting changes on ${esc(hostLabel())}" title="Write and preview a review requesting changes on ${esc(hostLabel())}" data-act="signoff" data-event="REQUEST_CHANGES" data-needs-post>request changes</button>`
   const commentTitle = `Write and preview a review with no verdict on ${esc(hostLabel())}`
+  const signoff = local
+    ? ''
+    : `<div class="signoff">${verdicts}` +
+      `<button class="cmd" type="button" id="comment-review" data-tooltip="${commentTitle}" title="${commentTitle}" data-act="signoff" data-event="COMMENT" data-needs-post>comment</button>` +
+      '<span class="capability-note" role="status"></span></div>'
   return (
     `<div class="progress"><div class="pline" role="progressbar" aria-valuenow="${p.done}" aria-valuemin="0" aria-valuemax="${p.total}" aria-label="Layers reviewed"><span style="width:${p.percent}%"></span></div>` +
     `<span class="ptext">${p.done} of ${p.total} layers reviewed</span></div>` +
@@ -192,9 +198,7 @@ export function progressHtml(artifact, state, opts = {}) {
       pendingCount(state),
       draftsByCommit(state, pr).earlier.length
     )}</div>` +
-    `<div class="signoff">${verdicts}` +
-    `<button class="cmd" type="button" id="comment-review" data-tooltip="${commentTitle}" title="${commentTitle}" data-act="signoff" data-event="COMMENT" data-needs-post>comment</button>` +
-    '<span class="capability-note" role="status"></span></div>'
+    signoff
   )
 }
 

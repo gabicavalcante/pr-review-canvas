@@ -296,6 +296,17 @@ describe('header', () => {
     expect(step?.querySelector('a')?.getAttribute('href')).toBe(artifact.pr.url)
   })
 
+  it('draws no sign-off on a local review, which has no pull request to post to', () => {
+    document.body.innerHTML = renderHeader(bundle({ local: 'branch' }), {
+      host: 'h',
+      theme: 'auto',
+      skin: 'terminal',
+      now: NOW,
+    })
+    expect(document.querySelector('.signoff, .capability-note')).toBeNull()
+    expect(document.querySelector('.ptext')?.textContent).toBe('0 of 1 layers reviewed')
+  })
+
   it('draws no sign-off for the author of an outdated canvas, where nothing is posted', () => {
     document.body.innerHTML = renderHeader(
       bundle({ status: 'stale', readerIsAuthor: true, selfReview: false }),

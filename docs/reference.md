@@ -932,7 +932,7 @@ request: **N points still yours** while points marked yours are open, then **rea
 review on GitHub**, or **ready to mark it ready for review on GitHub** for a draft, which links to
 the pull request. A merged or closed one shows no step. **comment**, the progress line, and the
 pending review stay. An outdated canvas posts nothing, so its header shows no sign-off for anyone.
-On a local review the three commands stay disabled, since there is no forge.
+A local review shows no sign-off, since its work is on no pull request to post a review to.
 
 ### Outdated canvases
 
