@@ -30,7 +30,7 @@ If the ref cannot be resolved or the scope is ambiguous, stop and ask.
 **Host**: the user chooses whether the reviewer runs on the same agent as the host or on a different one; default to the same host. The two kinds start differently:
 
 - **Same-host reviewer**: a subagent with a stable name (`tnr-reviewer`), kept for the whole loop so later passes reuse its context.
-- **Cross-host reviewer**: an `acpx` command that you run yourself from your own shell tool. On Claude Code that is Bash with `run_in_background: true`; the pass takes minutes, so wait for the completion notification and then read the verdict from the command's output file. The named acpx session keeps the reviewer alive across passes: create it once with `sessions ensure --name tnr-reviewer`, then send every pass to it with `-s tnr-reviewer --ttl 0`. Commands are in Host notes.
+- **Cross-host reviewer**: an `acpx` command that you run yourself from your own shell tool. The named acpx session keeps the reviewer alive across passes: create it once with `sessions ensure --name tnr-reviewer`, then send every pass to it with `-s tnr-reviewer --ttl 0`. The full commands, and how each host waits for the verdict, are in Host notes.
 
 A helper agent between you and acpx costs a model and a context window and puts the model choice in its hands; if you start one anyway, give it the cheapest tier (Claude: Haiku or Sonnet), never the Opus-like tier.
 
@@ -172,11 +172,12 @@ Approve when the scope has: no verified correctness or security defect, no rule 
 
 - **Claude Code host, same-host reviewer**: `Agent` tool with `model` set to the Opus-like tier, `name: tnr-reviewer`, `run_in_background: false`; continue it with `SendMessage` on later passes. Ask gate questions with `AskUserQuestion`.
 - **Codex host, same-host reviewer**: Codex has built-in subagents; spawn one, keep its handle, and message it on later passes. Its structured question tool works only in Plan mode, so ask gate questions by ending the turn in plain text. Under the default workspace-write sandbox a commit may trigger an approval prompt because `.git` can be protected; accept it, the commit is part of the loop.
-- **Cross-host reviewer via acpx**: run these from your own shell tool, the pass command in the background. Create one named session and send every pass to it so context persists; deny ACP writes while keeping reads and terminal:
+- **Cross-host reviewer via acpx**: run these yourself from your shell tool. Create one named session and send every pass to it so context persists; deny ACP writes while keeping reads and terminal:
 
     ```bash
-    acpx --approve-reads --non-interactive-permissions deny <agent> sessions ensure --name tnr-reviewer
-    acpx --approve-reads --non-interactive-permissions deny --ttl 0 --format quiet <agent> -s tnr-reviewer -f review-prompt.md > verdict-pass-N.md
+    acpx --approve-reads --non-interactive-permissions deny --model <id> <agent> sessions ensure --name tnr-reviewer
+    acpx codex set reasoning_effort high -s tnr-reviewer   # Codex reviewer only
+    acpx --approve-reads --non-interactive-permissions deny --ttl 0 --format quiet <agent> -s tnr-reviewer -f <scratch>/review-prompt.md
     ```
 
-    `<agent>` is `claude` or `codex`. `--ttl 0` keeps the session's process up between passes; close it with `acpx <agent> sessions close tnr-reviewer` when the loop ends. Use `--model` to request the Opus-like tier when the adapter advertises models (Codex also takes `--config-option reasoning_effort=high`). From a Codex host, acpx needs network, which the default sandbox blocks: expect one approval prompt. Paste the Review Standard (or `REVIEW.md`) into the prompt file when the reviewer agent cannot read this skill. The tree-integrity check in Spawn the reviewer is the real guard; the flags reduce the chance of needing it.
+    `<agent>` is `claude` or `codex`; `--model` requests the Opus-like tier when the adapter advertises models. Keep the prompt file outside the tree, so the integrity check sees only the reviewer's changes. On Claude Code, run the pass with `run_in_background: true`, wait for the completion notification, and read the verdict from the task output it names. On Codex, run the pass in the foreground; the tool result is the verdict. `--ttl 0` keeps the session's process up between passes; close it with `acpx <agent> sessions close tnr-reviewer` when the loop ends. From a Codex host, acpx needs network, which the default sandbox blocks: expect one approval prompt. Paste the Review Standard (or `REVIEW.md`) into the prompt file when the reviewer agent cannot read this skill. The tree-integrity check in Spawn the reviewer is the real guard; the flags reduce the chance of needing it.
