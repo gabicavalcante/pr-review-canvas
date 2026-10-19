@@ -732,7 +732,8 @@ zone or `pr-review import <zip> --pr <n>`.
 ### Attention point levels and impact
 
 Each attention point has a level, which says what it asks of you rather than how bad it is. Its
-icon shows the level by shape:
+icon shows the level by shape, and the level's name stands beside it on its card, on its line in
+the diff, and in the overview's counts:
 
 - **decide** (a diamond): a choice only a person can make, or a structural problem that holds the
   merge until the author justifies it.
@@ -780,16 +781,16 @@ kind, audience, and location. Click the title or **show** to read it and use its
 list shows every open point whole, in every layer, and **compact** goes back; the browser remembers
 the choice. A point on its line in the diff is always drawn whole while it is open.
 
-The counts in the rail, the layer headings, and the overview squares include only open points. The
-overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author · …** counts
-each status. Resolved points start off the page for every reader, the author too: **show the N
-resolved** brings them back, collapsed in place, until you click it again. A layer whose points are
-all resolved drops its **Attention points** heading while they are hidden. A link to a resolved
-point shows that one point, and a point you just resolved stays shown until the next load. The
-line's **hide the N acted on** command removes your other collapsed points from the page until you
-click it again; **edit** on an AI Chat proposed resolution brings its point back while the reason
-box is open. `]` and `[` step only through open points. `o` on a point drawn as one line expands it or
-collapses it again.
+The counts in the rail, the layer headings, and the overview's level counts include only open
+points. The overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author ·
+…** counts each status. Resolved points start off the page for every reader, the author too: **show
+the N resolved** brings them back, collapsed in place, until you click it again. A layer whose
+points are all resolved drops its **Attention points** heading while they are hidden. A link to a
+resolved point shows that one point, and a point you just resolved stays shown until the next load.
+The line's **hide the N acted on** command removes your other collapsed points from the page until
+you click it again; **edit** on an AI Chat proposed resolution brings its point back while the
+reason box is open. `]` and `[` step only through open points. `o` on a point drawn as one line
+expands it or collapses it again.
 
 ### Self-review
 
