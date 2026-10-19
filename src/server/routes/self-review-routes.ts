@@ -111,24 +111,28 @@ export function selfReviewRoutes(ctx: AppContext, loader: PrLoader): Hono {
     return c.json(answer)
   })
 
-  // A reviewer's page asks every few minutes. The comments are read again, and the canvas comment
-  // imported again only when the pull request's text changed, which a settlement does by updating it.
+  // A reviewer's page asks when it opens and every few minutes after. The comments are read again,
+  // and the canvas comment imported again only when the pull request's text changed, which a
+  // settlement does by updating it.
   api.get('/prs/:n/settled', async c => {
     const number = requirePrNumber(parseTargetKey(c.req.param('n')), 'reading resolutions')
     const canvasSha = parseHeadShaQuery(c.req.query('headSha'))
     if (canvasSha === undefined) {
       throw new AppError('BAD_REQUEST', 'name the canvas on screen with ?headSha=<sha>', 400)
     }
+    const { comments } = await loader.refreshComments(number)
     if (ctx.fixtureArtifact === null) {
-      const pr = await loader.currentPr(number)
-      const { comments } = await loader.refreshComments(number)
-      await runDiscovery(ctx, pr, comments, { refresh: false })
+      await runDiscovery(ctx, await loader.currentPr(number), comments, { refresh: false })
     }
     const artifact = ctx.fixtureArtifact ?? (await ctx.canvases.readArtifact(canvasSha))
     if (artifact === null) {
       throw new AppError('NOT_FOUND', `no canvas for ${canvasSha.slice(0, 7)}`, 404, 'reload the page')
     }
-    const body: SettledResponse = { generatedAt: artifact.generatedAt, settled: artifact.settled ?? {} }
+    const body: SettledResponse = {
+      generatedAt: artifact.generatedAt,
+      settled: artifact.settled ?? {},
+      issueComments: comments.issueComments,
+    }
     return c.json(body)
   })
 

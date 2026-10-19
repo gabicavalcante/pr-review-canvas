@@ -416,9 +416,14 @@ export class PrAppElement extends HTMLElement {
         bundle.canvas
       ) {
         this.settledPoller = pollSettled(boot.prNumber, bundle.canvas.headSha, answer => {
-          // A newer generation imported for the same commit is not the canvas on screen.
-          if (answer.generatedAt !== artifact.generatedAt) return
-          const added = session.takeSettled(answer.settled)
+          if (answer.generatedAt !== artifact.generatedAt) {
+            // A newer generation for this commit was imported; its resolutions belong to it.
+            this.settledPoller?.stop()
+            this.settledPoller = null
+            toast(this, 'the author shared a newer canvas for this commit; refresh to load it')
+            return
+          }
+          const added = session.takeSettled(answer)
           if (added.length > 0) {
             toast(
               this,

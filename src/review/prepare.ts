@@ -200,8 +200,8 @@ async function resolveResolutions(
   target: PrepareTarget,
   headSha: string
 ): Promise<Resolutions | null> {
-  const prNumber = target.kind === 'pr' ? target.number : undefined
-  const sha = await findResolutionSource(ctx.canvases, ctx.git, prNumber, headSha)
+  const key = target.kind === 'pr' ? target.number : target.kind === 'local' ? target.source : undefined
+  const sha = await findResolutionSource(ctx.canvases, ctx.git, key, headSha)
   const artifact = sha === null ? null : await ctx.canvases.readArtifact(sha).catch(() => null)
   if (sha === null || artifact === null) {
     return null

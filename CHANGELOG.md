@@ -12,9 +12,16 @@
 - Resolved points start hidden for every reader. The overview line counts them as **resolved by the
   author** and its **show the N resolved** command brings them back, collapsed in place. A layer
   whose points are all resolved drops its points heading while they are hidden.
-- A reviewer's open page reads the author's resolutions back from the canvas comment every two
-  minutes while its tab is in view, hides the newly resolved points, and says so. Before, a reviewer
-  who had already loaded the canvas saw them only after **refresh**.
+- A reviewer's page reads the author's resolutions back from the canvas comment when it opens and
+  every two minutes after while its tab is in view, hides the newly resolved points, and says so.
+  Before, a reviewer who had already loaded the canvas saw them only after **refresh**.
+
+### Upgrade
+
+- A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled
+  template has it under **Attention points**. Without it the generator is not told which points the
+  author resolved: a point that comes back with the same title stays resolved unchecked, and one
+  reworded comes back open.
 
 ## 0.9.0
 

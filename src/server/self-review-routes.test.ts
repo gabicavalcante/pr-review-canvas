@@ -452,6 +452,8 @@ describe('reading the author’s resolutions back on a reviewer’s page', () =>
     expect(await res.json()).toEqual({
       generatedAt: syntheticArtifact().generatedAt,
       settled: { 'fp-1': { reason: 'The spec says sum.', at: '2026-09-10T12:00:00.000Z' } },
+      // The canvas comment comes back too, with the tally the author's resolution left.
+      issueComments: [expect.objectContaining({ id: CANVAS_COMMENT.id, body: shared })],
     })
     const write = vi.spyOn(t.ctx.canvases, 'write')
     expect((await read('42')).status).toBe(200)

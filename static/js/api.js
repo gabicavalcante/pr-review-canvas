@@ -195,9 +195,9 @@ export function getSettled(prNumber, headSha, opts = {}) {
 export const SETTLED_POLL_MS = 2 * 60 * 1000
 
 /**
- * Reads the settled points of the canvas on screen every `SETTLED_POLL_MS` while the tab is in view,
- * and hands over each answer. A tab out of view asks once it comes back, if a read came due meanwhile.
- * A failed read is skipped; the next one may work.
+ * Reads the settled points of the canvas on screen at once, then every `SETTLED_POLL_MS` while the
+ * tab is in view, and hands over each answer. A tab out of view asks once it comes back, if a read
+ * came due meanwhile. A failed read is skipped; the next one may work.
  * @param {number} prNumber
  * @param {string} headSha the canvas on screen
  * @param {(answer: import('./contract-types.js').SettledResponse) => void} onSettled
@@ -232,7 +232,9 @@ export function pollSettled(prNumber, headSha, onSettled, opts = {}) {
     }
   }
   doc.addEventListener('visibilitychange', onVisible)
-  timer = setTimeout(tick, interval)
+  // A canvas imported earlier is not discovered again on load, so the first read is what brings it
+  // the resolutions made since.
+  timer = setTimeout(tick, 0)
   return {
     stop: () => {
       stopped = true

@@ -766,17 +766,19 @@ A resolution is written into the canvas itself:
 - The point leaves every reader's open list and starts hidden. **show the N resolved** shows it
   collapsed where it is, with the author's reason and, when posted, a link to the comment. A
   reason posted as a comment does not mark the point posted, so a reopened point is open again.
-- The canvas comment is shared again at once, with the new counts. A reviewer's open page reads it
-  back every two minutes while its tab is in view, hides the newly resolved points, and says so; a
-  reviewer opening the page later loads it with the canvas. Each read fetches the pull request's
-  comments, and downloads the canvas only when they changed. The author's Conversation card updates
+- The canvas comment is shared again at once, with the new counts. A reviewer's page reads it back
+  when it opens and every two minutes after while its tab is in view, hides the newly resolved
+  points, updates the Conversation card, and says so. Each read fetches the pull request's comments,
+  and downloads the canvas only when they changed. When the author shared a newer canvas for the
+  same commit, the page says to **refresh** and stops reading. The author's Conversation card updates
   immediately and stays current after reload.
   When sharing fails, the resolution stays in your local canvas and the message says why.
   With [`canvasComment` off](#turning-sharing-off), nothing is shared and reviewers do not see it.
 - **reopen** on the expanded point takes a resolution back and shares the canvas again. A posted comment
   stays on the forge.
 - A resolution follows the pull request to every later canvas, `--force` and canvases after a
-  rebase included. Each new canvas starts from the resolutions of the pull request's newest canvas:
+  rebase included. Each new canvas starts from the resolutions of the pull request's newest canvas,
+  a canvas generated for the pull request winning over a branch review of the same work:
   the generator is told each resolved point and its reason, and writes a concern that still applies
   under the same kind, path, and title, which keeps it resolved wherever its lines moved. It reopens
   a point only when it reads the new code and the reason no longer holds: the point comes back open
