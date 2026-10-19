@@ -6,10 +6,9 @@ import { diffstatHtml, testChanges } from './diffstat.js'
 import { esc, timeAgo } from './dom.js'
 import { generationMode } from './generate.js'
 import { authorProfileUrl, currentHost, hostLabel } from './host.js'
-import { canvasHiddenLines, getFoldLevel, refreshRail } from './layers.js'
+import { refreshRail } from './layers.js'
 import { draftsByCommit, pendingBarHtml, pendingCount } from './pending.js'
 import { progressSummary } from './progress.js'
-import { foldLevelControlHtml } from './reading-level.js'
 import { authorNextStepHtml, pointsStillYours } from './self-review.js'
 import { approveBlockedReason } from './signoff.js'
 import { headerBarHtml } from './header-bar.js'
@@ -124,23 +123,6 @@ export function renderHeader(bundle, opts) {
   const progress = ready
     ? progressHtml(artifact, bundle.state, { pr, readerIsAuthor: bundle.readerIsAuthor, local })
     : ''
-  const level = getFoldLevel()
-  const reading = ready
-    ? foldLevelControlHtml(
-        level,
-        canvasHiddenLines(
-          {
-            artifact,
-            files: bundle.files,
-            comments: bundle.comments.reviewComments,
-            state: bundle.state,
-            headSha: pr.headSha,
-            mergeBaseSha: pr.mergeBaseSha,
-          },
-          level
-        )
-      )
-    : ''
   const risk = ready ? riskLineHtml(artifact.risk) : ''
   return (
     '<header class="hdr">' +
@@ -158,7 +140,7 @@ export function renderHeader(bundle, opts) {
     `<p class="meta"><span>by ${authorHtml(pr.author, local)}</span>` +
     `<span class="mono">${esc(pr.headRef)} &rarr; ${esc(pr.baseRef)}</span>${statePill(pr)}` +
     `${diffstatHtml(pr, ready ? testChanges(artifact, bundle.files) : undefined)}${agent}</p>` +
-    `${largePrNoticeHtml(bundle)}${risk}${reading}${progress}</div></header>`
+    `${largePrNoticeHtml(bundle)}${risk}${progress}</div></header>`
   )
 }
 

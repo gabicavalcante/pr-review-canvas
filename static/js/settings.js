@@ -183,7 +183,7 @@ export function settingsDialogHtml(data, agents, tab = 'reading') {
     reading:
       '<div class="field"><label for="set-fold-level">Hide code by default</label>' +
       `<select id="set-fold-level">${optionsHtml(FOLD_LEVELS, settings.foldLevel)}</select></div>` +
-      '<p class="muted small">The level every review opens at. The Hide code control and the <span class="mono">f</span> key change it for one page.</p>' +
+      '<p class="muted small">The level every review opens at. The <span class="mono">f</span> key steps through the levels for one page.</p>' +
       '<div class="field"><label for="set-layer-view">Show layers</label>' +
       `<select id="set-layer-view">${optionsHtml(LAYER_VIEWS, settings.layerView, LAYER_VIEW_LABELS)}</select></div>` +
       '<p class="muted small">One at a time shows the overview or a single layer. The rail and the <span class="mono">j</span> and <span class="mono">k</span> keys move between them.</p>' +

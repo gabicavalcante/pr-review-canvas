@@ -206,6 +206,8 @@ test('turns a submitted attention point into a posted thread and link', async ({
   await expect(dialog).toBeHidden()
   await expect(page.locator('.toast a')).toHaveAttribute('href', /pullrequestreview-7001/)
   await expect(page.locator('tr.pending-row')).toHaveCount(0)
+  // The thread is drawn in the file's diff, which renders once its card is on screen.
+  await page.locator('section.layer article.file[data-path="src/app.ts"]').first().scrollIntoViewIfNeeded()
   await expect(page.locator('tr.thread[data-thread="8001"]')).toContainText('Sum instead of product')
   await expect(point.locator('.tbtns a')).toHaveAttribute('href', /discussion_r8001$/)
   await expect(point.locator('[data-act="point-queue"]')).toHaveCount(0)
@@ -233,6 +235,8 @@ test('keeps a layer open when a draft is added or deleted, whatever marks an old
   await expect(page.locator('.pending-bar')).toContainText('1 pending comment')
   await expect(body).toBeVisible()
   await expect(layer).not.toHaveClass(/is-reviewed/)
+  // The draft is drawn in the file's diff, which renders once its card is on screen.
+  await layer.locator('article.file[data-path="src/app.ts"]').scrollIntoViewIfNeeded()
   await page.locator('tr.pending-row [data-act="pending-delete"]').click()
   await expect(point).toHaveAttribute('data-status', 'open')
   await expect(body).toBeVisible()

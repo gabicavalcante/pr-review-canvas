@@ -655,9 +655,9 @@ Collapsing content does not mark it reviewed.
 
 ### Reading levels
 
-The **Hide code** control, beside the review progress, sets how much of the canvas is hidden. The
-levels nest: whatever `light` hides, `moderate` and `aggressive` hide too. The generator gives each
-fold and each collapsed file the lowest level at which it hides.
+The reading level sets how much of the canvas is hidden. The levels nest: whatever `light` hides,
+`moderate` and `aggressive` hide too. The generator gives each fold and each collapsed file the
+lowest level at which it hides.
 
 | Level        | What it hides                                                                            |
 | ------------ | ---------------------------------------------------------------------------------------- |
@@ -665,12 +665,12 @@ fold and each collapsed file the lowest level at which it hides.
 | `moderate`   | Also test bodies under their titles, helpers, adapters, boilerplate, mappings and wiring |
 | `aggressive` | Also any block its title explains, so the change reads as pseudo-code                    |
 
-The control shows what the chosen level hides and how many lines that is. Each layer shows its count
-in its Files heading, and the sign-off dialog records the total.
+Each layer shows how many lines the level hides in its Files heading, and the sign-off dialog
+records the total.
 
 The page opens at `foldLevel` from `settings.yml` (`light` by default), which the **Hide code by
-default** field in the settings dialog sets. The control and the `f` key change the level for the
-current page only. Changing the level redraws the visible diffs and closes the files it hides
+default** field in the settings dialog sets. The `f` key steps through the levels for the current
+page only, and its notice says the new level and how many lines it hides. Changing the level redraws the visible diffs and closes the files it hides
 whole, including cards opened by hand. It never opens a file: lowering the level leaves closed
 files closed.
 

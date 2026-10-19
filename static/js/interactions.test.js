@@ -21,6 +21,7 @@ import { renderChatShell, wireChat } from './chat.js'
 import {
   cardOf,
   defineLayerElements,
+  getFoldLevel,
   hydrateAll,
   getRenderContext,
   hydrateFileCard,
@@ -1105,17 +1106,15 @@ describe('comment composers', () => {
       })),
     }
     const page = setup({ artifact: folded, comments: [] })
-    const select = page.root.querySelector('#fold-level')
-    if (!(select instanceof HTMLSelectElement)) {
-      throw new Error('no level control')
-    }
     return {
       ...page,
       counter: page.root.querySelector('.fold-count'),
       line: () => page.root.querySelector('#L-src_app_test_ts-new-3'),
+      // The `f` key steps through the levels, the way a reader changes it for one page.
       pick: (/** @type {string} */ level) => {
-        select.value = level
-        select.dispatchEvent(new Event('change', { bubbles: true }))
+        while (getFoldLevel() !== level) {
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }))
+        }
       },
       /** @param {string} body */
       write: body => {

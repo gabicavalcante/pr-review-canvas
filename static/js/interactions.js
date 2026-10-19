@@ -852,8 +852,8 @@ export function wireReview(root, session, opts = {}) {
   }
 
   /**
-   * Switches how much code the page hides, from the control or from the `f` key. The hint under
-   * the control says what the new level hides and how much of the diff that is.
+   * Switches how much code the page hides, from the `f` key. The toast says the new level and how
+   * much of the diff it hides; the settings dialog holds the level every page opens at.
    * @param {string} value
    */
   const applyFoldLevel = value => {
@@ -862,7 +862,8 @@ export function wireReview(root, session, opts = {}) {
     }
     setFoldLevel(root, value)
     refreshFoldLevel(root, value, hiddenAt(value))
-    toast(root, `hiding code: ${value}`)
+    const hidden = hiddenLabel(hiddenAt(value))
+    toast(root, `hiding code: ${value}${hidden === '' ? '' : ` · ${hidden}`}`)
   }
 
   /**

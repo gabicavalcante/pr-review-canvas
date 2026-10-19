@@ -372,6 +372,8 @@ test('finishing the review waits for a draft edit on screen to be saved or cance
   await panel.locator('[data-act="pending-finish"]').click()
   await page.locator('#signoff-dialog [data-act="signoff-post"]').click()
   await expect(page.locator('#signoff-dialog')).toBeHidden()
+  // The posted comment is a thread in the file's diff, which draws once its card is on screen.
+  await page.locator('section.layer article.file[data-path="src/app.ts"]').first().scrollIntoViewIfNeeded()
   await expect(page.locator('#main')).toContainText('Replacement comment that must be posted.')
 })
 

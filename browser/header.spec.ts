@@ -20,31 +20,23 @@ test('describes every header action and preserves tooltips after review progress
   )
 })
 
-test('switches how much code is hidden from the control and from the keyboard', async ({
+test('switches how much code is hidden from the keyboard, for this page only', async ({
   page,
   reviewUrl,
 }) => {
   await page.goto(reviewUrl)
-  const select = page.locator('#fold-level')
-  const hint = page.locator('.reading .fold-hint')
+  await expect(page.locator('section.layer').first()).toBeVisible()
+  // The level lives in the settings dialog; the header carries no control for it.
+  await expect(page.locator('#fold-level')).toHaveCount(0)
 
-  // The canvas opens at the level saved in settings.yml, light until changed; a change from the
-  // control is page state and is not saved.
-  await expect(select).toHaveValue('light')
-  await expect(hint).toContainText('imports, whitespace, moved blocks, and generated files')
-
-  await select.selectOption('moderate')
-  await expect(page.locator('.toast')).toHaveText('hiding code: moderate')
-  await expect(hint).toContainText('also test bodies, helpers, wiring, templates')
-
+  // The canvas opens at the level saved in settings.yml, light until changed; the `f` key steps
+  // through the levels as page state, and its notice says where it landed.
   await page.locator('body').press('f')
-  await expect(select).toHaveValue('aggressive')
-  await expect(hint).toContainText('only the code you have to judge')
+  await expect(page.locator('.toast')).toContainText('hiding code: moderate')
   await page.locator('body').press('f')
-  await expect(select).toHaveValue('light')
-
-  await page.reload()
-  await expect(page.locator('#fold-level')).toHaveValue('light')
+  await expect(page.locator('.toast')).toContainText('hiding code: aggressive')
+  await page.locator('body').press('f')
+  await expect(page.locator('.toast')).toContainText('hiding code: light')
 })
 
 test('offers the default reading level in the settings dialog and saves it', async ({ page, reviewUrl }) => {
