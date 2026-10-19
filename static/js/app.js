@@ -437,7 +437,7 @@ export class PrAppElement extends HTMLElement {
           if (added.length > 0) {
             toast(
               this,
-              `the author resolved ${added.length === 1 ? 'a point' : `${added.length} points`}; show the resolved ones from the overview`
+              `the author resolved ${added.length === 1 ? 'a point' : `${added.length} points`}; show them from each layer's attention points`
             )
           }
         })

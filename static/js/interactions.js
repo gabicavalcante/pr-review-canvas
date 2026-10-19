@@ -956,7 +956,7 @@ export function wireReview(root, session, opts = {}) {
   }
 
   /**
-   * Flips one of the overview's switches; see `.is-handled` and `.is-resolved` in CSS.
+   * Flips one of a layer's switches; see `.is-handled` and `.is-resolved` in CSS.
    * @param {HTMLElement} el the switch
    * @param {'hiding' | 'showingResolved'} which
    */
@@ -964,7 +964,9 @@ export function wireReview(root, session, opts = {}) {
     const line = el.closest('.point-statuses')
     if (line === null) return
     const switches = { ...pointSwitches(line), [which]: el.getAttribute('aria-pressed') !== 'true' }
-    const next = nodeFrom(doc, pointStatusesHtml(session.artifact.points, session.state, switches))
+    const layerId = line.closest('section.layer')?.getAttribute('data-layer')
+    const own = session.artifact.points.filter(p => p.layerId === layerId)
+    const next = nodeFrom(doc, pointStatusesHtml(own, session.state, switches))
     if (next !== null) {
       line.replaceWith(next)
       const toggle = next.querySelector(`[data-act="${el.getAttribute('data-act')}"]`)

@@ -126,7 +126,7 @@ test('generated missing-test points use reviewer routing, changed code, and a wo
   await expect(card.locator('.pill.audience')).toHaveText('reviewer')
 })
 
-test('a reviewer loads the author’s resolved points off the page, and the layer they emptied without its heading', async ({
+test('a reviewer loads the author’s resolved points off the page, behind their layer’s switch', async ({
   page,
   chatServer,
 }) => {
@@ -145,12 +145,16 @@ test('a reviewer loads the author’s resolved points off the page, and the laye
     .locator('section.layer')
     .filter({ has: page.locator('li.finding[data-fingerprint="fp-1"]') })
     .locator('.lbl.sub', { hasText: 'Attention points' })
-  await expect(page.locator('.point-statuses')).toContainText('2 open · 1 resolved by the author')
+  // The layer keeps its heading, since the switch that brings the point back sits under it.
+  const line = page
+    .locator('section.layer')
+    .filter({ has: page.locator('li.finding[data-fingerprint="fp-1"]') })
+    .locator('.point-statuses')
+  await expect(line).toHaveText('1 resolved by the author show the 1 resolved')
   await expect(card).toBeHidden()
-  await expect(heading).toBeHidden()
-  await page.locator('[data-act="toggle-resolved"]').click()
-  await expect(card).toBeVisible()
   await expect(heading).toBeVisible()
+  await line.locator('[data-act="toggle-resolved"]').click()
+  await expect(card).toBeVisible()
   await expect(card.locator('.p-summary')).toHaveText('Resolved by the author: The spec says sum.')
   await expect(card.locator('[data-act="point-unsettle"]')).toHaveCount(0)
 })

@@ -5,7 +5,7 @@
 import { viewCommentHtml } from './comment-link.js'
 import { detailsSummaryHtml, esc, avatarHtml, timeAgo } from './dom.js'
 import { renderMarkdown } from './markdown.js'
-import { openPoints, pointStatusesHtml, sevsumHtml } from './points.js'
+import { openPoints, sevsumHtml } from './points.js'
 import { selfReviewNoteHtml } from './self-review.js'
 import { buildThreads } from './threads.js'
 
@@ -94,7 +94,7 @@ export function renderOverview(bundle, ctx) {
   return (
     '<section class="panel" id="overview" aria-labelledby="ov-h">' +
     `<div class="panel-h"><h2 id="ov-h">Overview</h2>${artifact ? sevsumHtml(active, artifact.layers) : ''}</div>` +
-    `<div class="body">${artifact ? selfReviewNoteHtml(artifact.points) + pointStatusesHtml(artifact.points, bundle.state) : ''}${summary}</div>` +
+    `<div class="body">${artifact ? selfReviewNoteHtml(artifact.points) : ''}${summary}</div>` +
     description +
     conversationHtml(bundle.comments.issueComments, ctx.now) +
     (reviews.length

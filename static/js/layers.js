@@ -25,7 +25,13 @@ import { fileAnchorId, layerAnchorId, reviewedId, sanitizeKey } from './keys.js'
 import { renderMarkdown } from './markdown.js'
 import { writtenOn } from './diff-identity.js'
 import { pendingForPath } from './pending.js'
-import { openPoints, pointCardHtml, pointsDensityToggleHtml, postedUrls } from './points.js'
+import {
+  openPoints,
+  pointCardHtml,
+  pointsDensityToggleHtml,
+  pointStatusesHtml,
+  postedUrls,
+} from './points.js'
 import { filesReviewed, layerProgress } from './progress.js'
 import { foldCountText } from './reading-level.js'
 import { anchorKey, buildThreads } from './threads.js'
@@ -281,7 +287,7 @@ export function layerPointsHtml(layer, points, paths, state, posted) {
   const cards = own.map(p =>
     pointCardHtml(p, posted === undefined ? { paths, state } : { paths, state, posted })
   )
-  return `<div class="layer-points"><h3 class="lbl sub">Attention points · <span class="point-count">${active}</span>${pointsDensityToggleHtml()}</h3><ol class="findings">${cards.join('')}</ol></div>`
+  return `<div class="layer-points"><h3 class="lbl sub">Attention points · <span class="point-count">${active}</span>${pointStatusesHtml(own, state)}${pointsDensityToggleHtml()}</h3><ol class="findings">${cards.join('')}</ol></div>`
 }
 
 /**

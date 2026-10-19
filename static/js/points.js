@@ -420,27 +420,29 @@ export function pointRowHtml(p, ctx) {
 }
 
 /**
- * The overview's line that counts the points by where they stand, with its two switches. Points the
- * author resolved are off the page until the reader shows them, so the reviewer's page holds only
- * what is left to judge; the other switch takes the reader's own acted-on points off too. Nothing is
- * drawn for a canvas without points.
+ * What a layer's Attention points heading adds after its open count: the points that are not open,
+ * by where they stand, with the two switches. Points the author resolved are off the page until
+ * the reader shows them, so the reviewer's page holds only what is left to judge; the other switch
+ * takes the reader's own acted-on points off too. Each switch acts on its own layer. Nothing is
+ * drawn while every point is open.
  * @param {ReadonlyArray<Point>} points
  * @param {PrState | null | undefined} state
  * @param {{ hiding?: boolean, showingResolved?: boolean }} [switches] `hiding`: the points the reader
  *   acted on are hidden now; `showingResolved`: the resolved ones are shown
  */
 export function pointStatusesHtml(points, state, switches = {}) {
-  if (points.length === 0) {
-    return '<p class="point-statuses" hidden></p>'
-  }
   const { hiding = false, showingResolved = false } = switches
   /** @type {Record<PointStatus, number>} */
   const counts = { open: 0, queued: 0, posted: 0, resolved: 0, dismissed: 0 }
   for (const p of points) {
     counts[pointStatus(p, state)] += 1
   }
+  if (counts.open === points.length) {
+    return '<span class="point-statuses" hidden></span>'
+  }
   const handled = points.length - counts.open - counts.resolved
-  const parts = [`<b>${counts.open} open</b>`]
+  /** @type {string[]} */
+  const parts = []
   for (const status of /** @type {const} */ (['queued', 'posted', 'resolved', 'dismissed'])) {
     if (counts[status] > 0) {
       parts.push(
@@ -456,11 +458,11 @@ export function pointStatusesHtml(points, state, switches = {}) {
     counts.resolved === 0
       ? ''
       : ` <button class="cmd" type="button" data-act="toggle-resolved" aria-pressed="${showingResolved}">${showingResolved ? 'hide' : 'show'} the ${counts.resolved} resolved</button>`
-  return `<p class="point-statuses muted">Attention points: ${parts.join(' · ')}${hide}${resolved}</p>`
+  return `<span class="point-statuses">${parts.join(' · ')}${hide}${resolved}</span>`
 }
 
 /**
- * Where the overview's two switches stand now.
+ * Where one layer's two switches stand now.
  * @param {ParentNode} root
  */
 export function pointSwitches(root) {
@@ -471,7 +473,7 @@ export function pointSwitches(root) {
 
 /**
  * Draws every point again where it changed, wherever it is on the page, and rebuilds the counts,
- * the overview's status line, and the author's note. A point keeps the reader's expanded view
+ * each layer's status line, and the author's note. A point keeps the reader's expanded view
  * while its status holds, and collapses when it changes. Calling it again with the same state
  * changes nothing.
  * @param {ParentNode} root
@@ -492,9 +494,16 @@ export function applyPointStates(root, points, state, ctx) {
     const layerId = counter.closest('[data-layer]')?.getAttribute('data-layer')
     counter.textContent = String(open.filter(p => p.layerId === layerId).length)
   }
-  replaceWithHtml(root.querySelector('.point-statuses'), host =>
-    pointStatusesHtml(points, state, pointSwitches(host))
-  )
+  for (const line of Array.from(root.querySelectorAll('.point-statuses'))) {
+    const layerId = line.closest('section.layer')?.getAttribute('data-layer')
+    replaceWithHtml(line, host =>
+      pointStatusesHtml(
+        points.filter(p => p.layerId === layerId),
+        state,
+        pointSwitches(host)
+      )
+    )
+  }
   replaceWithHtml(root.querySelector('.sevsum'), () => sevsumHtml(open, ctx.layers ?? []))
   replaceWithHtml(root.querySelector('.self-review-note'), () => selfReviewNoteHtml(points))
   // The step is drawn only for an open pull request, so the one on the page stays open.

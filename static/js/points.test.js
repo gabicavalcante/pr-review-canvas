@@ -164,18 +164,19 @@ describe('where a point stands', () => {
     expect(openPoints(points, queued).map(p => p.id)).toEqual(['p-2', 'p-3'])
   })
 
-  it('counts the points by status in the overview, and offers to hide the ones acted on', () => {
+  it('counts the points by status once one is not open, and offers to hide the ones acted on', () => {
     document.body.innerHTML = pointStatusesHtml([], BASE)
     expect(document.querySelector('.point-statuses')?.hasAttribute('hidden')).toBe(true)
+    // The heading's count already says how many are open, so nothing is added while all are.
     document.body.innerHTML = pointStatusesHtml(points, BASE)
-    expect(document.querySelector('.point-statuses')?.textContent).toBe('Attention points: 3 open')
+    expect(document.querySelector('.point-statuses')?.hasAttribute('hidden')).toBe(true)
     expect(document.querySelector('[data-act="toggle-handled"]')).toBeNull()
     const second = points[1]
     if (second === undefined) throw new Error('no point')
     const state = { ...dismissed, pending: [{ ...draftFor(second), id: 'p2' }] }
     document.body.innerHTML = pointStatusesHtml(points, state)
     expect(document.querySelector('.point-statuses')?.textContent).toBe(
-      'Attention points: 1 open · 1 in your review · 1 dismissed hide the 2 acted on'
+      '1 in your review · 1 dismissed hide the 2 acted on'
     )
     expect(pointSwitches(document).hiding).toBe(false)
     document.body.innerHTML = pointStatusesHtml(points, state, { hiding: true })
@@ -190,7 +191,7 @@ describe('where a point stands', () => {
     try {
       document.body.innerHTML = pointStatusesHtml(points, state)
       expect(document.querySelector('.point-statuses')?.textContent).toBe(
-        'Attention points: 1 open · 1 resolved by the author · 1 dismissed hide the 1 acted on show the 1 resolved'
+        '1 resolved by the author · 1 dismissed hide the 1 acted on show the 1 resolved'
       )
       expect(pointSwitches(document)).toEqual({ hiding: false, showingResolved: false })
       document.body.innerHTML = pointStatusesHtml(points, state, { showingResolved: true })
@@ -316,7 +317,8 @@ describe('where a point stands', () => {
   it.each([true, false])(
     'keeps the switch that hides the points acted on (%s) when state updates',
     hiding => {
-      document.body.innerHTML = pointStatusesHtml(artifact.points, dismissed, { hiding })
+      const own = artifact.points.filter(p => p.layerId === 'run-path')
+      document.body.innerHTML = `<section class="layer" data-layer="run-path">${pointStatusesHtml(own, dismissed, { hiding })}</section>`
       applyPointStates(document, artifact.points, dismissed, ctx)
       expect(pointSwitches(document).hiding).toBe(hiding)
       expect(document.querySelector('.point-statuses')?.textContent).toContain('1 dismissed')
@@ -326,15 +328,24 @@ describe('where a point stands', () => {
   it('counts the open points of each layer and collapses a point once it is acted on', () => {
     document.body.innerHTML =
       `<span class="sevsum">${sevsumHtml(artifact.points, artifact.layers)}</span>` +
-      '<section data-layer="run-path"><span class="point-count">1</span>' +
-      `<ol>${pointCardHtml(first, ctx)}</ol></section>` +
-      pointStatusesHtml(artifact.points, BASE)
+      '<section class="layer" data-layer="run-path"><span class="point-count">1</span>' +
+      pointStatusesHtml(
+        artifact.points.filter(p => p.layerId === 'run-path'),
+        BASE
+      ) +
+      `<ol>${pointCardHtml(first, ctx)}</ol></section>`
     applyPointStates(document, artifact.points, dismissed, ctx)
     expect(document.querySelector('.point-count')?.textContent).toBe('0')
     const card = document.querySelector('li.finding')
     expect(card?.hasAttribute('hidden')).toBe(false)
     expect(card?.getAttribute('data-status')).toBe('dismissed')
-    expect(document.querySelector('.point-statuses')?.textContent).toContain('1 dismissed')
+    // The statuses count their own layer only: a point dismissed in another layer is not in them.
+    const otherLayerToo = {
+      ...dismissed,
+      dismissed: { ...dismissed.dismissed, 'fp-2': { at: BASE.updatedAt } },
+    }
+    applyPointStates(document, artifact.points, otherLayerToo, ctx)
+    expect(document.querySelector('.point-statuses')?.textContent).toBe('1 dismissed hide the 1 acted on')
   })
 
   it('offers both ways to send a point, and shows its draft once it is waiting in the review', () => {

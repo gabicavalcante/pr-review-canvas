@@ -782,13 +782,14 @@ kind, audience, and location. Click the title or **show** to read it and use its
 list shows every open point whole, in every layer, and **compact** goes back; the browser remembers
 the choice. A point on its line in the diff is always drawn whole while it is open.
 
-The counts in the layer headings and the overview's level counts include only open points. The overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author ·
-…** counts each status. Resolved points start off the page for every reader, the author too: **show
-the N resolved** brings them back, collapsed in place, until you click it again. A layer whose
-points are all resolved drops its **Attention points** heading while they are hidden. A link to a
-resolved point shows that one point, and a point you just resolved stays shown until the next load.
-The line's **hide the N acted on** command removes your other collapsed points from the page until
-you click it again; **edit** on an AI Chat proposed resolution brings its point back while the
+The counts in the layer headings and the overview's level counts include only open points. Once
+a layer has a point that is not open, its **Attention points** heading goes on to count the rest by
+status: **Attention points · 2 · 1 in your review · 1 resolved by the author**. Resolved points start
+off the page for every reader, the author too: the heading's **show the N resolved** brings that
+layer's back, collapsed in place, until you click it again. A link to a resolved point shows that
+one point, and a point you just resolved stays shown until the next load. The heading's **hide the
+N acted on** command removes the layer's other collapsed points from the page until you click it
+again; **edit** on an AI Chat proposed resolution brings its point back while the
 reason box is open. `]` and `[` step only through open points. `o` on a point drawn as one line
 expands it or collapses it again.
 
@@ -818,9 +819,9 @@ it. To resolve a point you dismissed, **restore** it first.
 
 A resolution is written into the canvas itself:
 
-- The point leaves every reader's open list and starts hidden. **show the N resolved** shows it
-  collapsed where it is, with the author's reason and, when posted, a link to the comment. A
-  reason posted as a comment does not mark the point posted, so a reopened point is open again.
+- The point leaves every reader's open list and starts hidden. Its layer's **show the N resolved**
+  shows it collapsed where it is, with the author's reason and, when posted, a link to the comment.
+  A reason posted as a comment does not mark the point posted, so a reopened point is open again.
 - The canvas comment is shared again at once, with the new counts. A reviewer's page reads it back
   when it opens and every two minutes after while its tab is in view, hides the newly resolved
   points, updates the Conversation card, and says so. Each read fetches the pull request's comments,

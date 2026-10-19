@@ -416,9 +416,9 @@
 .pill.status.dismissed {
   color: var(--fg-muted);
 }
-/* The overview's switch takes every point the reader acted on off the page, wherever it is drawn,
-   except one whose reason box is open. */
-body:has(.point-statuses [data-act='toggle-handled'][aria-pressed='true'])
+/* A layer's switch takes every point of that layer the reader acted on off the page, in its list
+   and in its diff, except one whose reason box is open. */
+section.layer:has(.point-statuses [data-act='toggle-handled'][aria-pressed='true'])
   .is-handled:not(.is-resolved, :has(.settle-box)) {
   display: none;
 }
@@ -426,18 +426,20 @@ body:has(.point-statuses [data-act='toggle-handled'][aria-pressed='true'])
 .layer-points {
   display: contents;
 }
-/* A point the author resolved is off the page until the reader shows the resolved ones, or follows
-   a link to that point. A layer left with no point on the page drops its points heading too. */
-body:not(:has(.point-statuses [data-act='toggle-resolved'][aria-pressed='true']))
-  :is(
-    .is-resolved:not([data-revealed]),
-    .layer-points:not(:has(> .findings > li:not(.is-resolved:not([data-revealed]))))
-  ) {
+/* A point the author resolved is off the page until the reader shows its layer's resolved ones, or
+   follows a link to that point. The heading stays, since the switch that brings them back is in it. */
+section.layer:not(:has(.point-statuses [data-act='toggle-resolved'][aria-pressed='true']))
+  .is-resolved:not([data-revealed]) {
   display: none;
 }
+/* The statuses read on after the heading's open count, in the heading's own row. */
 .point-statuses {
-  margin: 0 0 12px;
-  font-size: 13px;
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+.point-statuses::before {
+  content: '· ';
+  margin-left: 0.25em;
 }
 .pr-desc {
   border-top: 1px solid var(--ink);
