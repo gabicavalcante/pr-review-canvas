@@ -731,9 +731,11 @@ icon shows the level by shape:
   by hand.
 - **fyi** (an info circle): context worth knowing.
 
-A `decide` point also has an impact: what a wrong call would cost. **critical** is hard to undo
-after merge, such as data loss, a security hole, an outage, or a break for callers. **high** costs
-real rework or changes what users see, but can be fixed after merge. **low** is cheap to reverse.
+A `decide` point also has an impact: what shipping the wrong call would do to users, their data, or
+callers, whatever it takes to change the code back. **critical** cannot be taken back once it
+ships, such as data lost or exposed, content shared that was not meant to be, an outage, or a break
+for callers. **high** shows users or callers wrong behavior until a fix ships. **low** goes
+unnoticed outside the code: the cost is rework or readability.
 Its card shows the impact next to the title, and `decide` points list the worst impact first. A
 canvas generated before impact existed shows its `decide` points without one.
 

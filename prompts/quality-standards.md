@@ -30,5 +30,7 @@ Does it belong in the layer where it now sits? Does a shared helper already do t
 What a problem asks of the reviewer maps to the point's level: `decide` for a decision the human
 must make or a structural problem that blocks the merge until the author justifies it; `check` for
 a real structural problem that does not block, or something a human must verify by hand; `fyi` for
-everything worth knowing. A `decide` point's `impact` is `critical` when a wrong call is hard to
-undo after merge, `high` when it costs real rework, and `low` when it is cheap to reverse.
+everything worth knowing. A `decide` point's `impact` judges what shipping the wrong call would do,
+not how easy the code is to change back: `critical` when its effect cannot be taken back, `high`
+when users or callers see wrong behavior until a fix ships, and `low` when nothing outside the code
+notices.
