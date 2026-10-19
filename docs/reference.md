@@ -547,22 +547,23 @@ placed in Other while its source is in a regular layer.
 
 The data directory's `settings.yml` accepts these keys and values:
 
-| Key                    | Default  | Accepted values                                                                  |
-| ---------------------- | -------- | -------------------------------------------------------------------------------- |
-| `version`              | `1`      | `1`                                                                              |
-| `skin`                 | `github` | `terminal`, `github`, `olive`                                                    |
-| `theme`                | `auto`   | `auto`, `light`, `dark`                                                          |
-| `foldLevel`            | `light`  | `light`, `moderate`, `aggressive`                                                |
-| `layerView`            | `all`    | `all`, `one`                                                                     |
-| `chatAgent`            | `claude` | `claude`, `codex` (2)                                                            |
-| `chatModel`            | `null`   | A model ID, or `null` for the agent's default (1) (2)                            |
-| `chatTimeoutSec`       | `600`    | Integer seconds, 30–3600                                                         |
-| `maxTurns`             | `null`   | Integer 1–100, or `null` for the agent's default                                 |
-| `checkoutEnabled`      | `true`   | `true` reads a [review checkout](#review-checkouts); `false` reads your checkout |
-| `checkoutIdleDays`     | `7`      | Integer 1–365, or `-1` to never remove an idle checkout                          |
-| `checkoutSweepMinutes` | `60`     | Integer minutes, 5–1440, between `serve`'s idle sweeps                           |
-| `canvasComment`        | `null`   | `true`, `false`, or `null` to follow the project (3)                             |
-| `mentionCanvas`        | `null`   | `true`, `false`, or `null` to follow the project (3)                             |
+| Key                    | Default   | Accepted values                                                                  |
+| ---------------------- | --------- | -------------------------------------------------------------------------------- |
+| `version`              | `1`       | `1`                                                                              |
+| `skin`                 | `github`  | `terminal`, `github`, `olive`                                                    |
+| `theme`                | `auto`    | `auto`, `light`, `dark`                                                          |
+| `foldLevel`            | `light`   | `light`, `moderate`, `aggressive`                                                |
+| `layerView`            | `all`     | `all`, `one`                                                                     |
+| `pointColors`          | `classic` | `classic`, `action`                                                              |
+| `chatAgent`            | `claude`  | `claude`, `codex` (2)                                                            |
+| `chatModel`            | `null`    | A model ID, or `null` for the agent's default (1) (2)                            |
+| `chatTimeoutSec`       | `600`     | Integer seconds, 30–3600                                                         |
+| `maxTurns`             | `null`    | Integer 1–100, or `null` for the agent's default                                 |
+| `checkoutEnabled`      | `true`    | `true` reads a [review checkout](#review-checkouts); `false` reads your checkout |
+| `checkoutIdleDays`     | `7`       | Integer 1–365, or `-1` to never remove an idle checkout                          |
+| `checkoutSweepMinutes` | `60`      | Integer minutes, 5–1440, between `serve`'s idle sweeps                           |
+| `canvasComment`        | `null`    | `true`, `false`, or `null` to follow the project (3)                             |
+| `mentionCanvas`        | `null`    | `true`, `false`, or `null` to follow the project (3)                             |
 
 (1) A model ID names a family; see [Model families](#model-families).
 (2) `chatAgent` also picks the agent that [generates canvases from the review
@@ -718,6 +719,29 @@ refused.
 
 When automatic download fails, download the archive in GitHub or GitLab and use the page's drop
 zone or `pr-review import <zip> --pr <n>`.
+
+### Attention point levels and impact
+
+Each attention point has a level, which says what it asks of you rather than how bad it is. Its
+icon shows the level by shape:
+
+- **decide** (a diamond): a choice only a person can make, or a structural problem that holds the
+  merge until the author justifies it.
+- **check** (a checked box): a real problem that does not hold the merge, or something to verify
+  by hand.
+- **fyi** (an info circle): context worth knowing.
+
+A `decide` point also has an impact: what shipping the wrong call would do to users, their data, or
+callers, whatever it takes to change the code back. **critical** cannot be taken back once it
+ships, such as data lost or exposed, content shared that was not meant to be, an outage, or a break
+for callers. **high** shows users or callers wrong behavior until a fix ships. **low** goes
+unnoticed outside the code: the cost is rework or readability.
+Its card shows the impact next to the title, and `decide` points list the worst impact first. A
+canvas generated before impact existed shows its `decide` points without one.
+
+The icons are red, amber, and gray by default. Set **Point colors** in the settings dialog to
+**action** for purple, blue, and gray instead, so no level reads as a warning. The choice is saved
+as `pointColors` in `settings.yml`.
 
 ### Attention point status
 
@@ -1224,4 +1248,5 @@ Validation reports name the field, file, hunk, or line to fix. Common groups are
 | `ANNOTATION_OUTSIDE_HUNK`, `POINT_OUTSIDE_DIFF`, `FOLD_INVALID` | Locations and fold ranges fit the assigned diff                                                                                                        |
 | `FOLD_MISSING`                                                  | Using diff rows in chunks: a file over 20 unannotated rows hides something; an open file over 60 folds half; a layer over 100 hides more at aggressive |
 | `TOO_MANY_POINTS`                                               | Count explicit points and missing-test entries together                                                                                                |
+| `POINT_IMPACT`                                                  | Every `decide` point has an impact, and no other point has one                                                                                         |
 | `LINK_UNRESOLVED`, `DIAGRAM_NODE_UNKNOWN`, `DIAGRAM_LIMIT`      | Link targets, diagram node IDs, and diagram counts                                                                                                     |

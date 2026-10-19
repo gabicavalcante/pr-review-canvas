@@ -8,6 +8,7 @@ import { esc } from './dom.js'
 import { hostLabel } from './host.js'
 import { pendingCommentHtml, pendingForPoint, pendingRange } from './pending.js'
 import { layerAnchorId, pointAnchorId } from './keys.js'
+import { LEVELS, levelIconHtml, pointLevelText } from './point-level.js'
 import { renderMarkdown } from './markdown.js'
 import {
   audiencePillHtml,
@@ -17,8 +18,6 @@ import {
   settleButtonHtml,
   settlementOf,
 } from './self-review.js'
-
-export const LEVELS = /** @type {const} */ (['decide', 'check', 'fyi'])
 
 /**
  * @param {ReadonlyArray<Point>} points
@@ -116,13 +115,6 @@ export function pointLocation(p) {
 }
 
 /**
- * @param {Point} p
- */
-export function squareHtml(p) {
-  return `<span class="sq ${p.level}" role="img" aria-label="${p.level}" title="${p.level}"></span>`
-}
-
-/**
  * Whether a point's comment names the canvas it came from. Off when `sharing.mentionCanvas` is
  * off; `app.js` sets it once per render, before the cards that read it are built.
  */
@@ -139,7 +131,7 @@ export function setMentionCanvas(on) {
  */
 export function pointToMarkdown(p) {
   const source = mentionCanvas ? ' · from the pr-review canvas' : ''
-  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${p.kind} · ${p.level}${source}_`
+  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${p.kind} · ${pointLevelText(p)}${source}_`
 }
 
 /**
@@ -340,6 +332,17 @@ function pointSignature(p, status, ctx) {
 }
 
 /**
+ * What a wrong call on the point would cost, for a point with an impact; nothing for one without,
+ * such as a `decide` point from a canvas written before impact existed.
+ * @param {Point} p
+ */
+export function impactPillHtml(p) {
+  return p.impact === undefined
+    ? ''
+    : `<span class="pill impact ${p.impact}" title="Impact: what a wrong call would cost">${p.impact}</span>`
+}
+
+/**
  * The attributes and the inside of a point, shared by its card and its row in the diff. A point
  * that was acted on is drawn collapsed to its title and one line, with a toggle that shows the
  * rest; an open point is always drawn whole.
@@ -362,7 +365,7 @@ function pointPartsHtml(p, ctx, opts) {
       `data-point="${esc(p.id)}" data-fingerprint="${esc(p.fingerprint)}" data-status="${status}" ` +
       `data-sig="${esc(pointSignature(p, status, ctx))}"`,
     handled: status === 'open' ? '' : status === 'resolved' ? ' is-handled is-resolved' : ' is-handled',
-    title: `<span class="p-title">${esc(p.title)}</span><span class="pill kind">${esc(p.kind)}</span>${audiencePillHtml(p)}${parts.pill}${loc}${toggle}`,
+    title: `<span class="p-title">${esc(p.title)}</span>${impactPillHtml(p)}<span class="pill kind">${esc(p.kind)}</span>${audiencePillHtml(p)}${parts.pill}${loc}${toggle}`,
     rest:
       parts.summary +
       `<div class="prose">${renderMarkdown(p.body, { paths: ctx.paths })}</div>` +
@@ -379,7 +382,7 @@ function pointPartsHtml(p, ctx, opts) {
 export function pointCardHtml(p, ctx) {
   const { attrs, handled, title, rest } = pointPartsHtml(p, ctx, { card: true })
   return (
-    `<li class="finding${handled}" id="${esc(pointAnchorId(p.id))}" ${attrs}>${squareHtml(p)}<div>` +
+    `<li class="finding${handled}" id="${esc(pointAnchorId(p.id))}" ${attrs}>${levelIconHtml(p.level)}<div>` +
     `<div class="f-title">${title}</div>${rest}</div></li>`
   )
 }
@@ -393,7 +396,7 @@ export function pointRowHtml(p, ctx) {
   const { attrs, handled, title, rest } = pointPartsHtml(p, ctx, { card: false })
   return (
     `<tr class="ifind ${p.level}${handled}" ${attrs}><td class="code x" colspan="4">` +
-    `<div class="f-title">${squareHtml(p)}${title}</div>${rest}</td></tr>`
+    `<div class="f-title">${levelIconHtml(p.level)}${title}</div>${rest}</td></tr>`
   )
 }
 
@@ -550,7 +553,7 @@ export function setPointExpanded(el, expanded = !el.hasAttribute('data-expanded'
 }
 
 /**
- * The three squares with counts in the overview header. Each count links to the first layer that
+ * The three level icons with counts in the overview header. Each count links to the first layer that
  * has a point of that level, so the overview only counts and the layers hold the cards.
  * @param {ReadonlyArray<Point>} points
  * @param {ReadonlyArray<Layer>} [layers] artifact order; omitted when there is nothing to link to
@@ -559,12 +562,12 @@ export function sevsumHtml(points, layers = []) {
   const by = pointsByLevel(points)
   const cell = /** @param {'decide' | 'check' | 'fyi'} level */ level => {
     const n = by[level].length
-    const square = `<span class="sq ${level}" role="img" aria-label="${n} ${level}" title="${n} ${level}"></span>${n}`
+    const icon = `${levelIconHtml(level, `${n} ${level}`)}${n}`
     const target = layers.find(l => by[level].some(p => p.layerId === l.id))
-    return target ? `<a href="#${esc(layerAnchorId(target.key))}">${square}</a>` : `<span>${square}</span>`
+    return target ? `<a href="#${esc(layerAnchorId(target.key))}">${icon}</a>` : `<span>${icon}</span>`
   }
   return (
     `<span class="sevsum" tabindex="0" role="group" aria-label="Attention points by level">${cell('decide')}${cell('check')}${cell('fyi')}` +
-    '<span class="legend" aria-hidden="true"><span><span class="sq decide"></span>decide</span><span><span class="sq check"></span>check</span><span><span class="sq fyi"></span>fyi</span></span></span>'
+    `<span class="legend" aria-hidden="true">${LEVELS.map(l => `<span>${levelIconHtml(l, null)}${l}</span>`).join('')}</span></span>`
   )
 }

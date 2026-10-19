@@ -23,12 +23,32 @@
   to add it under. `pr-review doctor` has the same check as its `prompts` line, for any release up
   to the running one.
 
+### Attention points
+
+- Each level has its own shape: a diamond for **decide**, a checked box for **check**, and an info
+  circle for **fyi**. The shapes replace the colored squares on cards, diff rows, the overview
+  counts, and the legend, so the level reads without color.
+- **Point colors** in the settings dialog picks the palette: **classic** (red, amber, gray, the
+  default) or **action** (purple, blue, gray), for readers who took the red and amber for a
+  severity scale. It is saved as `pointColors` in `settings.yml`.
+- A **decide** point has an impact: **critical**, **high**, or **low**, for what a wrong call would
+  cost. Its card shows it next to the title, and decide points list the worst impact first. A
+  canvas generated before this version shows its decide points without one; generate again to get
+  them.
+- A generation that leaves a decide point without an impact, or gives one to another point, is
+  sent back to the agent to fix (`POINT_IMPACT`).
+
 ### Upgrade
 
 - A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled
   template has it under **Attention points**; `pr-review upgrade` and `doctor` say so. Without it
   the generator is not told which points the author resolved: a point that comes back with the same
   title stays resolved unchecked, and one reworded comes back open.
+- A project with its own `generation-format.md`, `quality-standards.md`, `judging-strict.md`, or
+  `judging-surfacing.md` merges in the bundled copies' definitions of impact. `pr-review upgrade`
+  and `doctor` do not name this one, since it adds no token. Without them, every generated decide
+  point comes back with `POINT_IMPACT`, and the agent picks an impact without the definitions.
+- Teammates on 0.9.0 can still open new canvases; they do not see the impact.
 
 ## 0.9.0
 

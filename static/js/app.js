@@ -15,6 +15,7 @@ import {
 } from './api.js'
 import { setChatEnabled } from './ask.js'
 import { setMentionCanvas } from './points.js'
+import { applyPointColors } from './point-colors.js'
 import { wireBarDismissal } from './bar-dismissal.js'
 import { readChatMinimized, readChatWidth, renderChatShell, wireChat } from './chat.js'
 import { reviewPaneHtml, wireReviewPane } from './side-pane.js'
@@ -219,6 +220,7 @@ export class PrAppElement extends HTMLElement {
     // The reading level the canvas opens at comes from the settings file with the page, so the
     // first draw hides what the reader asked for.
     setFoldLevel(this, this.bootstrap.foldLevel)
+    applyPointColors(this.bootstrap.pointColors, document.documentElement)
     this.layerView?.stop()
     this.layerView = initOneLayer(this, { view: this.bootstrap.layerView })
     const patchesPromise = fetchPatches(this.bootstrap.prNumber).then(
@@ -380,7 +382,10 @@ export class PrAppElement extends HTMLElement {
         uncover: () => (this.chat ?? this.reviewPane)?.uncover(),
         openSettings: el =>
           void openSettingsDialog(this, el, {
-            onSaved: data => this.layerView?.setView(data.settings.layerView),
+            onSaved: data => {
+              this.layerView?.setView(data.settings.layerView)
+              applyPointColors(data.settings.pointColors, document.documentElement)
+            },
           }),
       })
       this.interactions = interactions
