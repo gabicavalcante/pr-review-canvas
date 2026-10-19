@@ -12,6 +12,7 @@ import {
   pointStatus,
   pointStatusesHtml,
   pointSwitches,
+  impactPillHtml,
   pointsByLevel,
   pointToMarkdown,
   setMentionCanvas,
@@ -46,7 +47,7 @@ describe('points', () => {
     expect(pointLocation({ ...p, endLine: 6 })).toBe('src/app.ts:4-6')
   })
 
-  it('renders a card with level icon, kind tag, location link, body, and its four commands', () => {
+  it('renders a card with level icon, impact, kind tag, location link, body, and its four commands', () => {
     const p = points[0]
     if (!p) {
       throw new Error('no point')
@@ -55,6 +56,7 @@ describe('points', () => {
     const li = document.querySelector('li.finding')
     expect(li?.id).toBe('point-p-1')
     expect(li?.querySelector('.lv.decide')?.getAttribute('aria-label')).toBe('decide')
+    expect(li?.querySelector('.pill.impact.high')?.textContent).toBe('high')
     expect(li?.querySelector('.pill.kind')?.textContent).toBe('decision')
     expect(li?.querySelector('a.loc')?.getAttribute('href')).toBe('#line:src/app.ts:4')
     expect(li?.querySelector('.prose p')?.textContent).toContain('Look at the operator')
@@ -68,6 +70,17 @@ describe('points', () => {
     // Nothing is disabled while the pane is off: the ask command is simply not there.
     expect([...(li?.querySelectorAll('button.cmd:disabled') ?? [])].map(b => b.textContent)).toEqual([])
     expect(li?.getAttribute('data-fingerprint')).toBe('fp-1')
+  })
+
+  it('shows an impact only on a decide point that has one', () => {
+    const p = points[0]
+    if (!p) {
+      throw new Error('no point')
+    }
+    expect(impactPillHtml({ ...p, impact: 'critical' })).toContain('class="pill impact critical"')
+    const { impact: _, ...older } = p
+    expect(impactPillHtml(older)).toBe('')
+    expect(impactPillHtml(points[1] ?? p)).toBe('')
   })
 
   it('renders the inline row and the level summary', () => {
@@ -110,14 +123,14 @@ describe('where a point stands', () => {
     expect(pointToMarkdown(first)).toBe(
       '**Sum instead of product**\n\n' +
         'Look at the operator because the spec is ambiguous; if the spec says sum, this is fine.\n\n' +
-        '_src/app.ts:4 · decision · decide · from the pr-review canvas_'
+        '_src/app.ts:4 · decision · decide (high impact) · from the pr-review canvas_'
     )
   })
 
   it('leaves the canvas out of the comment when mentionCanvas is off', () => {
     setMentionCanvas(false)
     try {
-      expect(pointToMarkdown(first)).toMatch(/_src\/app\.ts:4 · decision · decide_$/)
+      expect(pointToMarkdown(first)).toMatch(/_src\/app\.ts:4 · decision · decide \(high impact\)_$/)
       expect(pointToMarkdown(first).toLowerCase()).not.toContain('canvas')
     } finally {
       setMentionCanvas(true)

@@ -125,7 +125,7 @@ async function renderPoint(
   return [
     `## Context: attention point — ${point.title}`,
     '',
-    `${point.kind} · ${point.level} · point \`${pointRef(point.fingerprint)}\``,
+    `${point.kind} · ${point.level}${point.impact === undefined ? '' : ` (${point.impact} impact)`} · point \`${pointRef(point.fingerprint)}\``,
     '',
     point.body,
     '',

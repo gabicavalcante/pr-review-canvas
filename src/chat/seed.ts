@@ -59,7 +59,7 @@ export function pointsMarkdown(artifact: ReviewArtifact): string {
     .map(p => {
       const settled = artifact.settled?.[p.fingerprint]
       const answer = settled === undefined ? '' : ` — settled by the author: ${settled.reason}`
-      return `- ${p.level} · ${p.kind} · for the ${p.audience} · ${p.title} (\`${p.path}:${p.line}\`) · point \`${pointRef(p.fingerprint)}\`${answer}`
+      return `- ${p.level}${p.impact === undefined ? '' : ` (${p.impact} impact)`} · ${p.kind} · for the ${p.audience} · ${p.title} (\`${p.path}:${p.line}\`) · point \`${pointRef(p.fingerprint)}\`${answer}`
     })
     .join('\n')
 }

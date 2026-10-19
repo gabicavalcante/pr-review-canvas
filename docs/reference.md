@@ -720,7 +720,7 @@ refused.
 When automatic download fails, download the archive in GitHub or GitLab and use the page's drop
 zone or `pr-review import <zip> --pr <n>`.
 
-### Attention point levels
+### Attention point levels and impact
 
 Each attention point has a level, which says what it asks of you rather than how bad it is. Its
 icon shows the level by shape:
@@ -730,6 +730,12 @@ icon shows the level by shape:
 - **check** (a checked box): a real problem that does not hold the merge, or something to verify
   by hand.
 - **fyi** (an info circle): context worth knowing.
+
+A `decide` point also has an impact: what a wrong call would cost. **critical** is hard to undo
+after merge, such as data loss, a security hole, an outage, or a break for callers. **high** costs
+real rework or changes what users see, but can be fixed after merge. **low** is cheap to reverse.
+Its card shows the impact next to the title, and `decide` points list the worst impact first. A
+canvas generated before impact existed shows its `decide` points without one.
 
 The icons are red, amber, and gray by default. Set **Point colors** in the settings dialog to
 **action** for purple, blue, and gray instead, so no level reads as a warning. The choice is saved
@@ -1240,4 +1246,5 @@ Validation reports name the field, file, hunk, or line to fix. Common groups are
 | `ANNOTATION_OUTSIDE_HUNK`, `POINT_OUTSIDE_DIFF`, `FOLD_INVALID` | Locations and fold ranges fit the assigned diff                                                                                                        |
 | `FOLD_MISSING`                                                  | Using diff rows in chunks: a file over 20 unannotated rows hides something; an open file over 60 folds half; a layer over 100 hides more at aggressive |
 | `TOO_MANY_POINTS`                                               | Count explicit points and missing-test entries together                                                                                                |
+| `POINT_IMPACT`                                                  | Every `decide` point has an impact, and no other point has one                                                                                         |
 | `LINK_UNRESOLVED`, `DIAGRAM_NODE_UNKNOWN`, `DIAGRAM_LIMIT`      | Link targets, diagram node IDs, and diagram counts                                                                                                     |

@@ -426,7 +426,14 @@ function checkAnnotations(output: ModelOutput, index: Index, report: Report): vo
   }
 }
 
-function checkPoints(output: ModelOutput, index: Index, limits: Limits, report: Report): void {
+/** `storedArtifact`: a stored canvas may predate impact, so only a fresh generation must give one. */
+function checkPoints(
+  output: ModelOutput,
+  index: Index,
+  limits: Limits,
+  report: Report,
+  storedArtifact: boolean
+): void {
   const missingTests = output.layers.reduce(
     (n, l) => n + l.tests.filter(t => t.status === 'missing').length,
     0
@@ -441,6 +448,12 @@ function checkPoints(output: ModelOutput, index: Index, limits: Limits, report: 
   }
   output.points.forEach((p, i) => {
     const where = `point:${i + 1}`
+    if (p.level === 'decide' && p.impact === undefined && !storedArtifact) {
+      report.add('POINT_IMPACT', where, `point ${i + 1} "${p.title}": a decide point needs an impact`)
+    }
+    if (p.level !== 'decide' && p.impact !== undefined) {
+      report.add('POINT_IMPACT', where, `point ${i + 1} "${p.title}": only a decide point has an impact`)
+    }
     const side = p.side ?? 'new'
     const entry = index.byPath.get(p.path)
     const start = hunkAt(entry, side, p.line)
@@ -589,7 +602,7 @@ export function validateModelOutput(raw: unknown, input: ValidationInput): Valid
   })) {
     report.add(error.code, error.where ?? 'folds', error.message)
   }
-  checkPoints(output, index, input.limits, report)
+  checkPoints(output, index, input.limits, report, input.storedArtifact === true)
   checkLinks(output, input.files, report)
   checkDiagramLinks(output, input.files, input.limits, report)
   return report.errors.length === 0

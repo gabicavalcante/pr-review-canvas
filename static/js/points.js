@@ -156,7 +156,8 @@ export function setMentionCanvas(on) {
  */
 export function pointToMarkdown(p) {
   const source = mentionCanvas ? ' · from the pr-review canvas' : ''
-  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${p.kind} · ${p.level}${source}_`
+  const level = p.impact === undefined ? p.level : `${p.level} (${p.impact} impact)`
+  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${p.kind} · ${level}${source}_`
 }
 
 /**
@@ -357,6 +358,17 @@ function pointSignature(p, status, ctx) {
 }
 
 /**
+ * What a wrong call on a `decide` point would cost. Nothing for other points, or for a `decide`
+ * point from a canvas written before impact existed.
+ * @param {Point} p
+ */
+export function impactPillHtml(p) {
+  return p.impact === undefined
+    ? ''
+    : `<span class="pill impact ${p.impact}" title="Impact: what a wrong call would cost">${p.impact}</span>`
+}
+
+/**
  * The attributes and the inside of a point, shared by its card and its row in the diff. A point
  * that was acted on is drawn collapsed to its title and one line, with a toggle that shows the
  * rest; an open point is always drawn whole.
@@ -379,7 +391,7 @@ function pointPartsHtml(p, ctx, opts) {
       `data-point="${esc(p.id)}" data-fingerprint="${esc(p.fingerprint)}" data-status="${status}" ` +
       `data-sig="${esc(pointSignature(p, status, ctx))}"`,
     handled: status === 'open' ? '' : status === 'resolved' ? ' is-handled is-resolved' : ' is-handled',
-    title: `<span class="p-title">${esc(p.title)}</span><span class="pill kind">${esc(p.kind)}</span>${audiencePillHtml(p)}${parts.pill}${loc}${toggle}`,
+    title: `<span class="p-title">${esc(p.title)}</span>${impactPillHtml(p)}<span class="pill kind">${esc(p.kind)}</span>${audiencePillHtml(p)}${parts.pill}${loc}${toggle}`,
     rest:
       parts.summary +
       `<div class="prose">${renderMarkdown(p.body, { paths: ctx.paths })}</div>` +
