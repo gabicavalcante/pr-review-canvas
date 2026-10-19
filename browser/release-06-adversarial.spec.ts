@@ -59,7 +59,6 @@ for (const receipt of ['available', 'unavailable']) {
       },
     })
     await page.goto(url)
-    await openFiles(page)
     await openChat()
     await page.locator('#msg').fill('Propose a comment')
     await page.locator('#chat-send').click()
@@ -68,11 +67,11 @@ for (const receipt of ['available', 'unavailable']) {
     await card.locator('[data-act="proposed-queue"]').click()
     await expect(card).toContainText('in your review')
     await page.reload()
-    await openFiles(page)
     await openChat()
     await expect(card).toContainText('in your review')
     await expect(page.locator('.pending-bar')).toContainText('1 pending comment')
     await closeChat()
+    await openFiles(page)
     await page.locator('article.file[data-path="src/app.ts"]').first().scrollIntoViewIfNeeded()
     await page.locator('tr.pending-row [data-act="pending-delete"]').click()
     await openChat()
@@ -105,7 +104,6 @@ for (const receipt of ['available', 'unavailable']) {
     await expect(card.locator('[data-act="proposed-queue"]')).toHaveCount(0)
     await expect(card.locator('[data-act="proposed-post"]')).toHaveCount(0)
     await page.reload()
-    await openFiles(page)
     await openChat()
     for (const offset of [2, 4]) {
       movedBy = offset
@@ -115,7 +113,6 @@ for (const receipt of ['available', 'unavailable']) {
       await expect(card.locator('a[href$="discussion_r8001"]')).toHaveCount(1)
       await expect(secondCard.locator('a[href$="discussion_r8002"]')).toHaveCount(1)
       await page.reload()
-      await openFiles(page)
       await openChat()
       await expect(card.locator('a[href$="discussion_r8001"]')).toHaveCount(1)
       await expect(secondCard.locator('a[href$="discussion_r8002"]')).toHaveCount(1)

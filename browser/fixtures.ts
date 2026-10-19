@@ -26,20 +26,19 @@ export { expect } from '@playwright/test'
 
 /**
  * Opens every file of the layers that are open, as a reader who reads each one: a file starts
- * closed, and a spec that works in its diff opens it first.
+ * closed, and a spec that works in its diff opens it first. The chevrons are clicked in the page,
+ * through the app's own click handler, in one round trip; a scripted click moves neither the
+ * focus nor the scroll.
  */
 export async function openFiles(page: Page): Promise<void> {
-  const closed = page.locator(
-    'section.layer:has(> .layer-body:not([hidden])) article.file > .file-h > .chev[aria-expanded="false"]'
-  )
   await expect(page.locator('section.layer').first()).toBeVisible()
-  while ((await closed.count()) > 0) {
-    await closed.first().click()
-  }
-  // The clicks leave the focus on a chevron and the page scrolled; the reader starts at the top.
   await page.evaluate(() => {
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-    window.scrollTo(0, 0)
+    const closed = document.querySelectorAll(
+      'section.layer:has(> .layer-body:not([hidden])) article.file > .file-h > .chev[aria-expanded="false"]'
+    )
+    for (const chevron of closed) {
+      if (chevron instanceof HTMLElement) chevron.click()
+    }
   })
 }
 

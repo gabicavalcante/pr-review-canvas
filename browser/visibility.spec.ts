@@ -100,14 +100,22 @@ test('opens and closes file and layer bodies', async ({ page, reviewUrl }) => {
   await expect(fileToggle).toHaveAttribute('aria-expanded', 'false')
   await fileTitle.click()
   await expect(fileBody).toBeVisible()
-  // Double and triple clicks select the name to copy it, and leave the card open.
+  // Double and triple clicks select the name to copy it, and leave the card as it was. It is
+  // closed here: the first click opens it and the page grows below the name. Closing it would
+  // shrink this short page, the browser would pull the scroll up, and the second click would land
+  // on whatever moved under the pointer.
+  await fileTitle.click()
+  await expect(fileBody).toBeHidden()
   const onName = { position: { x: 4, y: 4 } }
   await fileTitle.dblclick(onName)
   expect(await page.evaluate(() => window.getSelection()?.toString())).not.toBe('')
-  await expect(fileBody).toBeVisible()
+  await expect(fileBody).toBeHidden()
   await fileTitle.click({ ...onName, clickCount: 3 })
+  await expect(fileBody).toBeHidden()
+  await expect(fileToggle).toHaveAttribute('aria-expanded', 'false')
+  await page.evaluate(() => window.getSelection()?.removeAllRanges())
+  await fileTitle.click()
   await expect(fileBody).toBeVisible()
-  await expect(fileToggle).toHaveAttribute('aria-expanded', 'true')
 
   const layerBody = layer.locator(':scope > .layer-body')
   const layerToggle = layer.locator(':scope > .layer-h > .chev')
