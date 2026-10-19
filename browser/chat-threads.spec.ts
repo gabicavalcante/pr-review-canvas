@@ -40,8 +40,10 @@ test('each ask opens the thread of its place, and the Threads tab lists them', a
   await page.locator('#thread-index').getByText('Sum instead of product').click()
   await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
   await expect(page.locator('#chat-log')).toContainText('Is the sum intended?')
-  // The point's ask counts its thread's questions.
-  expect(await pointAsk.evaluate(el => getComputedStyle(el, '::after').content)).toBe('"1"')
+  // The point's ask carries the dot of a thread, in its label, which no skin draws on.
+  expect(await pointAsk.locator('.ask-label').evaluate(el => getComputedStyle(el, '::after').content)).toBe(
+    '"" / "thread"'
+  )
 })
 
 test('with a thread per place off, every ask goes to the open thread until the reader turns it on', async ({
@@ -70,7 +72,9 @@ test('with a thread per place off, every ask goes to the open thread until the r
   ])
   await page.locator('#side-tab-threads').click()
   await expect(page.locator('#thread-index [data-thread-open]')).toHaveCount(1)
-  expect(await pointAsk.evaluate(el => getComputedStyle(el, '::after').content)).toBe('none')
+  expect(await pointAsk.locator('.ask-label').evaluate(el => getComputedStyle(el, '::after').content)).toBe(
+    'none'
+  )
   await page.locator('#side-tab-chat').click()
 
   await page.locator('#settings').click()

@@ -973,13 +973,14 @@ that server run. Canvas generation models are configured separately in
 **Ask** on a layer, file, attention point, or line selection opens the thread of that place. The
 first ask about a place starts one, titled after it; a later ask about the same place comes back to
 it, history and all. A thread is made by its first question, so an ask you do not follow up leaves
-nothing behind. Lines match on their exact range: a different selection starts another thread.
-Each thread is a session of its own with the agent. The canvas goes with a thread's first question,
-and again when the PR's head, the folder the agent reads, or your right to resolve points changes.
-A place's thread belongs to the chat agent it was made with: after you switch agents, an ask about
-the place starts a new thread. The ask command of a place with a thread shows how many questions
-it holds, and **go to code** at the top of a thread leads back to its place. The `a` key asks about
-the focused target, and `/` focuses the message box.
+nothing behind. Lines match on their exact range: a different selection starts another thread. Each
+thread is a session of its own with the agent. The canvas goes with a thread's first question, and
+again when the PR's head, the folder the agent reads, or your right to resolve points changes. A
+place's thread belongs to the chat agent it was made with: after you switch agents, an ask about the
+place starts a new thread. The ask command of a place with a thread carries a dot, which fills with
+the accent when an answer arrived there while you were reading another thread; the **Threads** tab
+carries the same dot until you open that thread. **go to code** at the top of a thread leads back to
+its place. The `a` key asks about the focused target, and `/` focuses the message box.
 
 The **Threads** tab lists the review's threads by kind of place (attention points, lines, files,
 layers, whole PR) with the number of questions in each; pick one to open it in **AI Chat**. **new

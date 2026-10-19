@@ -132,15 +132,40 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* An ask command whose place has a thread carries its question count, written by chat.js. */
-[data-act='ask']::after {
+/* An ask command whose place has a thread carries a dot after its label, which chat.js turns on;
+   the dot takes the accent while an answer the reader has not seen waits there. It hangs off the
+   label, since a skin may draw the command's brackets or icon in the command's own
+   pseudo-elements: within brackets it reads `[ ask ● ]`. Like the icons, it is an SVG mask on a
+   fixed box, so neither the font nor a scaled screen changes its size or roundness. */
+.ask-label::after {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: 6px;
-  padding: 0 6px;
-  border-radius: 999px;
+  background: var(--fg-dim);
+  mask: var(--i-dot) center / contain no-repeat;
+  vertical-align: middle;
+}
+/* The Threads tab and an index entry say where an answer arrived that the reader has not seen. */
+.threads-new,
+.thread-new::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   background: var(--accent);
-  color: var(--bg);
-  font-size: 11px;
+}
+.threads-new[hidden] {
+  display: none;
+}
+.thread-new {
+  color: var(--accent);
   font-weight: 600;
+}
+.thread-new::before {
+  content: '';
+  margin-right: 5px;
+  vertical-align: middle;
 }
 select,
 input,

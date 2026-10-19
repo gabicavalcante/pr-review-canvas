@@ -832,13 +832,63 @@ describe('a thread per place', () => {
     expect(el(root, '#chat-stop').hidden).toBe(true)
   })
 
-  it('counts the questions of a place’s thread on every ask command of that place', async () => {
+  it('marks every ask command of a place that has a thread with a dot', async () => {
     const { root } = mount({ fetchThreads: async () => PLACED })
     await flush()
     const marks = el(root, '#chat-thread-marks').textContent ?? ''
-    expect(marks).toContain('[data-act="ask"][data-ask-point="fp-1"]::after { content: "2"; }')
+    expect(marks).toBe(
+      '[data-act="ask"][data-ask-point="fp-1"] > .ask-label::after { content: "" / "thread"; }'
+    )
     // The thread about the whole PR has no place, so no command carries it.
-    expect(marks.split('\n')).toHaveLength(1)
+  })
+
+  it('marks an answer that ended off screen as new until its thread is opened', async () => {
+    /** @type {{ end: (() => void) | null }} */
+    const stream = { end: null }
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: (_pr, input, opts) =>
+        new Promise(resolve => {
+          opts.onEvent({ event: 'turn', data: { thread: input.thread, agent: 'claude', seeded: false } })
+          stream.end = () => resolve(undefined)
+        }),
+    })
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    chat.ask(LAYER)
+    await flush()
+    stream.end?.()
+    await flush()
+    const marks = () => el(root, '#chat-thread-marks').textContent ?? ''
+    expect(marks()).toContain(
+      '[data-ask-point="fp-1"] > .ask-label::after { content: "" / "new answer"; background: var(--accent); }'
+    )
+    expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(false)
+    const entry = el(root, '[data-thread-open="pr-review-a-b-42-claude-t1"] .thread-new')
+    expect(entry.textContent).toBe('new answer')
+    // Opening the thread is seeing it.
+    chat.ask(POINT)
+    await flush()
+    expect(marks()).toContain('[data-ask-point="fp-1"] > .ask-label::after { content: "" / "thread"; }')
+    expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(true)
+    expect(root.querySelector('.thread-new')).toBeNull()
+  })
+
+  it('does not mark an answer the reader watched come in', async () => {
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: async (_pr, input, opts) => {
+        opts.onEvent({ event: 'turn', data: { thread: input.thread, agent: 'claude', seeded: false } })
+      },
+    })
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    expect(el(root, '#chat-thread-marks').textContent).not.toContain('new answer')
+    expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(true)
   })
 
   it('brings the thread open last time back without taking the reader off their tab', async () => {
@@ -889,9 +939,9 @@ describe('a place’s thread, in its corners', () => {
     await flush()
     const path = cssEscape('src/app.ts')
     expect((el(root, '#chat-thread-marks').textContent ?? '').split('\n')).toEqual([
-      '[data-act="ask"][data-ask-layer="run-path"]::after { content: "1"; }',
-      `[data-act="ask"][data-ask-path="${path}"]:not([data-ask-start])::after { content: "2"; }`,
-      `[data-act="ask"][data-ask-path="${path}"][data-ask-side="old"][data-ask-start="3"][data-ask-end="4"]::after { content: "3"; }`,
+      '[data-act="ask"][data-ask-layer="run-path"] > .ask-label::after { content: "" / "thread"; }',
+      `[data-act="ask"][data-ask-path="${path}"]:not([data-ask-start]) > .ask-label::after { content: "" / "thread"; }`,
+      `[data-act="ask"][data-ask-path="${path}"][data-ask-side="old"][data-ask-start="3"][data-ask-end="4"] > .ask-label::after { content: "" / "thread"; }`,
     ])
   })
 
@@ -1028,6 +1078,47 @@ describe('a place’s thread, in its corners', () => {
     expect(el(root, '#chat-stop').hidden).toBe(false)
     streams[1]?.end()
     await flush()
+  })
+
+  it('leaves send as it was while answers come in, and turns it off while a question waits', async () => {
+    /** @type {Array<() => void>} */
+    const ends = []
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: () =>
+        new Promise(resolve => {
+          ends.push(() => resolve(undefined))
+        }),
+    })
+    await flush()
+    const send = /** @type {HTMLButtonElement} */ (el(root, '#chat-send'))
+    await sendMessage(root, 'overall?')
+    chat.ask(POINT)
+    await flush()
+    // The answer coming in is the other thread's; this thread's send waits for nothing.
+    expect([send.textContent, send.disabled, send.hidden]).toEqual(['send', false, false])
+    await sendMessage(root, 'is the sum intended?')
+    expect([send.textContent, send.disabled]).toEqual(['send', true])
+    ends[0]?.()
+    await flush()
+    // The waiting question went, and is answered here, so stop takes send's place.
+    expect([send.hidden, send.disabled, el(root, '#chat-stop').hidden]).toEqual([true, false, false])
+    ends[1]?.()
+    await flush()
+    expect([send.textContent, send.disabled, send.hidden]).toEqual(['send', false, false])
+  })
+
+  it('says in its answer that a question did not reach the agent', async () => {
+    const { root } = mount({
+      streamChat: async () => {
+        throw new Error('a canvas generation holds the review checkout')
+      },
+    })
+    await sendMessage(root, 'is this covered?')
+    expect(el(root, '.turn.a .chat-warning').textContent).toBe(
+      'a canvas generation holds the review checkout'
+    )
+    expect(el(root, '#chat-send').hidden).toBe(false)
   })
 
   it('sends a question asked elsewhere during an answer once that answer ends, to its own thread', async () => {

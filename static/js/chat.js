@@ -540,7 +540,7 @@ export function wireChat(options) {
   const contextLine = mustFind(root, '#chat-ctx-line', HTMLElement)
   const clearButton = mustFind(root, '#chat-clear', HTMLElement)
   const bubble = mustFind(root, '#chat-unseen', HTMLElement)
-  const sendButton = mustFind(root, '#chat-send', HTMLElement)
+  const sendButton = mustFind(root, '#chat-send', HTMLButtonElement)
   const stopButton = mustFind(root, '#chat-stop', HTMLElement)
   const reviewPanel = qs(`#${REVIEW_PANEL_ID}`, pane)
 
@@ -608,6 +608,12 @@ export function wireChat(options) {
    * @type {Question & { user: HTMLElement, shown: boolean } | null}
    */
   let queued = null
+  /**
+   * The threads whose answer ended while the reader was reading another one. An answer comes in
+   * only while the page is open, so this lives as long as the page does.
+   * @type {Set<string>}
+   */
+  const unseen = new Set()
   /**
    * The badge on every ask command whose place has a thread, as CSS: cards drawn later, and the
    * selection toolbar, pick it up without being visited.
@@ -744,6 +750,8 @@ export function wireChat(options) {
     sendButton.hidden = answeringHere
     stopButton.hidden = !answeringHere
     box.disabled = answeringHere || queued !== null
+    // A box that cannot take a question has no send either.
+    sendButton.disabled = queued !== null
     box.placeholder =
       queued !== null
         ? `A question already waits for the answer in “${answeringName()}”.`
@@ -769,6 +777,10 @@ export function wireChat(options) {
   ])
 
   const drawIndex = () => {
+    for (const dot of Array.from(root.querySelectorAll('.threads-new'))) {
+      dot.toggleAttribute('hidden', unseen.size === 0)
+      dot.setAttribute('title', 'A thread has an answer you have not seen')
+    }
     if (threads.length === 0) {
       index.innerHTML =
         '<p class="empty">No threads yet. Use ask on an attention point, a selection of lines, a file or a layer, or start a thread about the whole PR.</p>'
@@ -784,13 +796,15 @@ export function wireChat(options) {
               ? 'answering…'
               : t.name === queued?.thread
                 ? 'question waiting'
-                : t.turns === 1
-                  ? '1 question'
-                  : `${t.turns} questions`
+                : unseen.has(t.name)
+                  ? 'new answer'
+                  : t.turns === 1
+                    ? '1 question'
+                    : `${t.turns} questions`
           return (
             `<li><button type="button" class="thread-item${t.name === activeThread ? ' current' : ''}" data-thread-open="${esc(t.name)}">` +
             `<span class="thread-item-t">${esc(shownTitle(t))}</span>` +
-            `<span class="muted small">${esc(status)}</span></button></li>`
+            `<span class="small ${status === 'new answer' ? 'thread-new' : 'muted'}">${esc(status)}</span></button></li>`
           )
         })
         .join('')
@@ -821,19 +835,26 @@ export function wireChat(options) {
     }
   }
   const drawMarks = () => {
-    // Off, an ask never opens the thread its badge would count.
+    // Off, an ask never opens the thread its dot would mark.
     if (!threadPerPlace) {
       marks.textContent = ''
       return
     }
     marks.textContent = threads
       .flatMap(t => {
-        // Only the thread an ask would open counts: this agent's, as `threadOfPlace` picks it.
+        // Only the thread an ask would open is marked: this agent's, as `threadOfPlace` picks it.
         const selector =
           t.anchor === undefined || t.turns === 0 || threadOfPlace(threads, agentName, t.anchor) !== t
             ? null
             : askSelector(t.anchor)
-        return selector === null ? [] : [`${selector}::after { content: "${t.turns}"; }`]
+        if (selector === null) {
+          return []
+        }
+        return [
+          unseen.has(t.name)
+            ? `${selector} > .ask-label::after { content: "" / "new answer"; background: var(--accent); }`
+            : `${selector} > .ask-label::after { content: "" / "thread"; }`,
+        ]
       })
       .join('\n')
   }
@@ -1074,7 +1095,11 @@ export function wireChat(options) {
     return answerHtml(text, targets, proposed, paths, { turnKey, ...paneState() })
   }
 
-  const send = async () => {
+  /**
+   * Sends what the box holds, or has it wait for the answer coming in. It does not wait for the
+   * answer itself: the reader may be on another thread by the time it ends.
+   */
+  const send = () => {
     const message = box.value.trim()
     if (message === '' || box.disabled) {
       return
@@ -1093,7 +1118,7 @@ export function wireChat(options) {
       drawIndex()
       return
     }
-    await runTurn(question, turn, true)
+    void runTurn(question, turn, true)
   }
 
   /**
@@ -1136,7 +1161,8 @@ export function wireChat(options) {
     drawComposer()
     drawIndex()
     let text = ''
-    inFlight = new AbortController()
+    const request = new AbortController()
+    inFlight = request
     try {
       await api.streamChat(
         prNumber,
@@ -1146,7 +1172,7 @@ export function wireChat(options) {
           ...(question.thread === null ? {} : { thread: question.thread }),
         },
         {
-          signal: inFlight.signal,
+          signal: request.signal,
           onEvent: event => {
             const data = /** @type {Record<string, unknown>} */ (event.data ?? {})
             const field = /** @param {string} key */ key => data[key]
@@ -1219,9 +1245,22 @@ export function wireChat(options) {
           },
         }
       )
+    } catch (error) {
+      // A question the server refused, or that never reached it, says so in its own answer. One
+      // the pane gave up on, as it was taken down, has nothing left to say it in.
+      if (!request.signal.aborted) {
+        answer.turn.insertAdjacentHTML(
+          'beforeend',
+          `<p class="chat-warning small" role="alert">${esc(error instanceof Error ? error.message : String(error))}</p>`
+        )
+      }
     } finally {
       inFlight = null
       live = null
+      // An answer that ended off screen waits to be seen, marked on its place and in Threads.
+      if (!current.shown && current.thread !== null) {
+        unseen.add(current.thread)
+      }
       void refreshThreads().catch(() => undefined)
       stopActivity()
       toolDetails.open = false
@@ -1243,7 +1282,7 @@ export function wireChat(options) {
       drawIndex()
       if (next !== null) {
         next.user.querySelector('.chat-waiting')?.remove()
-        void runCommand(sendButton, () => runTurn(next, next.user, next.shown), { pendingLabel: 'sending…' })
+        void runTurn(next, next.user, next.shown)
       }
     }
   }
@@ -1276,6 +1315,8 @@ export function wireChat(options) {
    */
   const openThread = async name => {
     activeThread = name
+    unseen.delete(name)
+    drawMarks()
     openPlace = currentThread()?.anchor
     context = askedIn(openPlace)
     drawContext()
@@ -1332,7 +1373,7 @@ export function wireChat(options) {
   /** @param {Event} event */
   const onSubmit = event => {
     event.preventDefault()
-    void runCommand(sendButton, send, { pendingLabel: 'sending…' })
+    send()
   }
 
   /** @param {Event} event */
@@ -1447,7 +1488,7 @@ export function wireChat(options) {
   const onKeyDown = event => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
-      void runCommand(sendButton, send, { pendingLabel: 'sending…' })
+      send()
     }
   }
 
@@ -1597,7 +1638,7 @@ export function wireChat(options) {
           setContext(next)
         }
         box.value = question
-        await runCommand(sendButton, send, { pendingLabel: 'sending…' })
+        send()
       })()
     },
     stop() {

@@ -12,7 +12,8 @@
   to it. The new **Threads** tab lists them by kind of place, with the questions in each, and
   **new thread** starts one about the whole PR; an ask about the whole PR comes back to the latest
   of those. It replaces the thread list in the pane's head.
-- The ask command of a place with a thread shows how many questions that thread holds.
+- The ask command of a place with a thread carries a dot. The dot fills, and the **Threads** tab
+  shows one too, when an answer arrived there while the reader was reading another thread.
 - While an answer comes in, ask, the Threads tab and **new thread** still open any thread, and the
   answer keeps arriving in its own. A question asked elsewhere meanwhile is sent once it ends.
 - The open thread comes back when the page is reloaded.
