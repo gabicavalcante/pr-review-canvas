@@ -12,7 +12,7 @@ import type {
 import { extractLinks, parseLink } from '../contract/links.js'
 import type { Point, ReviewArtifact } from '../contract/review-artifact.js'
 import type { Git } from '../git/git.js'
-import type { CanvasStore } from '../store/canvas-store.js'
+import type { CanvasEntry, CanvasStore } from '../store/canvas-store.js'
 import type { Derived } from '../store/derived-store.js'
 
 /**
@@ -120,16 +120,43 @@ export async function findBasisCanvas(
   prNumber: number | undefined,
   headSha: string
 ): Promise<string | null> {
-  const index = await canvases.readIndex()
-  const candidates = Object.entries(index.canvases)
-    .filter(
-      ([sha, entry]) => sha !== headSha && (entry.prNumber === undefined || entry.prNumber === prNumber)
-    )
-    .sort(([, a], [, b]) => (a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0))
-  for (const [sha] of candidates) {
-    if (await git.isAncestor(sha, headSha)) {
+  for (const [sha] of await newestFirst(canvases, prNumber)) {
+    if (sha !== headSha && (await git.isAncestor(sha, headSha))) {
       return sha
     }
   }
   return null
+}
+
+/**
+ * The canvas a new canvas takes the author's resolutions from: the newest one generated for this
+ * review, the head's own included. Only the newest counts, because a point the author reopened there,
+ * or the generator dropped, is open now whatever an older canvas says. A pull request's own canvases
+ * count on any commit, so its resolutions survive a rebase; a canvas with no number counts on a
+ * commit the head was built on, as for the basis.
+ */
+export async function findResolutionSource(
+  canvases: CanvasStore,
+  git: Git,
+  prNumber: number | undefined,
+  headSha: string
+): Promise<string | null> {
+  for (const [sha, entry] of await newestFirst(canvases, prNumber)) {
+    const owned = prNumber !== undefined && entry.prNumber === prNumber
+    if (owned || sha === headSha || (await git.isAncestor(sha, headSha))) {
+      return sha
+    }
+  }
+  return null
+}
+
+/** The canvases of this pull request, or with no number, newest generation first. */
+async function newestFirst(
+  canvases: CanvasStore,
+  prNumber: number | undefined
+): Promise<Array<[string, CanvasEntry]>> {
+  const index = await canvases.readIndex()
+  return Object.entries(index.canvases)
+    .filter(([, entry]) => entry.prNumber === undefined || entry.prNumber === prNumber)
+    .sort(([, a], [, b]) => (a.generatedAt < b.generatedAt ? 1 : a.generatedAt > b.generatedAt ? -1 : 0))
 }

@@ -4,7 +4,6 @@ import { emptyState } from '../../src/contract/state.js'
 import { syntheticArtifact } from '../../src/testing/synthetic.js'
 import {
   applyPointStates,
-  hidingHandled,
   openPoints,
   pointCardHtml,
   pointLink,
@@ -12,6 +11,7 @@ import {
   pointRowHtml,
   pointStatus,
   pointStatusesHtml,
+  pointSwitches,
   pointsByLevel,
   pointToMarkdown,
   setMentionCanvas,
@@ -20,6 +20,7 @@ import {
   refreshPoint,
   sevsumHtml,
 } from './points.js'
+import { setSettled } from './self-review.js'
 
 const points = syntheticArtifact().points
 const ctx = { paths: new Set(['src/app.ts']) }
@@ -151,10 +152,30 @@ describe('where a point stands', () => {
     expect(document.querySelector('.point-statuses')?.textContent).toBe(
       'Attention points: 1 open · 1 in your review · 1 dismissed hide the 2 acted on'
     )
-    expect(hidingHandled(document)).toBe(false)
-    document.body.innerHTML = pointStatusesHtml(points, state, true)
+    expect(pointSwitches(document).hiding).toBe(false)
+    document.body.innerHTML = pointStatusesHtml(points, state, { hiding: true })
     expect(document.querySelector('[data-act="toggle-handled"]')?.textContent).toBe('show the 2 acted on')
-    expect(hidingHandled(document)).toBe(true)
+    expect(pointSwitches(document).hiding).toBe(true)
+  })
+
+  it('counts the resolved points apart, behind a switch that starts with them hidden', () => {
+    setSettled({ [first.fingerprint]: { reason: 'Known.', at: '2026-09-10T12:00:00.000Z' } })
+    // A resolution wins over the reader's own dismissal of the same point.
+    const state = { ...dismissed, dismissed: { ...dismissed.dismissed, 'fp-3': { at: BASE.updatedAt } } }
+    try {
+      document.body.innerHTML = pointStatusesHtml(points, state)
+      expect(document.querySelector('.point-statuses')?.textContent).toBe(
+        'Attention points: 1 open · 1 resolved by the author · 1 dismissed hide the 1 acted on show the 1 resolved'
+      )
+      expect(pointSwitches(document)).toEqual({ hiding: false, showingResolved: false })
+      document.body.innerHTML = pointStatusesHtml(points, state, { showingResolved: true })
+      expect(document.querySelector('[data-act="toggle-resolved"]')?.textContent).toBe('hide the 1 resolved')
+      expect(pointSwitches(document).showingResolved).toBe(true)
+      document.body.innerHTML = `<ol>${pointCardHtml(first, ctx)}</ol>`
+      expect(document.querySelector('li.finding')?.className).toBe('finding is-handled is-resolved')
+    } finally {
+      setSettled({})
+    }
   })
 
   it('links a posted point to its comment, and says it was sent when the comment is unknown', () => {
@@ -233,9 +254,9 @@ describe('where a point stands', () => {
   it.each([true, false])(
     'keeps the switch that hides the points acted on (%s) when state updates',
     hiding => {
-      document.body.innerHTML = pointStatusesHtml(artifact.points, dismissed, hiding)
+      document.body.innerHTML = pointStatusesHtml(artifact.points, dismissed, { hiding })
       applyPointStates(document, artifact.points, dismissed, ctx)
-      expect(hidingHandled(document)).toBe(hiding)
+      expect(pointSwitches(document).hiding).toBe(hiding)
       expect(document.querySelector('.point-statuses')?.textContent).toContain('1 dismissed')
     }
   )

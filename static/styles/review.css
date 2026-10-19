@@ -402,9 +402,23 @@
 .pill.status.dismissed {
   color: var(--fg-muted);
 }
-/* The overview's switch takes every point acted on off the page, wherever it is drawn, except one
-   whose reason box is open. */
-body:has(.point-statuses [aria-pressed='true']) .is-handled:not(:has(.settle-box)) {
+/* The overview's switch takes every point the reader acted on off the page, wherever it is drawn,
+   except one whose reason box is open. */
+body:has(.point-statuses [data-act='toggle-handled'][aria-pressed='true'])
+  .is-handled:not(.is-resolved, :has(.settle-box)) {
+  display: none;
+}
+/* A layer's points heading and list lay out as the layer's own children. */
+.layer-points {
+  display: contents;
+}
+/* A point the author resolved is off the page until the reader shows the resolved ones, or follows
+   a link to that point. A layer left with no point on the page drops its points heading too. */
+body:not(:has(.point-statuses [data-act='toggle-resolved'][aria-pressed='true']))
+  :is(
+    .is-resolved:not([data-revealed]),
+    .layer-points:not(:has(> .findings > li:not(.is-resolved:not([data-revealed]))))
+  ) {
   display: none;
 }
 .point-statuses {

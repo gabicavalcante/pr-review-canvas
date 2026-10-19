@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Self-review
+
+- A resolution now lasts. Every later canvas of the pull request starts from the resolutions of its
+  newest canvas, after a push that changes the code under a point, a rebase, or `--force` too. The
+  generator keeps a resolved concern under its title, so it stays resolved, and reopens it under a
+  new title only when the author's reason no longer holds. Before, a push that touched a resolved
+  point's lines, or any `--force`, brought the point back open.
+- Resolved points start hidden for every reader. The overview line counts them as **resolved by the
+  author** and its **show the N resolved** command brings them back, collapsed in place. A layer
+  whose points are all resolved drops its points heading while they are hidden.
+- A reviewer's open page reads the author's resolutions back from the canvas comment every two
+  minutes while its tab is in view, hides the newly resolved points, and says so. Before, a reviewer
+  who had already loaded the canvas saw them only after **refresh**.
+
 ## 0.9.0
 
 Changes since 0.8.0.

@@ -716,7 +716,8 @@ Acting on it changes its status:
   out when you submit. A point can hold more than one draft; the card lists them all.
 - **posted**: you posted it (or a comment AI Chat tied to it), or it went out with a submitted
   review. Drafts for it that still wait show on its card too.
-- **resolved**: the author answered it with a reason. Every reader sees this status.
+- **resolved**: the author answered it with a reason. Every reader sees this status, and the point
+  starts hidden for every reader (see below).
 - **dismissed**: you took it off your own list. Other readers still see it open.
 
 When more than one applies, the point shows the first one in this order: resolved, posted, in your
@@ -730,10 +731,14 @@ under the point), and the commands that undo it: **reopen**, **restore**, or
 deleting the draft. The point collapses again when its status changes. A reload also collapses it.
 
 The counts in the rail, the layer headings, and the overview squares include only open points. The
-overview line **Attention points: 2 open · 1 in your review · …** counts each status. Its
-**hide the N acted on** command removes the collapsed points from the page until you click it
-again; **edit** on an AI Chat proposed resolution brings its point back while the reason box is
-open. `]` and `[` step only through open points. `o` on a collapsed point expands it or collapses
+overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author · …** counts
+each status. Resolved points start off the page for every reader, the author too: **show the N
+resolved** brings them back, collapsed in place, until you click it again. A layer whose points are
+all resolved drops its **Attention points** heading while they are hidden. A link to a resolved
+point shows that one point, and a point you just resolved stays shown until the next load. The
+line's **hide the N acted on** command removes your other collapsed points from the page until you
+click it again; **edit** on an AI Chat proposed resolution brings its point back while the reason
+box is open. `]` and `[` step only through open points. `o` on a collapsed point expands it or collapses
 it again.
 
 ### Self-review
@@ -758,18 +763,26 @@ it. To resolve a point you dismissed, **restore** it first.
 
 A resolution is written into the canvas itself:
 
-- The point leaves every reader's open list and collapses where it is, with the author's reason
-  and, when posted, a link to the comment. A reason posted as a comment does not mark the point
-  posted, so a reopened point is open again.
-- The canvas comment is shared again at once, with the new counts. Reviewers click **refresh** to
-  load it. The author's Conversation card updates immediately and stays current after reload.
+- The point leaves every reader's open list and starts hidden. **show the N resolved** shows it
+  collapsed where it is, with the author's reason and, when posted, a link to the comment. A
+  reason posted as a comment does not mark the point posted, so a reopened point is open again.
+- The canvas comment is shared again at once, with the new counts. A reviewer's open page reads it
+  back every two minutes while its tab is in view, hides the newly resolved points, and says so; a
+  reviewer opening the page later loads it with the canvas. Each read fetches the pull request's
+  comments, and downloads the canvas only when they changed. The author's Conversation card updates
+  immediately and stays current after reload.
   When sharing fails, the resolution stays in your local canvas and the message says why.
   With [`canvasComment` off](#turning-sharing-off), nothing is shared and reviewers do not see it.
 - **reopen** on the expanded point takes a resolution back and shares the canvas again. A posted comment
   stays on the forge.
-- Regenerating the canvas for the same commit keeps each resolution whose point comes back with the
-  same kind, path, and title. An [incremental canvas](#incremental-canvases) keeps the
-  resolutions of the points it carries.
+- A resolution follows the pull request to every later canvas, `--force` and canvases after a
+  rebase included. Each new canvas starts from the resolutions of the pull request's newest canvas:
+  the generator is told each resolved point and its reason, and writes a concern that still applies
+  under the same kind, path, and title, which keeps it resolved wherever its lines moved. It reopens
+  a point only when it reads the new code and the reason no longer holds: the point comes back open
+  under a new title, with what changed in its body. A point whose code is gone is left out. A
+  resolution the author takes back with **reopen** stays taken back, because only the newest canvas
+  counts.
 - When you tell AI Chat how you decided a point, it can propose a resolution instead of a comment:
   a **proposed resolution** card names the point and the reason. **resolve** saves that reason as
   it stands and does not post it as a comment; **edit** opens the point's own reason box with it,

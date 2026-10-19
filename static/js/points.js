@@ -361,7 +361,7 @@ function pointPartsHtml(p, ctx, opts) {
     attrs:
       `data-point="${esc(p.id)}" data-fingerprint="${esc(p.fingerprint)}" data-status="${status}" ` +
       `data-sig="${esc(pointSignature(p, status, ctx))}"`,
-    handled: status === 'open' ? '' : ' is-handled',
+    handled: status === 'open' ? '' : status === 'resolved' ? ' is-handled is-resolved' : ' is-handled',
     title: `<span class="p-title">${esc(p.title)}</span><span class="pill kind">${esc(p.kind)}</span>${audiencePillHtml(p)}${parts.pill}${loc}${toggle}`,
     rest:
       parts.summary +
@@ -398,41 +398,53 @@ export function pointRowHtml(p, ctx) {
 }
 
 /**
- * The overview's line that counts the points by where they stand, with the switch that takes the
- * ones already acted on off the page. Nothing is drawn for a canvas without points.
+ * The overview's line that counts the points by where they stand, with its two switches. Points the
+ * author resolved are off the page until the reader shows them, so the reviewer's page holds only
+ * what is left to judge; the other switch takes the reader's own acted-on points off too. Nothing is
+ * drawn for a canvas without points.
  * @param {ReadonlyArray<Point>} points
  * @param {PrState | null | undefined} state
- * @param {boolean} [hiding] whether the points acted on are hidden now
+ * @param {{ hiding?: boolean, showingResolved?: boolean }} [switches] `hiding`: the points the reader
+ *   acted on are hidden now; `showingResolved`: the resolved ones are shown
  */
-export function pointStatusesHtml(points, state, hiding = false) {
+export function pointStatusesHtml(points, state, switches = {}) {
   if (points.length === 0) {
     return '<p class="point-statuses" hidden></p>'
   }
+  const { hiding = false, showingResolved = false } = switches
   /** @type {Record<PointStatus, number>} */
   const counts = { open: 0, queued: 0, posted: 0, resolved: 0, dismissed: 0 }
   for (const p of points) {
     counts[pointStatus(p, state)] += 1
   }
-  const handled = points.length - counts.open
+  const handled = points.length - counts.open - counts.resolved
   const parts = [`<b>${counts.open} open</b>`]
   for (const status of /** @type {const} */ (['queued', 'posted', 'resolved', 'dismissed'])) {
     if (counts[status] > 0) {
-      parts.push(`${counts[status]} ${STATUS_LABELS[status]}`)
+      parts.push(
+        `${counts[status]} ${status === 'resolved' ? 'resolved by the author' : STATUS_LABELS[status]}`
+      )
     }
   }
-  const toggle =
+  const hide =
     handled === 0
       ? ''
       : ` <button class="cmd" type="button" data-act="toggle-handled" aria-pressed="${hiding}">${hiding ? 'show' : 'hide'} the ${handled} acted on</button>`
-  return `<p class="point-statuses muted">Attention points: ${parts.join(' · ')}${toggle}</p>`
+  const resolved =
+    counts.resolved === 0
+      ? ''
+      : ` <button class="cmd" type="button" data-act="toggle-resolved" aria-pressed="${showingResolved}">${showingResolved ? 'hide' : 'show'} the ${counts.resolved} resolved</button>`
+  return `<p class="point-statuses muted">Attention points: ${parts.join(' · ')}${hide}${resolved}</p>`
 }
 
 /**
- * Whether the page hides the points already acted on, read from the overview's switch.
+ * Where the overview's two switches stand now.
  * @param {ParentNode} root
  */
-export function hidingHandled(root) {
-  return root.querySelector('[data-act="toggle-handled"]')?.getAttribute('aria-pressed') === 'true'
+export function pointSwitches(root) {
+  const pressed = /** @param {string} act */ act =>
+    root.querySelector(`[data-act="${act}"]`)?.getAttribute('aria-pressed') === 'true'
+  return { hiding: pressed('toggle-handled'), showingResolved: pressed('toggle-resolved') }
 }
 
 /**
@@ -459,7 +471,7 @@ export function applyPointStates(root, points, state, ctx) {
     counter.textContent = String(open.filter(p => p.layerId === layerId).length)
   }
   replaceWithHtml(root.querySelector('.point-statuses'), host =>
-    pointStatusesHtml(points, state, hidingHandled(host))
+    pointStatusesHtml(points, state, pointSwitches(host))
   )
   replaceWithHtml(root.querySelector('.sevsum'), () => sevsumHtml(open, ctx.layers ?? []))
   replaceWithHtml(root.querySelector('.self-review-note'), () => selfReviewNoteHtml(points))

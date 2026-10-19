@@ -99,6 +99,22 @@ describe('createReviewSession', () => {
     expect(off.reviewed).toEqual({})
   })
 
+  it('takes the settled points read back from the shared canvas and redraws once per change', () => {
+    let draws = 0
+    const s = session({}, () => {
+      draws += 1
+    })
+    const settlement = { reason: 'Known.', at: '2026-09-10T12:00:00.000Z' }
+    expect(s.takeSettled({ 'fp-1': settlement })).toEqual(['fp-1'])
+    expect(s.settled).toEqual({ 'fp-1': settlement })
+    expect(draws).toBe(1)
+    expect(s.takeSettled({ 'fp-1': settlement })).toEqual([])
+    expect(draws).toBe(1)
+    // A point the author reopened is open again; nothing new was resolved.
+    expect(s.takeSettled({})).toEqual([])
+    expect(draws).toBe(2)
+  })
+
   it('dismisses and restores a point', async () => {
     /** @type {Array<boolean>} */
     const asked = []

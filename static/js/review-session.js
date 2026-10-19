@@ -318,6 +318,21 @@ export function createReviewSession(options) {
       })
     },
     /**
+     * Takes the settled points the author wrote since the page was drawn, read back from the shared
+     * canvas, and redraws the points they change. The same set again changes nothing.
+     * @param {Record<string, import('./contract-types.js').Settlement>} next
+     * @returns {string[]} the fingerprints resolved since the last set
+     */
+    takeSettled(next) {
+      if (JSON.stringify(next) === JSON.stringify(settled)) {
+        return []
+      }
+      const added = Object.keys(next).filter(fp => settled[fp] === undefined)
+      settled = next
+      publish(state)
+      return added
+    },
+    /**
      * @param {number} rootCommentId
      * @param {boolean} hidden
      */

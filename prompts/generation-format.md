@@ -273,6 +273,8 @@ second pair of eyes:
 
 When in doubt, choose `reviewer`: a point the author resolves leaves every reviewer's list.
 
+{{RESOLVED}}
+
 - Every decision or trade-off you surface gets a `kind: "decision"` point. Use `level: "fyi"`
   to explain a chosen approach, its benefit and cost; use `level: "decide"` when human agreement
   is needed. Label inferred rationale as an inference. Sound design choices belong here too.
