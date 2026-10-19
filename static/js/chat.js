@@ -1087,17 +1087,26 @@ export function wireChat(options) {
       // them back, against the state they are in now.
       live.redraw()
     }
-    for (const turn of refused.filter(isHere)) {
-      emptyNote()
-      log.append(turn.user, turn.answer)
-      refused.splice(refused.indexOf(turn), 1)
-    }
+    putBackRefused()
     if (queued !== null && isHere(queued)) {
       emptyNote()
       log.append(queued.user)
       queued.shown = true
     }
     drawComposer()
+  }
+
+  /**
+   * Puts back, once, the questions refused while their thread was off screen that belong to the
+   * thread on screen. A refused question from new thread has no saved thread, so the next new
+   * thread takes it back: it failed already, so nothing new mixes with it.
+   */
+  const putBackRefused = () => {
+    for (const turn of refused.filter(isHere)) {
+      emptyNote()
+      log.append(turn.user, turn.answer)
+      refused.splice(refused.indexOf(turn), 1)
+    }
   }
 
   /**
@@ -1283,8 +1292,10 @@ export function wireChat(options) {
           'beforeend',
           `<p class="chat-warning small" role="alert">${esc(reason)}</p>`
         )
-        // Off screen, the reader hears of it where they are, and finds it in its thread.
-        if (!current.shown) {
+        // A question the agent never took, off screen: the reader hears of it where they are, and
+        // finds it in its thread. One the agent took is in the transcript already, and its thread
+        // is marked as having a new answer below.
+        if (!current.shown && !agentTookTurn) {
           refused.push(current)
           toast(root, `Your question in “${threadLabel(current)}” was not sent: ${reason}`, { failed: true })
         }
@@ -1383,7 +1394,9 @@ export function wireChat(options) {
         ? '<p class="empty">A new thread about the whole PR.</p>'
         : `<p class="empty">A new thread about ${esc(chatContextLabel(anchor, layerTitle, pointTitle))}. Asking about it again comes back here.</p>`
     dispatch({ type: 'thread-switch', pinned: true })
-    if (opts.fresh !== true) {
+    if (opts.fresh === true) {
+      putBackRefused()
+    } else {
       putBackPending()
     }
     showThread()

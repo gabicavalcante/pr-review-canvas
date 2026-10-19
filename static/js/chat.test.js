@@ -1187,6 +1187,81 @@ describe('a place’s thread, in its corners', () => {
     expect(log).toContain('a canvas generation holds the review checkout')
   })
 
+  it('counts a question the agent took as asked, even when its answer breaks off screen', async () => {
+    /** @type {Array<{ onEvent: (event: { event: string, data: unknown }) => void, end: () => void, fail: (error: Error) => void }>} */
+    const streams = []
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      fetchThreadHistory: async (_pr, name) => ({
+        name,
+        turns: name.endsWith('t1') ? [{ role: 'user', text: 'is the sum intended?', at: '' }] : [],
+      }),
+      streamChat: (_pr, _input, opts) =>
+        new Promise((resolve, reject) => {
+          streams.push({ onEvent: opts.onEvent, end: () => resolve(undefined), fail: reject })
+        }),
+    })
+    await flush()
+    await sendMessage(root, 'overall?')
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    chat.ask(LAYER)
+    await flush()
+    streams[0]?.end()
+    await flush()
+    streams[1]?.onEvent({
+      event: 'turn',
+      data: { thread: 'pr-review-a-b-42-claude-t1', agent: 'claude', seeded: false },
+    })
+    streams[1]?.fail(new Error('the connection to the server was lost'))
+    await flush()
+    // The agent took it, so it was sent: no "not sent", and its thread has an answer to see.
+    expect(root.querySelector('.toast')).toBeNull()
+    expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(false)
+    chat.ask(POINT)
+    await flush()
+    const questions = [...root.querySelectorAll('#chat-log .turn.u')].map(turn => turn.textContent)
+    expect(questions.filter(text => text?.includes('is the sum intended?'))).toHaveLength(1)
+  })
+
+  it('brings a refused question from new thread back in the next new thread', async () => {
+    /** @type {Array<{ end: () => void, fail: (error: Error) => void }>} */
+    const streams = []
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: () =>
+        new Promise((resolve, reject) => {
+          streams.push({ end: () => resolve(undefined), fail: reject })
+        }),
+    })
+    await flush()
+    await sendMessage(root, 'overall?')
+    el(root, '#side-tab-threads').click()
+    el(root, '#new-thread').click()
+    await flush()
+    await sendMessage(root, 'what changed overall?')
+    chat.ask(POINT)
+    await flush()
+    streams[0]?.end()
+    await flush()
+    streams[1]?.fail(new Error('a canvas generation holds the review checkout'))
+    await flush()
+    el(root, '#side-tab-threads').click()
+    el(root, '#new-thread').click()
+    await flush()
+    const log = el(root, '#chat-log').textContent ?? ''
+    expect(log).toContain('what changed overall?')
+    expect(log).toContain('a canvas generation holds the review checkout')
+    // Once seen, it is not brought back again.
+    chat.ask(POINT)
+    await flush()
+    el(root, '#side-tab-threads').click()
+    el(root, '#new-thread').click()
+    await flush()
+    expect(el(root, '#chat-log').textContent).not.toContain('what changed overall?')
+  })
+
   it('says where the reader is that a quick question cannot go yet, and leaves the box alone', async () => {
     const { root, chat } = mount({
       fetchThreads: async () => PLACED,

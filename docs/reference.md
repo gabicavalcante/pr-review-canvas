@@ -1001,9 +1001,10 @@ Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time. 
 coming in, ask, the Threads tab and **new thread** still open any thread, and the answer keeps
 arriving in its own. A question asked in another thread meanwhile waits, marked as waiting, and is
 sent once the answer ends; one question waits at a time. If the server cannot take it then, a
-message says so wherever you are, and its thread shows the question with the reason. Updating the
-review while a question waits asks first, as it does for unsent text. A timeout or incomplete answer
-can be retried; increase `chatTimeoutSec` if replies need more time.
+message says so wherever you are, and its thread shows the question with the reason; for a question
+asked from **new thread**, the next new thread does. Updating the review while a question waits asks
+first, as it does for unsent text. A timeout or incomplete answer can be retried; increase
+`chatTimeoutSec` if replies need more time.
 
 ### Review checkouts
 
