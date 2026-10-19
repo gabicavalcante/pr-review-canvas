@@ -12,7 +12,9 @@ import { LEVELS, levelIconHtml, pointLevelText } from './point-level.js'
 import { renderMarkdown } from './markdown.js'
 import {
   audiencePillHtml,
+  authorNextStepHtml,
   canSettle,
+  pointsStillYours,
   reopenButtonHtml,
   selfReviewNoteHtml,
   settleButtonHtml,
@@ -478,6 +480,9 @@ export function applyPointStates(root, points, state, ctx) {
   )
   replaceWithHtml(root.querySelector('.sevsum'), () => sevsumHtml(open, ctx.layers ?? []))
   replaceWithHtml(root.querySelector('.self-review-note'), () => selfReviewNoteHtml(points))
+  replaceWithHtml(root.querySelector('.author-next'), host =>
+    authorNextStepHtml(pointsStillYours(points), host.getAttribute('data-pr-url') ?? '')
+  )
 }
 
 /**

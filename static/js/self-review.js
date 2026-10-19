@@ -8,6 +8,7 @@
 /** @typedef {import('./contract-types.js').Settlement} Settlement */
 import { runCommand, showCommandError } from './commands.js'
 import { esc } from './dom.js'
+import { currentHost } from './host.js'
 import { SETTLEMENT_REASON_MAX } from './proposed-comment.js'
 
 let selfReview = false
@@ -102,7 +103,7 @@ export function selfReviewNoteHtml(points) {
     return '<p class="self-review-note" hidden></p>'
   }
   const open = points.filter(p => settlementOf(p) === undefined)
-  const yours = open.filter(p => p.audience === 'author').length
+  const yours = pointsStillYours(points)
   const theirs = open.length - yours
   const lead =
     yours === 0
@@ -118,6 +119,33 @@ export function selfReviewNoteHtml(points) {
       : `Resolve what you can answer now with a reason, including a reviewer point that does not apply; ${where}. `) +
     `${theirs} ${theirs === 1 ? 'point goes' : 'points go'} to the reviewer.</p>`
   )
+}
+
+/**
+ * How many points the author can still answer: written for the author and not settled. A personal
+ * dismissal answers nothing, so it does not count. The overview note and the author's next step in
+ * the header count the same points.
+ * @param {ReadonlyArray<Point>} points every point on the canvas
+ * @param {Readonly<Record<string, Settlement>>} [settledPoints] the settled points; the ones set here by default
+ */
+export function pointsStillYours(points, settledPoints = settled) {
+  return points.filter(p => p.audience === 'author' && settledPoints[p.fingerprint] === undefined).length
+}
+
+/**
+ * Where reviewers approve or request changes, the author of the pull request sees their next step:
+ * the points still theirs to answer, then asking for review on the forge, which refuses both
+ * verdicts on one's own change. The pull request's page rides on the element, so the step is drawn
+ * again from it when a settlement changes the count.
+ * @param {number} yours points still the author's, as `pointsStillYours` counts them
+ * @param {string} prUrl the pull request's page on the forge
+ */
+export function authorNextStepHtml(yours, prUrl) {
+  const step =
+    yours > 0
+      ? `${yours} ${yours === 1 ? 'point' : 'points'} still yours`
+      : `ready to <a href="${esc(prUrl)}" target="_blank" rel="noopener noreferrer">request review on ${esc(currentHost().kind)}</a>`
+  return `<span class="author-next" role="status" data-pr-url="${esc(prUrl)}">${step}</span>`
 }
 
 /**

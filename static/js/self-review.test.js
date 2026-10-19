@@ -6,6 +6,8 @@ import { openPoints, pointCardHtml, pointCommandsHtml, pointStatus, resolvable }
 import { createReviewSession } from './review-session.js'
 import {
   audiencePillHtml,
+  authorNextStepHtml,
+  pointsStillYours,
   selfReviewActions,
   selfReviewNoteHtml,
   setSelfReview,
@@ -25,6 +27,26 @@ const settlement = { reason: 'Covered by `e2e`.', at: '2026-09-10T12:00:00.000Z'
 const ctx = { paths: new Set(['src/app.ts']) }
 
 afterEach(() => setSelfReview(false, {}))
+
+describe('the next step of the author', () => {
+  it('counts the points written for the author that are not settled, from the canvas or as set here', () => {
+    expect(pointsStillYours(artifact.points, {})).toBe(2)
+    expect(pointsStillYours(artifact.points, { [tests.fingerprint]: settlement })).toBe(1)
+    setSelfReview(true, { [tests.fingerprint]: settlement, [debt.fingerprint]: settlement })
+    expect(pointsStillYours(artifact.points)).toBe(0)
+  })
+
+  it('names the points still theirs, then links to the pull request to ask for review', () => {
+    const url = 'https://github.com/acme/widgets/pull/42'
+    expect(authorNextStepHtml(2, url)).toContain('>2 points still yours<')
+    expect(authorNextStepHtml(1, url)).toContain('>1 point still yours<')
+    document.body.innerHTML = authorNextStepHtml(0, url)
+    const step = document.querySelector('.author-next')
+    expect(step?.textContent).toBe('ready to request review on github')
+    expect(step?.querySelector('a')?.getAttribute('href')).toBe(url)
+    expect(step?.getAttribute('data-pr-url')).toBe(url)
+  })
+})
 
 describe('what a reader sees', () => {
   it('names the audience, as yours for the author', () => {

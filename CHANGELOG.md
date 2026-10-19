@@ -38,6 +38,13 @@
 - A generation that leaves a decide point without an impact, or gives one to another point, is
   sent back to the agent to fix (`POINT_IMPACT`).
 
+### Sign-off
+
+- The author of the pull request or merge request no longer sees **approve** or **request
+  changes**, which the forge refuses on one's own change. The header shows their next step instead:
+  **N points still yours**, then **ready to request review**, linking to the pull request.
+  **comment** stays.
+
 ### Upgrade
 
 - A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled
