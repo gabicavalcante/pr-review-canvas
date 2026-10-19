@@ -21,6 +21,7 @@ const SETTINGS = {
     theme: 'auto',
     foldLevel: 'light',
     layerView: 'all',
+    pointColors: 'classic',
     chatAgent: 'claude',
     chatModel: null,
     chatTimeoutSec: 600,
@@ -230,6 +231,7 @@ describe('readSettingsForm', () => {
     expect(readSettingsForm(holder)).toEqual({
       foldLevel: 'light',
       layerView: 'all',
+      pointColors: 'classic',
       chatAgent: 'claude',
       chatModel: null,
       chatTimeoutSec: 600,
@@ -272,6 +274,18 @@ describe('readSettingsForm', () => {
     expect(box.checked).toBe(true)
     box.checked = false
     expect(readSettingsForm(holder).chatThreadPerPlace).toBe(false)
+  })
+
+  it('reads the point colors the reader picked', () => {
+    const holder = document.createElement('div')
+    holder.innerHTML = settingsDialogHtml(
+      { ...SETTINGS, settings: { ...SETTINGS.settings, pointColors: 'action' } },
+      AGENTS
+    )
+    expect(holder.querySelector('#set-point-colors option[selected]')?.textContent).toBe(
+      'action: purple, blue, gray'
+    )
+    expect(readSettingsForm(holder).pointColors).toBe('action')
   })
 })
 
@@ -336,6 +350,7 @@ describe('openSettingsDialog', () => {
     expect(saved[0]).toEqual({
       foldLevel: 'light',
       layerView: 'all',
+      pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,
       chatTimeoutSec: 600,
@@ -423,6 +438,7 @@ describe('the dialog with parts missing', () => {
     expect(readSettingsForm(holder)).toEqual({
       foldLevel: 'light',
       layerView: 'all',
+      pointColors: 'classic',
       chatAgent: 'claude',
       chatModel: 'gpt-5.2',
       chatTimeoutSec: 120,
