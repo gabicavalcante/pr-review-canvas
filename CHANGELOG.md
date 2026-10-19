@@ -16,12 +16,19 @@
   every two minutes after while its tab is in view, hides the newly resolved points, and says so.
   Before, a reviewer who had already loaded the canvas saw them only after **refresh**.
 
+### Prompt templates
+
+- `pr-review upgrade` checks the project's own prompt templates once pr-review moves: each token
+  the new release added to a bundled template that a custom copy lacks is named, with the heading
+  to add it under. `pr-review doctor` has the same check as its `prompts` line, for any release up
+  to the running one.
+
 ### Upgrade
 
 - A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled
-  template has it under **Attention points**. Without it the generator is not told which points the
-  author resolved: a point that comes back with the same title stays resolved unchecked, and one
-  reworded comes back open.
+  template has it under **Attention points**; `pr-review upgrade` and `doctor` say so. Without it
+  the generator is not told which points the author resolved: a point that comes back with the same
+  title stays resolved unchecked, and one reworded comes back open.
 
 ## 0.9.0
 

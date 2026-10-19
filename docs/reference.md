@@ -315,6 +315,9 @@ outdated or modified copy in `.claude/skills` or `.agents/skills` fails the skil
 other copy is current. Refresh copies with `pr-review upgrade` or `pr-review install-skill` (repeat
 any custom directory flags used during installation). Automatic discovery checks the two default directories.
 
+`doctor`'s `prompts` check fails when one of the project's own prompt templates lacks a token any
+release up to the running one added to the bundled template, and its hint says where to add it.
+
 `serve` runs this skill check automatically and prints failures with a repair hint to stderr.
 Warnings do not prevent the server from starting. Use `doctor --all-checks` for full diagnostics.
 The `.gitignore` update always applies to the selected repository root, even with custom skill
@@ -335,9 +338,16 @@ pr-review upgrade [--yes] [--only package,acpx,skill] [--repo <dir>]
 | The project skill | A copy in `.claude/skills` or `.agents/skills` differs from the bundled one | The same copy `install-skill` makes                        |
 
 When pr-review itself upgrades, the skill step covers every copy, since the new version may ship
-a new skill. After installing, it runs the new version as `pr-review upgrade --yes --only <kinds>`
-with the confirmed steps, so the new version copies its own skill and takes only the steps the plan
-showed. If the install fails, the current version runs the remaining steps itself.
+a new skill. After installing, it runs the new version as
+`pr-review upgrade --yes --from <old version> --only <kinds>` with the confirmed steps, none when
+none are left, so the new version copies its own skill and takes only the steps the plan showed.
+If the install fails, the current version runs the remaining steps itself.
+
+Last, `upgrade` checks the project's own [prompt templates](#prompt-templates). For each token a
+release after the old version added to a bundled template, a custom copy that lacks it is named
+with the token and the heading the bundled template has it under, for you to add. Run at the
+latest version with nothing to upgrade, it names the tokens that version added. It never edits a
+template.
 
 - `--only` limits the run to the named kinds. Skipped kinds are listed in `notes`.
 - `upgrade` does not install a missing acpx or add a missing skill copy. It prints the command
@@ -349,7 +359,8 @@ showed. If the install fails, the current version runs the remaining steps itsel
 Without a terminal, `upgrade` prints the plan and changes nothing. `--yes` applies it without
 asking. The plan and each step's outcome go to stderr. With `--json`, or when stdout is a pipe,
 stdout is one JSON line with `applied` and, after applying, `ok` and each step's `status` (`done`
-or `failed`, with a `detail`). The exit code is `1` when a step fails. When a skill copy changes,
+or `failed`, with a `detail`), and `prompts`, the tokens the project's templates lack. The exit
+code is `1` when a step fails; a missing token does not change it. When a skill copy changes,
 stderr says to commit and push it.
 
 ### Output and exit codes
@@ -480,8 +491,9 @@ validation rules enforced by the tool.
 
 Run `prepare` again to apply generation edits (use `--force` for an existing canvas).
 Restart the server after changing the config; chat template edits apply to new threads.
-Custom templates persist across tool upgrades. Compare them with the new bundled templates
-when upgrading.
+Custom templates persist across tool upgrades. When a release adds a token to a bundled template,
+`pr-review upgrade` and `pr-review doctor` name each custom copy that lacks it and where it goes.
+Compare the rest of your templates with the new bundled ones when upgrading.
 
 ### Text limits
 
