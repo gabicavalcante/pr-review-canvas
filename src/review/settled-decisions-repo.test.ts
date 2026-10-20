@@ -39,14 +39,25 @@ const REASON = 'No: the callers compare it raw'
 const REVISED = 'Not until the callers move to the enum'
 const KEEP_TWO = 'Should two stay for old readers?'
 const DROPPED = 'No: nothing reads it since the reader moved'
+const MOVED = Array.from({ length: 10 }, (_, i) => `line ${i + 1}\n`).join('')
 
 describe('settled decisions against a real repository', () => {
   let dir: string
   // In order: the author's decision, followed by a blank line and an attribution as the loop writes
   // it; another person's commit with a decision of their own; lines added above the decided one;
   // the same line decided again; a deleted line decided as numbered in its parent; the decided line
-  // edited; the deleted line restored, with the line under it changed.
-  const heads = { decided: '', other: '', shifted: '', revised: '', deleted: '', edited: '', restored: '' }
+  // edited; the deleted line restored, with the line under it changed; a file renamed, then a line of
+  // it deleted and decided under its new name.
+  const heads = {
+    decided: '',
+    other: '',
+    shifted: '',
+    revised: '',
+    deleted: '',
+    edited: '',
+    restored: '',
+    renamed: '',
+  }
   let harness: TestContext
 
   beforeAll(async () => {
@@ -56,6 +67,7 @@ describe('settled decisions against a real repository', () => {
     await runGit(dir, 'config', 'user.name', 'Test')
     await write(dir, 'src/app.ts', 'a\nb\nc\nd\ne\nf\ng\nh\n')
     await write(dir, 'src/old.ts', 'one\ntwo\nthree\n')
+    await write(dir, 'src/moved.ts', MOVED)
     await runGit(dir, 'add', '.')
     await runGit(dir, 'commit', '-q', '-m', 'base')
     await runGit(dir, 'checkout', '-q', '-b', 'feature')
@@ -96,6 +108,13 @@ describe('settled decisions against a real repository', () => {
     heads.edited = await commit(dir, ['fix(app): soften E'])
     await write(dir, 'src/old.ts', 'zero\none\ntwo\nTHREE\n')
     heads.restored = await commit(dir, ['revert(old): bring two back'])
+    await runGit(dir, 'mv', 'src/moved.ts', 'src/renamed.ts')
+    await commit(dir, ['refactor: rename moved'])
+    await write(dir, 'src/renamed.ts', MOVED.replace('line 3\n', ''))
+    heads.renamed = await commit(dir, [
+      'refactor(renamed): drop line 3',
+      `Settled-decision: src/renamed.ts:3:old ${DROPPED}`,
+    ])
   })
   afterAll(async () => rm(dir, { recursive: true, force: true }))
   beforeEach(async () => {
@@ -196,6 +215,15 @@ describe('settled decisions against a real repository', () => {
       context.decisions.filter(decision => decision.side === 'old').map(decision => decision.line)
     ).toEqual([null])
     expect(artifact.points.filter(point => point.decisionCommit !== undefined)).toEqual([])
+  })
+
+  it("places a deleted line's decision in a renamed file on the line its old name had at the merge base", async () => {
+    const { context } = await prepared(heads.renamed)
+    expect(
+      context.decisions
+        .filter(decision => decision.path === 'src/renamed.ts')
+        .map(decision => [decision.side, decision.line])
+    ).toEqual([['old', 3]])
   })
 
   it('keeps a decision whose line changed after the commit as context, and adds no point for it', async () => {
