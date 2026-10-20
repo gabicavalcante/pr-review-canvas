@@ -283,4 +283,6 @@ export interface ReviewBootstrap {
   layerView: LayerView
   /** The palette of the point level icons, from the settings file. */
   pointColors: PointColors
+  /** Whether a branch review updates its outdated canvas by itself, from the settings file. */
+  autoUpdateCanvas: boolean
 }

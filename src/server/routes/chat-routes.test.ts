@@ -283,6 +283,7 @@ describe('the settings routes', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: true,
       canvasComment: null,
       mentionCanvas: null,
     })
@@ -313,6 +314,7 @@ describe('the settings routes', () => {
         chatModel: 'gpt-5.2',
         chatTimeoutSec: 300,
         maxTurns: 4,
+        autoUpdateCanvas: false,
       }),
     })
     expect((await json<SettingsResponse>(res)).settings).toEqual({
@@ -330,6 +332,7 @@ describe('the settings routes', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: false,
       canvasComment: null,
       mentionCanvas: null,
     })

@@ -1,7 +1,8 @@
 // @ts-check
 // Boot: read the bootstrap JSON, fetch the bundle and the patches together, render the screen for
 // the bundle's status, and keep the page current: the empty screen polls until a canvas is
-// published, and the regenerate dialog polls until a newer canvas replaces the one on screen.
+// published, the regenerate dialog polls until a newer canvas replaces the one on screen, and a
+// local review reads the work again when the reader comes back to the page.
 /** @typedef {import('./contract-types.js').PrBundle} PrBundle */
 import {
   ApiError,
@@ -48,6 +49,8 @@ import { renderOverview } from './overview.js'
 import { initOneLayer } from './one-layer.js'
 import { wireQuickQuestions } from './quick-questions.js'
 import { createGeneration } from './generate.js'
+import { isRunning } from './generation-phases.js'
+import { screenMoved, shouldAutoUpdate, watchReturns } from './local-return.js'
 import { canvasChanged, openRegenerateDialog } from './regenerate.js'
 import { createReviewSession } from './review-session.js'
 import { initScrollSpy } from './scroll-spy.js'
@@ -173,6 +176,20 @@ export class PrAppElement extends HTMLElement {
    * @type {ReturnType<typeof createGeneration> | null}
    */
   generation = null
+  /**
+   * The bundle the screen shows, which a local review's return compares the work read again with.
+   * @type {PrBundle | null}
+   */
+  shown = null
+  /** Whether a branch review updates its outdated canvas by itself, from the settings file. */
+  autoUpdate = true
+  /**
+   * The head this page last started an update for by itself, so a return never starts a second.
+   * @type {string | null}
+   */
+  autoUpdatedHead = null
+  /** @type {{ stop: () => void } | null} */
+  returns = null
 
   connectedCallback() {
     // Once per element: the content is re-rendered on every flip, the element itself is not.
@@ -182,6 +199,8 @@ export class PrAppElement extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this.returns?.stop()
+    this.returns = null
     this.stopPolling()
     this.settledPoller?.stop()
     this.settledPoller = null
@@ -223,6 +242,12 @@ export class PrAppElement extends HTMLElement {
     applyPointColors(this.bootstrap.pointColors, document.documentElement)
     this.layerView?.stop()
     this.layerView = initOneLayer(this, { view: this.bootstrap.layerView })
+    this.autoUpdate = this.bootstrap.autoUpdateCanvas
+    // The page only polls the head it was opened with, so a local review reads the work again when
+    // the reader comes back: that is when a commit or an edit made meanwhile shows.
+    if (typeof this.bootstrap.prNumber === 'string') {
+      this.returns ??= watchReturns(() => this.reread())
+    }
     const patchesPromise = fetchPatches(this.bootstrap.prNumber).then(
       r => r.patches,
       () => null
@@ -291,6 +316,7 @@ export class PrAppElement extends HTMLElement {
     if (hasUnfinishedText && !window.confirm('Discard unfinished text and update the review?')) {
       return
     }
+    this.shown = bundle
     this.diagrams?.stop()
     this.diagrams = null
     this.deepLinks?.stop()
@@ -383,14 +409,7 @@ export class PrAppElement extends HTMLElement {
         chat: () => this.chat,
         openReview: () => (this.chat ?? this.reviewPane)?.openReview(),
         uncover: () => (this.chat ?? this.reviewPane)?.uncover(),
-        openSettings: el =>
-          void openSettingsDialog(this, el, {
-            onSaved: data => {
-              this.layerView?.setView(data.settings.layerView)
-              this.chat?.followSettings(data.settings)
-              applyPointColors(data.settings.pointColors, document.documentElement)
-            },
-          }),
+        openSettings: el => void openSettingsDialog(this, el, { onSaved: data => this.settingsSaved(data) }),
       })
       this.interactions = interactions
       if (chatEnabled) {
@@ -479,7 +498,10 @@ export class PrAppElement extends HTMLElement {
     // have no such handler, so the command is wired here for every screen.
     const settings = qs('#settings', this)
     if (settings instanceof HTMLElement && this.interactions === null) {
-      settings.addEventListener('click', () => void openSettingsDialog(this, settings))
+      settings.addEventListener(
+        'click',
+        () => void openSettingsDialog(this, settings, { onSaved: data => this.settingsSaved(data) })
+      )
     }
     this.wireAppearance()
     const boot = this.bootstrap
@@ -491,7 +513,7 @@ export class PrAppElement extends HTMLElement {
     if (bundle.chat.enabled) {
       this.generation ??= createGeneration(this, {
         prNumber: boot.prNumber,
-        onEnded: job => this.generationEnded(job),
+        onEnded: (job, how) => this.generationEnded(job, how),
         onError: message => toast(this, message),
       })
       this.generation.attach(bundle)
@@ -554,14 +576,67 @@ export class PrAppElement extends HTMLElement {
   }
 
   /**
-   * A job this page watched has ended. A published canvas is loaded; the dialog comes back over
-   * it when the reader had it open, or when sharing failed and the reader has an upload to do.
-   * @param {import('./contract-types.js').GenerationJob} job
+   * The settings the dialog saved, applied to the open page without a reload.
+   * @param {import('./contract-types.js').SettingsResponse} data
    */
-  async generationEnded(job) {
+  settingsSaved(data) {
+    this.layerView?.setView(data.settings.layerView)
+    this.chat?.followSettings(data.settings)
+    applyPointColors(data.settings.pointColors, document.documentElement)
+    this.autoUpdate = data.settings.autoUpdateCanvas
+  }
+
+  /**
+   * The reader came back to a local review. The work is read again, and the screen drawn again
+   * only when what it shows moved; a canvas the reader was reading stays on screen under the
+   * outdated bar. A branch review whose canvas is now of an earlier commit is then updated.
+   */
+  async reread() {
+    const boot = this.bootstrap
+    const shown = this.shown
+    if (!boot || !shown) {
+      return
+    }
+    /** @type {PrBundle} */
+    let next
+    try {
+      next = await fetchBundle(boot.prNumber)
+    } catch {
+      // The next return tries again; the screen still shows what it did.
+      return
+    }
+    if (screenMoved(shown, next)) {
+      const readingCanvas = shown.status === 'ready' && shown.artifact !== undefined
+      if (readingCanvas && next.status === 'stale') {
+        this.viewStale = true
+      }
+      await this.render(next)
+    }
+    const generation = this.generation
+    const job = generation?.job ?? null
+    const running = job !== null && isRunning(job)
+    if (
+      generation === null ||
+      !shouldAutoUpdate(next, { enabled: this.autoUpdate, running, lastHead: this.autoUpdatedHead })
+    ) {
+      return
+    }
+    this.autoUpdatedHead = next.pr.headSha
+    await generation.autoUpdate(next)
+  }
+
+  /**
+   * A job this page watched has ended. A published canvas is loaded; the dialog comes back over
+   * it when the reader had it open, or when sharing failed and the reader has an upload to do. An
+   * update the page started by itself says how it went in a toast when it published, and in its
+   * corner notice when it did not.
+   * @param {import('./contract-types.js').GenerationJob} job
+   * @param {{ auto: boolean }} [how]
+   */
+  async generationEnded(job, how = { auto: false }) {
     const wasOpen = this.querySelector('#generate-dialog')?.hasAttribute('open') === true
     if (job.phase !== 'done') {
-      if (!wasOpen) {
+      if (!wasOpen && !how.auto) {
         toast(
           this,
           job.phase === 'cancelled'
@@ -574,6 +649,11 @@ export class PrAppElement extends HTMLElement {
     await this.reload().catch(() => undefined)
     if (wasOpen || job.sharing?.status === 'failed') {
       this.generation?.showLast()
+    } else if (how.auto) {
+      toast(
+        this,
+        job.headSha === undefined ? 'canvas updated' : `canvas updated to ${job.headSha.slice(0, 7)}`
+      )
     } else {
       toast(this, 'canvas published')
     }

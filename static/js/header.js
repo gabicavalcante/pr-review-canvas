@@ -111,15 +111,16 @@ export function renderHeader(bundle, opts) {
     ? `<span class="pill agent" title="The agent, model, and harness that generated this canvas">canvas by ${esc(artifact.generator.agent)}${artifact.generator.model ? ` · ${esc(artifact.generator.model)}` : ''} · ${esc(artifact.generator.harness)}</span><span>generated ${esc(timeAgo(artifact.generatedAt, opts.now))}</span>`
     : ''
   const number = pr.number === null ? '' : `<span class="mono num">#${pr.number}</span>`
-  // Work that is not pushed has no page on the forge, and nothing to refresh from it either.
+  // Work that is not pushed has no page on the forge, and nothing to refresh from it either: the
+  // page reads the work again whenever the reader comes back to it.
   const local = bundle.local !== undefined
   const forgeLink =
     pr.url === ''
       ? ''
       : `<a class="cmd" href="${esc(pr.url)}" target="_blank" rel="noopener noreferrer">${esc(currentHost().kind)}</a>`
-  const refreshTitle = local
-    ? 'Snapshot the working tree again and redraw'
-    : `Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}`
+  const refresh = local
+    ? ''
+    : `<button class="cmd" type="button" id="refresh" title="Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}">refresh</button>`
   const progress = ready
     ? progressHtml(artifact, bundle.state, { pr, readerIsAuthor: bundle.readerIsAuthor, local })
     : ''
@@ -130,7 +131,7 @@ export function renderHeader(bundle, opts) {
       opts,
       `<button class="cmd" type="button" id="regenerate" title="${esc(generate.title)}" aria-haspopup="dialog"${generate.disabled ? ' disabled' : ''}>${generate.label}</button>` +
         `<button class="cmd" type="button" id="export-zip" title="Download this canvas as a zip to share on ${esc(hostLabel())}"${hasCanvas ? '' : ' disabled'}>export zip</button>` +
-        `<button class="cmd" type="button" id="refresh" title="${refreshTitle}">refresh</button>` +
+        refresh +
         '<button class="cmd" type="button" id="settings" data-act="settings" aria-haspopup="dialog" title="Configure the default reading level, how layers show, point colors, and the AI Chat agent, model, and limits">settings</button>' +
         '<button class="cmd" type="button" data-act="help" title="Show keyboard shortcuts and review help" aria-haspopup="dialog">help</button>'
     ) +

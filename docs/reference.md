@@ -154,9 +154,25 @@ one never disturbs the other.
   snapshot cannot leave it collectable. The same working tree always hashes to the same commit.
 - **Staleness.** Committing after `--branch`, or editing a file after `--uncommitted`, moves the
   head, so `publish` answers `CANVAS_STALE`, exactly as a push does for a pull request. The page
-  reads the head again when it is opened and when `refresh` is pressed, and offers to regenerate.
-  Its background polls answer about that same head, so they never contradict what the page shows;
-  they read the work again only once a new canvas has been prepared.
+  reads the work again when it is opened and each time you come back to it (its tab is shown again
+  or its window regains focus), redraws when the head or the canvas moved, and offers to
+  regenerate. A canvas you were reading stays on screen under the outdated bar. A local review has
+  no **refresh** command, since there is no forge to fetch from. Its background polls answer about
+  the head the page last read, so they never contradict what the page shows; they read the work
+  again only once a new canvas has been prepared.
+- **Updating after new commits.** When you come back to a branch review whose canvas is now of an
+  earlier commit, the page starts an [incremental update](#incremental-canvases) by itself, as
+  **update** would, without opening the dialog. The older canvas stays on screen while it runs, and
+  a notice in the bottom-left corner says the canvas is updating; its **show** opens the generation
+  dialog. When the update publishes, the page loads it and says which commit the canvas is now of.
+  A failed or stopped update says so in the notice, with **details** for the dialog, and **update**
+  stays in the header. The page starts at most one update per head: a commit made while one runs
+  does not stop it, and the next return after it ends starts another for the new head. A start the
+  server refuses, for example while another review's generation runs, is reported once and not
+  tried again for that head. It needs `autoUpdateCanvas` in
+  [`settings.yml`](#local-settings-and-storage), on by default, and an agent the page can
+  [run](#generating-from-the-review-app); without one the page shows the outdated bar and its
+  commands as before. The uncommitted review and pull request reviews never update by themselves.
 - **Worktrees.** Each worktree of a clone has its own `branch` and `uncommitted` reviews: their
   review progress, chat threads, review checkout, and the canvases they fall back on are that
   checkout's own. A canvas belongs to its commit, so two checkouts at the same commit show the
@@ -567,6 +583,7 @@ The data directory's `settings.yml` accepts these keys and values:
 | `checkoutEnabled`      | `true`    | `true` reads a [review checkout](#review-checkouts); `false` reads your checkout |
 | `checkoutIdleDays`     | `7`       | Integer 1–365, or `-1` to never remove an idle checkout                          |
 | `checkoutSweepMinutes` | `60`      | Integer minutes, 5–1440, between `serve`'s idle sweeps                           |
+| `autoUpdateCanvas`     | `true`    | `true` starts an update after new commits (4); `false` leaves it to **update**   |
 | `canvasComment`        | `null`    | `true`, `false`, or `null` to follow the project (3)                             |
 | `mentionCanvas`        | `null`    | `true`, `false`, or `null` to follow the project (3)                             |
 
@@ -579,6 +596,8 @@ keeps working: `agent` and `model` are read as
 (3) Overrides `sharing.canvasComment` or `sharing.mentionCanvas` in the project config for you; see
 [turning sharing off](#turning-sharing-off). Edit these in the file; the settings dialog does not
 show them.
+(4) On a branch review, when you come back to the page; see [updating after new
+commits](#reviewing-before-the-pull-request-exists). The settings dialog shows it under **AI Chat**.
 
 Invalid settings fall back to defaults. URL parameters `?skin=github&theme=light` can override
 appearance for one page load without saving it.
@@ -1206,6 +1225,9 @@ do not have to run the skill in Claude Code or Codex:
 - The header has one generate command, named for what it does on the screen: **generate** when
   there is no canvas, **update** on an outdated canvas, and **regenerate** on a current one, which
   writes it again from a blank page.
+- A branch review runs **update** by itself when you come back to it after a commit, with
+  `autoUpdateCanvas` on; see [updating after new
+  commits](#reviewing-before-the-pull-request-exists).
 
 The dialog names the agent and says whether publishing shares the canvas on the PR or MR. Click
 **start**. When publishing would share it, the server first checks that `gh` or `glab` is logged

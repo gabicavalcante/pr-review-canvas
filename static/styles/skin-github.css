@@ -637,7 +637,8 @@
   }
   .cmd.unseen,
   .qq-menu,
-  .toast {
+  .toast,
+  .gen-notice {
     border-radius: var(--r);
     box-shadow: var(--drop-shadow);
   }

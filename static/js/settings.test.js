@@ -30,6 +30,7 @@ const SETTINGS = {
     checkoutEnabled: true,
     checkoutIdleDays: 7,
     checkoutSweepMinutes: 60,
+    autoUpdateCanvas: true,
     canvasComment: null,
     mentionCanvas: null,
   },
@@ -240,6 +241,7 @@ describe('readSettingsForm', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: true,
     })
   })
 
@@ -274,6 +276,30 @@ describe('readSettingsForm', () => {
     expect(box.checked).toBe(true)
     box.checked = false
     expect(readSettingsForm(holder).chatThreadPerPlace).toBe(false)
+  })
+
+  it('offers the canvas updates on the AI Chat tab with what they cost, and reads them turned off', () => {
+    const holder = document.createElement('div')
+    holder.innerHTML = settingsDialogHtml(
+      { ...SETTINGS, settings: { ...SETTINGS.settings, autoUpdateCanvas: false } },
+      AGENTS
+    )
+    const box = holder.querySelector('#settings-panel-chat #set-auto-update')
+    if (!(box instanceof HTMLInputElement)) {
+      throw new Error('no checkbox')
+    }
+    expect(holder.querySelector('label[for="set-auto-update"]')?.textContent).toBe(
+      'Update the canvas after new commits'
+    )
+    expect(holder.querySelector('#settings-panel-chat')?.textContent).toContain('takes time and tokens')
+    expect(box.checked).toBe(false)
+    expect(readSettingsForm(holder).autoUpdateCanvas).toBe(false)
+    box.checked = true
+    expect(readSettingsForm(holder).autoUpdateCanvas).toBe(true)
+    // With chat off the page cannot run the agent, so the dialog does not offer it.
+    holder.innerHTML = settingsDialogHtml(SETTINGS, null)
+    expect(holder.querySelector('#set-auto-update')).toBeNull()
+    expect(readSettingsForm(holder).autoUpdateCanvas).toBeUndefined()
   })
 
   it('reads the point colors the reader picked', () => {
@@ -359,6 +385,7 @@ describe('openSettingsDialog', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: true,
     })
     expect(saved[1]).toBe('claude')
     expect(dialog.hasAttribute('open')).toBe(false)
@@ -447,6 +474,7 @@ describe('the dialog with parts missing', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: true,
     })
   })
 

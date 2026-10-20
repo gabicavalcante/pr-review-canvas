@@ -2,7 +2,8 @@
 // Generating the canvas from the page: the dialog that starts a run and shows where it is. The
 // server runs the job and keeps it across reloads; the page only polls it, and loads the new
 // canvas once the job publishes one. While a job runs, the header's generate command shows it and
-// opens its dialog.
+// opens its dialog. An update the page starts by itself, on a branch review whose canvas went
+// outdated, opens no dialog: a notice in the corner follows it instead.
 /** @typedef {import('./contract-types.js').PrBundle} PrBundle */
 /** @typedef {import('./contract-types.js').ReviewKey} ReviewKey */
 /** @typedef {import('./contract-types.js').GenerationJob} GenerationJob */
@@ -251,6 +252,30 @@ export function generationStatusHtml(job, now) {
 /** The id of the header's generate command, which shows the job while one runs. */
 export const GENERATE_BUTTON_ID = 'regenerate'
 
+/** The corner notice of an update the page started by itself. */
+export const AUTO_UPDATE_NOTICE_ID = 'auto-update-notice'
+
+/**
+ * What the corner notice says about an update the page started by itself: that it runs, or how it
+ * ended when it did not publish. A published update needs no notice, since the page loads it.
+ * @param {GenerationJob} job
+ * @returns {string}
+ */
+export function autoUpdateNoticeHtml(job) {
+  if (isRunning(job)) {
+    return (
+      '<span>Updating the canvas with the latest commits…</span>' +
+      '<button class="cmd" type="button" data-gen="show" aria-haspopup="dialog" title="Show the canvas generation">show</button>'
+    )
+  }
+  const what = job.phase === 'cancelled' ? 'The canvas update was stopped.' : 'The canvas update failed.'
+  return (
+    `<span>${what}</span>` +
+    '<button class="cmd" type="button" data-gen="show" aria-haspopup="dialog" title="Show the canvas generation">details</button>' +
+    '<button class="cmd" type="button" data-gen="dismiss" title="Dismiss this notice">dismiss</button>'
+  )
+}
+
 /**
  * What the header's generate command says while a job runs.
  * @param {GenerationJob} job
@@ -338,7 +363,7 @@ function showDialog(dialog) {
  * @param {HTMLElement} root
  * @param {{
  *   prNumber: ReviewKey,
- *   onEnded: (job: GenerationJob) => void | Promise<void>,
+ *   onEnded: (job: GenerationJob, how: { auto: boolean }) => void | Promise<void>,
  *   onError?: (message: string) => void,
  *   fetchImpl?: typeof fetch,
  *   now?: () => Date,
@@ -368,6 +393,16 @@ export function createGeneration(root, opts) {
   let skill = null
   /** True once this page saw the job running, so its end is news to it. */
   let watching = false
+  /**
+   * The job on hand is an update this page started by itself, which the corner notice follows
+   * instead of the dialog.
+   */
+  let auto = false
+  /**
+   * Counts the starts this page asked for. A poll sent before a start may answer after it, with no
+   * job yet; its answer is dropped rather than replace the job the start returned.
+   */
+  let starts = 0
   /** @type {ReturnType<typeof setTimeout> | null} */
   let timer = null
   let stopped = false
@@ -400,6 +435,32 @@ export function createGeneration(root, opts) {
     button.textContent = running === null ? label : runningLabel(running, now())
     button.title = running === null ? title : 'Show the canvas generation'
     button.classList.toggle('gen-running', running !== null)
+  }
+
+  /**
+   * The corner notice of an update this page started by itself: there while it runs, and after a
+   * failed or stopped one until dismissed. A render replaces the page's content, so this runs after
+   * each, like drawButton; the notice is written again only when what it says changes.
+   */
+  const drawNotice = () => {
+    const found = root.querySelector(`:scope > #${AUTO_UPDATE_NOTICE_ID}`)
+    if (!auto || job === null || job.phase === 'done') {
+      found?.remove()
+      return
+    }
+    const box = found instanceof HTMLElement ? found : root.appendChild(document.createElement('div'))
+    if (box !== found) {
+      box.id = AUTO_UPDATE_NOTICE_ID
+      box.className = 'gen-notice'
+      box.setAttribute('role', 'status')
+      box.setAttribute('aria-live', 'polite')
+    }
+    const state = isRunning(job) ? 'running' : job.phase
+    if (box.dataset['state'] !== state) {
+      box.dataset['state'] = state
+      box.classList.toggle('failed', state === 'failed')
+      box.innerHTML = autoUpdateNoticeHtml(job)
+    }
   }
 
   const drawDialog = () => {
@@ -435,14 +496,24 @@ export function createGeneration(root, opts) {
       watching = true
     } else if (job !== null && watching) {
       watching = false
-      void opts.onEnded(job)
+      const how = { auto }
+      // A published update is loaded and announced by the page; a failed one stays in the notice.
+      auto = auto && job.phase !== 'done'
+      void opts.onEnded(job, how)
     }
+    drawNotice()
     schedule()
   }
 
   const poll = async () => {
+    const sent = starts
     try {
-      update((await fetchGeneration(opts.prNumber, api)).job)
+      const res = await fetchGeneration(opts.prNumber, api)
+      if (sent !== starts) {
+        schedule()
+        return
+      }
+      update(res.job)
     } catch {
       // A missed poll is tried again; the server keeps the job either way.
       schedule()
@@ -451,10 +522,12 @@ export function createGeneration(root, opts) {
 
   /** @param {boolean} force */
   const start = async force => {
+    starts += 1
     try {
       const res = await startGeneration(opts.prNumber, force, api)
       startError = null
       starting = false
+      auto = false
       update(res.job)
       drawDialog()
     } catch (err) {
@@ -470,14 +543,28 @@ export function createGeneration(root, opts) {
     }
   }
 
+  /** Shows the status of the job on hand in the dialog. */
+  const showJob = () => {
+    if (job !== null) {
+      starting = false
+      drawDialog()
+      showDialog(ensureDialog(root))
+    }
+  }
+
   root.addEventListener('click', event => {
     const target = event.target instanceof Element ? event.target : null
-    const action = target?.closest(`#${GENERATE_DIALOG_ID} [data-gen]`)
+    const action = target?.closest(`#${GENERATE_DIALOG_ID} [data-gen], #${AUTO_UPDATE_NOTICE_ID} [data-gen]`)
     if (!(action instanceof HTMLButtonElement)) {
       return
     }
     const kind = action.dataset['gen']
-    if (kind === 'start') {
+    if (kind === 'show') {
+      showJob()
+    } else if (kind === 'dismiss') {
+      auto = false
+      drawNotice()
+    } else if (kind === 'start') {
       // Only the blank-page box is the reader's to decide; with none on screen there is no earlier
       // canvas to update, and a head that has its own canvas the server writes again anyway.
       const box = root.querySelector(`#${GENERATE_DIALOG_ID} input[name="force"]`)
@@ -523,17 +610,37 @@ export function createGeneration(root, opts) {
     attach(next) {
       bundle = next
       drawButton()
+      drawNotice()
       if (job === null && timer === null) {
         void poll()
       }
     },
+    /**
+     * Starts an incremental update of the outdated canvas `next` shows, with no dialog: the corner
+     * notice follows it. A refusal is said once and not tried again; a run another tab started is
+     * followed as usual. Resolves whether a run started.
+     * @param {PrBundle} next
+     * @returns {Promise<boolean>}
+     */
+    async autoUpdate(next) {
+      bundle = next
+      starts += 1
+      try {
+        const res = await startGeneration(opts.prNumber, false, api)
+        auto = true
+        update(res.job)
+        return true
+      } catch (err) {
+        await poll()
+        if (job === null || !isRunning(job)) {
+          opts.onError?.(`the canvas was not updated: ${err instanceof Error ? err.message : String(err)}`)
+        }
+        return false
+      }
+    },
     /** Shows the status of the job that just ended, on the screen that loaded its canvas. */
     showLast() {
-      if (job !== null) {
-        starting = false
-        drawDialog()
-        showDialog(ensureDialog(root))
-      }
+      showJob()
     },
     stop() {
       stopped = true

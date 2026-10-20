@@ -58,6 +58,11 @@ checkoutIdleDays: 7
 # How often, in minutes, pr-review serve looks for idle review checkouts.
 checkoutSweepMinutes: 60
 
+# Whether a branch review updates its canvas by itself after new commits: when you come back to
+# the page and the canvas is outdated, it starts an incremental update. Each update runs the chat
+# agent, which takes time and tokens. Needs chat.enabled and acpx.
+autoUpdateCanvas: true
+
 # Whether publish posts the canvas as a PR/MR comment. null follows sharing.canvasComment in
 # pr-review.config.yml; true or false wins over it for you.
 canvasComment: null
@@ -266,6 +271,9 @@ function stripUndefined(input: SettingsInput): Partial<Settings> {
   }
   if (input.checkoutSweepMinutes !== undefined) {
     out.checkoutSweepMinutes = input.checkoutSweepMinutes
+  }
+  if (input.autoUpdateCanvas !== undefined) {
+    out.autoUpdateCanvas = input.autoUpdateCanvas
   }
   return out
 }

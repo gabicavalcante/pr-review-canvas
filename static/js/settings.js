@@ -1,6 +1,7 @@
 // @ts-check
 // The settings dialog: the personal settings this browser can change, the reading level a review
-// opens at, how layers show, the colors of points, and the AI Chat settings, and a read-only look at the project config,
+// opens at, how layers show, the colors of points, the AI Chat settings and whether a branch
+// review updates its canvas by itself, and a read-only look at the project config,
 // which is committed and belongs to the repository. The chat agent and model are personal and run
 // AI Chat only; the canvas generation models come from the project config.
 /** @typedef {import('./contract-types.js').AgentsResponse} AgentsResponse */
@@ -64,6 +65,9 @@ function chatFieldsHtml(settings, agents) {
     `<input id="set-thread-per-place" type="checkbox"${settings.chatThreadPerPlace ? ' checked' : ''}></div>` +
     '<p class="muted small">Ask opens the thread of the attention point, lines, file or layer it was asked from, and starts one the first time. Off, every ask goes to the open thread.</p>' +
     '<p class="muted small">Changing the chat agent starts a new chat thread; the old ones stay in the list.</p>' +
+    '<div class="field field-check"><label for="set-auto-update">Update the canvas after new commits</label>' +
+    `<input id="set-auto-update" type="checkbox"${settings.autoUpdateCanvas ? ' checked' : ''}></div>` +
+    '<p class="muted small">On a branch review, coming back to the page after a commit updates the outdated canvas. Each update runs the agent, which takes time and tokens.</p>' +
     '<button class="cmd" type="button" data-act="settings-probe">test agent</button>'
   )
 }
@@ -313,6 +317,7 @@ export function readSettingsForm(/** @type {ParentNode} */ dialog) {
   const timeout = qs('#set-timeout', dialog)
   const turns = qs('#set-turns', dialog)
   const threadPerPlace = qs('#set-thread-per-place', dialog)
+  const autoUpdate = qs('#set-auto-update', dialog)
   const checkoutEnabled = qs('#set-checkout-enabled', dialog)
   const checkoutIdle = qs('#set-checkout-idle', dialog)
   const checkoutSweep = qs('#set-checkout-sweep', dialog)
@@ -341,6 +346,9 @@ export function readSettingsForm(/** @type {ParentNode} */ dialog) {
   }
   if (threadPerPlace instanceof HTMLInputElement) {
     input.chatThreadPerPlace = threadPerPlace.checked
+  }
+  if (autoUpdate instanceof HTMLInputElement) {
+    input.autoUpdateCanvas = autoUpdate.checked
   }
   if (checkoutEnabled instanceof HTMLInputElement) {
     input.checkoutEnabled = checkoutEnabled.checked

@@ -55,6 +55,7 @@ describe('createSettingsStore', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: true,
       canvasComment: null,
       mentionCanvas: null,
     })
@@ -83,6 +84,7 @@ describe('createSettingsStore', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: true,
       canvasComment: null,
       mentionCanvas: null,
     })
@@ -235,6 +237,34 @@ describe('applySettings', () => {
   })
 })
 
+describe('the canvas update setting', () => {
+  it('is on by default, and on for a file written before the key existed', () => {
+    expect(DEFAULT_SETTINGS.autoUpdateCanvas).toBe(true)
+    expect(parseSettings(SETTINGS_TEMPLATE).autoUpdateCanvas).toBe(true)
+    expect(parseSettings('version: 1\nchatAgent: codex\n')).toMatchObject({
+      chatAgent: 'codex',
+      autoUpdateCanvas: true,
+    })
+  })
+
+  it('reads a value the file sets, and refuses one that is not a boolean', () => {
+    expect(parseSettings('autoUpdateCanvas: false\n').autoUpdateCanvas).toBe(false)
+    expect(parseSettings('autoUpdateCanvas: sometimes\n')).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('saves it under its comment, also into a file that lacked it', async () => {
+    const store = createSettingsStore(dataDir)
+    await writeFile(store.file, 'version: 1\nchatAgent: claude\n', 'utf8')
+    expect((await store.write({ autoUpdateCanvas: false })).autoUpdateCanvas).toBe(false)
+    const text = await readFile(store.file, 'utf8')
+    expect(text).toContain('# Whether a branch review updates its canvas by itself after new commits')
+    expect(text).toContain('autoUpdateCanvas: false')
+    expect((await store.read()).autoUpdateCanvas).toBe(false)
+    // A save of another field keeps it.
+    expect((await store.write({ chatTimeoutSec: 120 })).autoUpdateCanvas).toBe(false)
+  })
+})
+
 describe('the review checkout settings', () => {
   it('gives a file written before them the keys with their template comments', () => {
     const { text, settings } = applySettings('chatAgent: claude\n', {
@@ -284,6 +314,7 @@ describe('two saves that arrive together', () => {
       checkoutEnabled: true,
       checkoutIdleDays: 7,
       checkoutSweepMinutes: 60,
+      autoUpdateCanvas: true,
       canvasComment: null,
       mentionCanvas: null,
     })

@@ -74,6 +74,11 @@ export const SettingsSchema = z.object({
   checkoutIdleDays: CheckoutIdleDaysSchema,
   /** How often `serve` looks for idle review checkouts. */
   checkoutSweepMinutes: CheckoutSweepMinutesSchema,
+  /**
+   * Whether a branch review whose canvas went outdated starts an incremental update by itself when
+   * the reader comes back to the page. Each update runs the agent.
+   */
+  autoUpdateCanvas: z.boolean(),
   /** Overrides `sharing.canvasComment` in pr-review.config.yml; null follows the project. */
   canvasComment: z.boolean().nullable(),
   /** Overrides `sharing.mentionCanvas` in pr-review.config.yml; null follows the project. */
@@ -96,6 +101,7 @@ export const DEFAULT_SETTINGS: Settings = {
   checkoutEnabled: true,
   checkoutIdleDays: 7,
   checkoutSweepMinutes: 60,
+  autoUpdateCanvas: true,
   canvasComment: null,
   mentionCanvas: null,
 }
@@ -126,6 +132,7 @@ export const SettingsInputSchema = z.strictObject({
   checkoutEnabled: z.boolean().optional(),
   checkoutIdleDays: CheckoutIdleDaysSchema.optional(),
   checkoutSweepMinutes: CheckoutSweepMinutesSchema.optional(),
+  autoUpdateCanvas: z.boolean().optional(),
 })
 export type SettingsInput = z.infer<typeof SettingsInputSchema>
 

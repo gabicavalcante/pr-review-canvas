@@ -5,6 +5,8 @@ import { emptyState } from '../../src/contract/state.js'
 import { UNKNOWN_CAPABILITIES } from '../../src/host/capabilities.js'
 import { syntheticArtifact } from '../../src/testing/synthetic.js'
 import {
+  AUTO_UPDATE_NOTICE_ID,
+  autoUpdateNoticeHtml,
   createGeneration,
   elapsedText,
   fetchGenerationSkill,
@@ -874,6 +876,177 @@ describe('createGeneration', () => {
     generation.attach(bundle())
     await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(3))
     generation.stop()
+  })
+})
+
+describe('updating an outdated canvas by itself', () => {
+  const STALE = bundle({ status: 'stale', local: 'branch' })
+  const notice = (/** @type {HTMLElement} */ root) => root.querySelector(`:scope > #${AUTO_UPDATE_NOTICE_ID}`)
+  const click = (/** @type {Element | null | undefined} */ el) =>
+    el?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+
+  it('words the notice for a run, a failed run, and a stopped one', () => {
+    expect(autoUpdateNoticeHtml(job())).toContain('Updating the canvas with the latest commits…')
+    expect(autoUpdateNoticeHtml(job({ phase: 'failed' }))).toContain('The canvas update failed.')
+    expect(autoUpdateNoticeHtml(job({ phase: 'cancelled' }))).toContain('The canvas update was stopped.')
+    expect(autoUpdateNoticeHtml(job({ phase: 'failed' }))).toContain('data-gen="dismiss"')
+  })
+
+  it('starts an incremental run with no dialog, follows it in the corner, and ends it as its own', async () => {
+    const root = page()
+    const fetches = fakeFetch({
+      gets: [job(), job({ phase: 'done', headSha: 'f'.repeat(40), sharing: { status: 'local' } })],
+      post: () => new Response(JSON.stringify({ job: job({ phase: 'preparing' }) }), { status: 202 }),
+    })
+    const onEnded = vi.fn()
+    const generation = createGeneration(root, {
+      prNumber: 'branch',
+      onEnded,
+      fetchImpl: fetches.impl,
+      now: () => NOW,
+      pollMs: 5,
+    })
+    expect(await generation.autoUpdate(STALE)).toBe(true)
+    expect(fetches.calls.find(c => c.method === 'POST')?.body).toEqual({ force: false })
+    expect(root.querySelector(`#${GENERATE_DIALOG_ID}`)?.hasAttribute('open') ?? false).toBe(false)
+    expect(notice(root)?.textContent).toContain('Updating the canvas with the latest commits…')
+    expect(root.querySelector('#regenerate')?.textContent).toContain('generating')
+
+    // A render replaces the page's content; attaching again puts the notice back.
+    root.innerHTML = '<header><div class="hdr-actions"><button id="regenerate">update</button></div></header>'
+    generation.attach(STALE)
+    expect(notice(root)?.textContent).toContain('Updating the canvas')
+
+    await vi.waitFor(() => expect(onEnded).toHaveBeenCalledTimes(1))
+    expect(onEnded.mock.calls[0]?.[0]).toMatchObject({ phase: 'done' })
+    expect(onEnded.mock.calls[0]?.[1]).toEqual({ auto: true })
+    // The page loads the published canvas and says so; the notice has nothing left to say.
+    expect(notice(root)).toBeNull()
+    generation.attach(STALE)
+    expect(notice(root)).toBeNull()
+    generation.stop()
+  })
+
+  it('keeps the run it started when the poll of the render before it answers late', async () => {
+    const root = page()
+    /** @type {typeof fetch} */
+    const impl = async (_url, init) => {
+      if (init?.method === 'POST') {
+        return new Response(JSON.stringify({ job: job() }), { status: 202 })
+      }
+      await new Promise(resolve => setTimeout(resolve, 20))
+      return new Response(JSON.stringify({ job: null }), { status: 200 })
+    }
+    const generation = createGeneration(root, {
+      prNumber: 'branch',
+      onEnded: () => undefined,
+      fetchImpl: impl,
+      now: () => NOW,
+      pollMs: 60_000,
+    })
+    generation.attach(STALE)
+    await generation.autoUpdate(STALE)
+    await new Promise(resolve => setTimeout(resolve, 40))
+    expect(generation.job?.phase).toBe('generating')
+    expect(notice(root)?.textContent).toContain('Updating the canvas')
+    generation.stop()
+  })
+
+  it('opens the status from the notice, keeps a failed run in it until dismissed', async () => {
+    const root = page()
+    const failed = job({
+      phase: 'failed',
+      error: { code: 'INTERNAL', message: 'x' },
+      endedAt: NOW.toISOString(),
+    })
+    const fetches = fakeFetch({
+      gets: [failed],
+      post: () => new Response(JSON.stringify({ job: job() }), { status: 202 }),
+    })
+    const onEnded = vi.fn()
+    const generation = createGeneration(root, {
+      prNumber: 'branch',
+      onEnded,
+      fetchImpl: fetches.impl,
+      now: () => NOW,
+      pollMs: 20,
+    })
+    await generation.autoUpdate(STALE)
+    click(notice(root)?.querySelector('[data-gen="show"]'))
+    const dialog = root.querySelector(`#${GENERATE_DIALOG_ID}`)
+    expect(dialog?.hasAttribute('open')).toBe(true)
+    expect(dialog?.querySelector('h2')?.textContent).toBe('The agent is writing the canvas')
+    dialog?.removeAttribute('open')
+
+    await vi.waitFor(() => expect(onEnded).toHaveBeenCalledTimes(1))
+    expect(onEnded.mock.calls[0]?.[1]).toEqual({ auto: true })
+    expect(notice(root)?.classList.contains('failed')).toBe(true)
+    expect(notice(root)?.textContent).toContain('The canvas update failed.')
+    click(notice(root)?.querySelector('[data-gen="show"]'))
+    expect(dialog?.querySelector('h2')?.textContent).toBe('Generation failed')
+
+    click(notice(root)?.querySelector('[data-gen="dismiss"]'))
+    expect(notice(root)).toBeNull()
+    generation.attach(STALE)
+    expect(notice(root)).toBeNull()
+    generation.stop()
+  })
+
+  it('leaves the notice to a run the reader starts from the dialog', async () => {
+    const root = page()
+    const fetches = fakeFetch({
+      gets: [job()],
+      post: () => new Response(JSON.stringify({ job: job() }), { status: 202 }),
+    })
+    const generation = createGeneration(root, {
+      prNumber: 'branch',
+      onEnded: () => undefined,
+      fetchImpl: fetches.impl,
+      now: () => NOW,
+      pollMs: 60_000,
+    })
+    generation.open(STALE)
+    click(root.querySelector('[data-gen="start"]'))
+    await flush()
+    expect(root.querySelector('#regenerate')?.textContent).toContain('generating')
+    expect(notice(root)).toBeNull()
+    generation.stop()
+  })
+
+  it('says once why the server refused it, and follows a run another tab started instead', async () => {
+    const busy = () =>
+      new Response(JSON.stringify({ error: { code: 'GENERATION_BUSY', message: 'already running' } }), {
+        status: 409,
+      })
+    const root = page()
+    const onError = vi.fn()
+    const refused = createGeneration(root, {
+      prNumber: 'branch',
+      onEnded: () => undefined,
+      onError,
+      fetchImpl: fakeFetch({ gets: [null], post: busy }).impl,
+      now: () => NOW,
+      pollMs: 60_000,
+    })
+    expect(await refused.autoUpdate(STALE)).toBe(false)
+    expect(onError).toHaveBeenCalledWith('the canvas was not updated: already running')
+    expect(notice(root)).toBeNull()
+    refused.stop()
+
+    const other = page()
+    const followed = createGeneration(other, {
+      prNumber: 'branch',
+      onEnded: () => undefined,
+      onError,
+      fetchImpl: fakeFetch({ gets: [job()], post: busy }).impl,
+      now: () => NOW,
+      pollMs: 60_000,
+    })
+    expect(await followed.autoUpdate(STALE)).toBe(false)
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(other.querySelector('#regenerate')?.textContent).toContain('generating')
+    expect(notice(other)).toBeNull()
+    followed.stop()
   })
 })
 
