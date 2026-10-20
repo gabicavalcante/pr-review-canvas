@@ -1138,6 +1138,16 @@ and keeps earlier threads. `--chat-agent` and `--chat-model` override saved pref
 that server run. Canvas generation models are configured separately in
 [`generation.models`](#project-config).
 
+On a screen wider than 1360px, AI Chat docks on the right. Opening it moves the rail and the reading
+column left only as far as the chat needs for its width (380px until you resize it), and narrows the
+reading column when moving them is not enough; with that much room already, nothing moves. The chat
+then fills the space from the reading column to the screen's edge. Drag its left edge, or focus the
+edge and press the left and right arrow keys, to narrow it down to 360px or widen it back up to the
+reading column; the rail and the reading column stay where they are while you do. The browser
+remembers the width, and the next time the chat opens, or the page loads with it open, the rail and
+the reading column make room for that width. Minimizing the chat puts them back in the middle. On
+narrower screens AI Chat floats over the canvas.
+
 **Ask** on a layer, file, attention point, or line selection opens the thread of that place. The
 first ask about a place starts one, titled after it; a later ask about the same place comes back to
 it, history and all. A thread is made by its first question, so an ask you do not follow up leaves

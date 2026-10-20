@@ -159,25 +159,134 @@ describe('the chat width', () => {
     expect(readChatWidth(null)).toBe(CHAT_WIDTH_DEFAULT)
   })
 
-  it('moves the pane with the arrow keys from the handle', () => {
+  it('narrows to the minimum where no reading column bounds it', () => {
     const { root } = mount()
-    const handle = el(root, '#chat-handle')
-    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
-    expect(root.style.getPropertyValue('--chat-w')).toBe(`${CHAT_WIDTH_DEFAULT + 16}px`)
-    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
-    expect(root.style.getPropertyValue('--chat-w')).toBe(`${CHAT_WIDTH_DEFAULT + 16}px`)
+    el(root, '#chat-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(root.style.getPropertyValue('--chat-w')).toBe(`${CHAT_WIDTH_MIN}px`)
+  })
+})
+
+describe('resizing a docked chat', () => {
+  // The pane docks above 1360px, and media queries read the happy-dom viewport.
+  /** @param {number} width */
+  const setViewportWidth = width => {
+    const win = /** @type {{ happyDOM: { setViewport: (v: { width: number }) => void } }} */ (
+      /** @type {unknown} */ (window)
+    )
+    win.happyDOM.setViewport({ width })
+  }
+  let previousWidth = 0
+  beforeEach(() => {
+    previousWidth = window.innerWidth
+    setViewportWidth(1920)
+  })
+  afterEach(() => {
+    setViewportWidth(previousWidth)
   })
 
-  it('widens the pane while the handle is dragged left', () => {
-    const { root } = mount()
-    window.innerWidth = 1200
-    el(root, '#chat-handle').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
-    document.dispatchEvent(new PointerEvent('pointermove', { clientX: 800 }))
-    expect(root.style.getPropertyValue('--chat-w')).toBe('400px')
+  function memoryStorage() {
+    /** @type {Record<string, string>} */
+    const store = {}
+    const storage = /** @type {Storage} */ (
+      /** @type {unknown} */ ({
+        getItem: (/** @type {string} */ k) => store[k] ?? null,
+        setItem: (/** @type {string} */ k, /** @type {string} */ v) => {
+          store[k] = v
+        },
+      })
+    )
+    return { store, storage }
+  }
+
+  /**
+   * Mounts the pane docked at 1920 wide: the reading column ends at 1540 and the pane, 380 wide,
+   * at 1920, so it fills the 380px right of the text.
+   * @param {Storage} storage
+   */
+  function mountDocked(storage) {
+    const { root } = mount({}, { storage })
+    const main = document.createElement('main')
+    main.id = 'main'
+    el(root, '.layout').prepend(main)
+    vi.spyOn(main, 'getBoundingClientRect').mockReturnValue(new DOMRect(440, 0, 1100, 900))
+    vi.spyOn(el(root, '.chat'), 'getBoundingClientRect').mockReturnValue(new DOMRect(1540, 0, 380, 900))
+    return { root, handle: el(root, '#chat-handle') }
+  }
+  /** @param {HTMLElement} root */
+  const anchor = root => root.style.getPropertyValue('--chat-anchor-w')
+  /** @param {HTMLElement} root */
+  const live = root => root.style.getPropertyValue('--chat-w')
+  /** @param {number} clientX */
+  const moveTo = clientX => document.dispatchEvent(new PointerEvent('pointermove', { clientX }))
+
+  it('makes room for the stored width, and lets the pane fill it until it is dragged', () => {
+    const { store, storage } = memoryStorage()
+    store[CHAT_WIDTH_KEY] = '400'
+    const { root } = mountDocked(storage)
+    expect(anchor(root)).toBe('400px')
+    expect(live(root)).toBe('')
+    const fresh = mountDocked(memoryStorage().storage)
+    expect(anchor(fresh.root)).toBe(`${CHAT_WIDTH_DEFAULT}px`)
+  })
+
+  it('follows the handle from the minimum up to the reading column, keeping the room it has', () => {
+    const { store, storage } = memoryStorage()
+    const { root, handle } = mountDocked(storage)
+    handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    moveTo(1550)
+    expect(live(root)).toBe('370px')
+    expect(handle.getAttribute('aria-valuenow')).toBe('370')
+    // Over the text, the pane stops at it.
+    moveTo(1000)
+    expect(live(root)).toBe('380px')
+    expect(handle.getAttribute('aria-valuemax')).toBe('380')
+    moveTo(1900)
+    expect(live(root)).toBe(`${CHAT_WIDTH_MIN}px`)
     document.dispatchEvent(new PointerEvent('pointerup'))
+    expect(store[CHAT_WIDTH_KEY]).toBe(String(CHAT_WIDTH_MIN))
+    expect(anchor(root)).toBe(`${CHAT_WIDTH_DEFAULT}px`)
     // A move after the drag ended changes nothing.
-    document.dispatchEvent(new PointerEvent('pointermove', { clientX: 700 }))
-    expect(root.style.getPropertyValue('--chat-w')).toBe('400px')
+    moveTo(1550)
+    expect(live(root)).toBe(`${CHAT_WIDTH_MIN}px`)
+  })
+
+  it('stores nothing when the handle is pressed without moving', () => {
+    const { store, storage } = memoryStorage()
+    const { root, handle } = mountDocked(storage)
+    handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    document.dispatchEvent(new PointerEvent('pointerup'))
+    document.dispatchEvent(new PointerEvent('pointerup'))
+    expect(store[CHAT_WIDTH_KEY]).toBeUndefined()
+    expect(live(root)).toBe('')
+  })
+
+  it('moves the pane with the arrow keys, from the width it shows up to the reading column', () => {
+    const { store, storage } = memoryStorage()
+    const { root, handle } = mountDocked(storage)
+    handle.dispatchEvent(new FocusEvent('focus'))
+    expect(handle.getAttribute('aria-valuenow')).toBe('380')
+    expect(handle.getAttribute('aria-valuemax')).toBe('380')
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(live(root)).toBe('364px')
+    expect(store[CHAT_WIDTH_KEY]).toBe('364')
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(store[CHAT_WIDTH_KEY]).toBe('364')
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
+    expect(live(root)).toBe('380px')
+  })
+
+  it('makes room for the width it was dragged to when it opens again, and fills it', () => {
+    const { store, storage } = memoryStorage()
+    store[CHAT_MINIMIZED_KEY] = '0'
+    const { root, handle } = mountDocked(storage)
+    handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    moveTo(1550)
+    document.dispatchEvent(new PointerEvent('pointerup'))
+    expect(anchor(root)).toBe(`${CHAT_WIDTH_DEFAULT}px`)
+    el(root, '#chat-minimize').click()
+    el(root, '#chat-launcher').click()
+    expect(anchor(root)).toBe('370px')
+    expect(live(root)).toBe('')
   })
 })
 
@@ -2344,12 +2453,6 @@ describe('the pane wiring', () => {
 })
 
 describe('the pane in the last few corners', () => {
-  it('narrows the pane with the right arrow', () => {
-    const { root } = mount()
-    el(root, '#chat-handle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    expect(root.style.getPropertyValue('--chat-w')).toBe(`${CHAT_WIDTH_DEFAULT - 16}px`)
-  })
-
   it('names the thread it is answering in on the next message', async () => {
     /** @type {Array<{ message: string, context: unknown, thread?: string }>} */
     const sent = []
@@ -2382,7 +2485,7 @@ describe('the pane in the last few corners', () => {
     document.body.replaceChildren(root)
     localStorage.setItem(CHAT_WIDTH_KEY, '500')
     const chat = wireChat({ root, prNumber: 42, session: session() })
-    expect(root.style.getPropertyValue('--chat-w')).toBe('500px')
+    expect(root.style.getPropertyValue('--chat-anchor-w')).toBe('500px')
     chat?.stop()
     localStorage.removeItem(CHAT_WIDTH_KEY)
   })

@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { expect, openFiles, test } from './fixtures.js'
 
 // A first visit: nothing in storage says the reader opened the chat before.
@@ -148,4 +149,119 @@ test('keeps the quick-question menu inside the window with the chat minimized', 
   const box = (await menu.boundingBox())!
   expect(box.x).toBeGreaterThanOrEqual(0)
   expect(box.x + box.width).toBeLessThanOrEqual(1600)
+})
+
+test.describe('a docked chat on a wide screen', () => {
+  test.beforeEach(({ page: _page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'sets its own window width')
+  })
+
+  const box = async (page: Page, selector: string) => {
+    const found = await page.locator(selector).boundingBox()
+    if (found === null) throw new Error(`no box for ${selector}`)
+    return { x: found.x, width: found.width, right: found.x + found.width }
+  }
+  /** Where the rail, the reading column and the title are. */
+  const places = async (page: Page) => ({
+    rail: (await box(page, 'nav.rail')).x,
+    main: await box(page, '#main'),
+    title: (await box(page, '.hdr-title h1')).x,
+  })
+  const near = (actual: number, expected: number) => expect(Math.abs(actual - expected)).toBeLessThan(1)
+  const launcher = (page: Page) => page.getByRole('button', { name: 'AI Chat', exact: true })
+  const chat = '.layout > .chat'
+
+  /** Drags the chat's left edge to `x`. */
+  const dragTo = async (page: Page, x: number) => {
+    const handle = await page.locator('#chat-handle').boundingBox()
+    if (handle === null) throw new Error('no handle')
+    const y = handle.y + 100
+    await page.mouse.move(handle.x + handle.width / 2, y)
+    await page.mouse.down()
+    await page.mouse.move(x, y, { steps: 4 })
+    await page.mouse.up()
+  }
+
+  // `centred` is the rail's left edge minimized; `docked` is where it goes when the chat opens at
+  // its default 380px, which then fills what is right of the 1100px reading column.
+  for (const { width, centred, docked } of [
+    { width: 1800, centred: 230, docked: 80 },
+    { width: 1920, centred: 290, docked: 200 },
+    { width: 2400, centred: 530, docked: 530 },
+  ]) {
+    test(`moves the rail and the text left only as far as the chat needs, and back, at ${width}`, async ({
+      page,
+      reviewUrl,
+    }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(reviewUrl)
+      await expect(page.locator('.layout')).toHaveClass(/no-chat/)
+      const minimized = await places(page)
+      near(minimized.rail, centred)
+      near(minimized.main.x, centred + 240)
+      near(minimized.main.width, 1100)
+      near(minimized.title, centred + 20)
+
+      await launcher(page).click()
+      await expect(page.locator(chat)).toBeVisible()
+      const open = await places(page)
+      const pane = await box(page, chat)
+      near(open.rail, docked)
+      near(open.main.x, docked + 240)
+      near(open.main.width, 1100)
+      near(open.title, docked + 20)
+      // No gap after the text, none before the edge.
+      near(pane.x, open.main.right)
+      near(pane.right, width)
+      expect(pane.width).toBeGreaterThanOrEqual(380)
+
+      await page.getByRole('button', { name: 'Minimize AI Chat' }).click()
+      expect(await places(page)).toEqual(minimized)
+    })
+  }
+
+  test('narrows the chat into a gap and widens it up to the text, without moving the text', async ({
+    page,
+    reviewUrl,
+  }) => {
+    await page.setViewportSize({ width: 2400, height: 900 })
+    await page.goto(reviewUrl)
+    await launcher(page).click()
+    const open = await places(page)
+
+    await dragTo(page, 2030)
+    const narrowed = await box(page, chat)
+    near(narrowed.width, 370)
+    near(narrowed.right, 2400)
+    expect(narrowed.x - open.main.right).toBeGreaterThan(150)
+    expect(await places(page)).toEqual(open)
+    expect(await page.evaluate(() => localStorage.getItem('pr-review.chat-width'))).toBe('370')
+
+    await dragTo(page, open.main.x + 100)
+    const widened = await box(page, chat)
+    near(widened.x, open.main.right)
+    near(widened.right, 2400)
+    expect(await places(page)).toEqual(open)
+  })
+
+  test('makes room for the width it was resized to after a reload', async ({ page, reviewUrl }) => {
+    await page.setViewportSize({ width: 1920, height: 900 })
+    await page.goto(reviewUrl)
+    await launcher(page).click()
+    const open = await places(page)
+    await dragTo(page, 1550)
+    near((await box(page, chat)).x, 1550)
+    near((await places(page)).rail, open.rail)
+
+    await page.reload()
+    await expect(page.locator(chat)).toBeVisible()
+    const reloaded = await places(page)
+    const pane = await box(page, chat)
+    // 370px needs 10px less than 380, so the rail and the text sit 10px further right.
+    near(reloaded.rail, open.rail + 10)
+    near(reloaded.title, reloaded.rail + 20)
+    near(pane.width, 370)
+    near(pane.x, reloaded.main.right)
+    near(pane.right, 1920)
+  })
 })

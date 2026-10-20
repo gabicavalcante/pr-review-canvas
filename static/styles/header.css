@@ -77,11 +77,18 @@
 /* The header's content starts and ends where the columns below it do, so the title lines up with
    the rail on a wide screen. */
 :is(.hdr-bar, .hdr-title) {
-  --page-w: calc(var(--rail-w) + var(--main-max) + var(--chat-w));
+  --page-w: calc(var(--rail-w) + var(--main-max) + var(--chat-anchor-w));
   padding-inline: max(20px, calc((100% - var(--page-w)) / 2 + 20px));
 }
 body:has(.layout.no-chat) :is(.hdr-bar, .hdr-title) {
   --page-w: calc(var(--rail-w) + var(--main-max));
+}
+/* With AI Chat docked, the header spans the rail and the reading column where the layout puts
+   them (layout.css), so it follows the rail when the chat makes room. */
+@media (width > 1360px) {
+  body:has(.layout:not(.no-chat)) :is(.hdr-bar, .hdr-title) {
+    padding-inline: calc(var(--dock-left) + 20px) calc(var(--dock-fill) + 20px);
+  }
 }
 .title {
   display: flex;

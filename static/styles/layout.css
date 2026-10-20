@@ -2,35 +2,49 @@
 .layout {
   display: grid;
   width: 100%;
-  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--chat-w);
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
   flex: 1;
   align-items: start;
-  background:
-    linear-gradient(var(--ink), var(--ink)) calc(var(--rail-w) - 1px) 0 / 1px 100% no-repeat,
-    linear-gradient(var(--ink), var(--ink)) calc(100% - var(--chat-w)) 0 / 1px 100% no-repeat,
-    linear-gradient(var(--ink), var(--ink)) 100% 0 / 1px 100% no-repeat;
+  background: linear-gradient(var(--ink), var(--ink)) calc(var(--rail-w) - 1px) 0 / 1px 100% no-repeat;
 }
 /* Without AI Chat docked, the rail and the reading column, which stops at --main-max, sit side by
    side in the middle of a wide screen. */
 .layout.no-chat {
   max-width: calc(var(--rail-w) + var(--main-max));
   margin-inline: auto;
-  grid-template-columns: var(--rail-w) minmax(0, 1fr);
-  background: linear-gradient(var(--ink), var(--ink)) calc(var(--rail-w) - 1px) 0 / 1px 100% no-repeat;
 }
-/* With AI Chat docked on a wide screen, the chat keeps the right edge at full height, and the rail
-   and the reading column sit side by side in the middle of what is left. The line after the rail
-   moves with them. */
 @media (width > 1360px) {
+  /* Where a docked AI Chat puts the rail and the reading column, for the layout and the header
+     alike; 100% is the page width wherever these are used. The gutter left of the rail is the
+     centred one it has minimized, cut just enough to leave --chat-anchor-w right of the reading
+     column; past a zero gutter the reading column narrows. --dock-fill is what is left right of
+     it, never less than the anchor. The anchor changes only when the chat opens, so dragging the
+     chat moves neither the rail nor the text. Declared on each element that uses them, so the
+     anchor set on the app's root is the one read. */
+  :is(.layout, .hdr-bar, .hdr-title) {
+    --dock-left: max(
+      0px,
+      min(
+        (100% - var(--rail-w) - var(--main-max)) / 2,
+        100% - var(--rail-w) - var(--main-max) - var(--chat-anchor-w)
+      )
+    );
+    --dock-main: min(var(--main-max), 100% - var(--dock-left) - var(--rail-w) - var(--chat-anchor-w));
+    --dock-fill: calc(100% - var(--dock-left) - var(--rail-w) - var(--dock-main));
+  }
+  /* The chat sits on the right edge of its track. Until it is dragged it fills the track; dragged
+     narrower it leaves a gap after the text, and it is never wider than the track. The lines
+     follow the rail's right edge, the chat's left edge and the screen's right edge. Each of the
+     first two is the last pixel of an image as wide as what lies left of it, since background-size
+     percentages are of the layout's width, as the track sizes are. */
   .layout:not(.no-chat) {
-    grid-template-columns: minmax(0, 1fr) var(--rail-w) minmax(0, var(--main-max)) minmax(0, 1fr) var(
-        --chat-w
-      );
+    --chat-now: min(var(--chat-w, var(--dock-fill)), var(--dock-fill));
+    grid-template-columns: var(--dock-left) var(--rail-w) var(--dock-main) minmax(0, 1fr);
     background:
-      linear-gradient(var(--ink), var(--ink))
-        calc(max(0px, (100% - var(--rail-w) - var(--main-max) - var(--chat-w)) / 2) + var(--rail-w) - 1px) 0 /
-        1px 100% no-repeat,
-      linear-gradient(var(--ink), var(--ink)) calc(100% - var(--chat-w)) 0 / 1px 100% no-repeat,
+      linear-gradient(to left, var(--ink) 1px, transparent 0) 0 0 / calc(var(--dock-left) + var(--rail-w))
+        100% no-repeat,
+      linear-gradient(to left, var(--ink) 1px, transparent 0) 0 0 / calc(100% - var(--chat-now)) 100%
+        no-repeat,
       linear-gradient(var(--ink), var(--ink)) 100% 0 / 1px 100% no-repeat;
   }
   .layout:not(.no-chat) > .rail {
@@ -40,7 +54,9 @@
     grid-column: 3;
   }
   .layout:not(.no-chat) > aside.chat {
-    grid-column: 5;
+    grid-column: 4;
+    justify-self: end;
+    width: min(var(--chat-w, 100%), 100%);
   }
 }
 .rail,

@@ -677,12 +677,16 @@ export function wireChat(options) {
     return logSeq
   }
 
-  const applyWidth = /** @param {number} width */ width => {
-    root.style.setProperty('--chat-w', `${clampWidth(width)}px`)
-    const handle = qs('#chat-handle', root)
-    handle?.setAttribute('aria-valuenow', String(clampWidth(width)))
+  /**
+   * Makes room in the layout for the reader's stored width, and lets the docked pane fill that room
+   * again. The room stays as it is while the pane is resized, so a drag moves neither the rail nor
+   * the text; the width a drag stores is the room the pane gets the next time it opens.
+   */
+  const anchorWidth = () => {
+    root.style.setProperty('--chat-anchor-w', `${readChatWidth(storage)}px`)
+    root.style.removeProperty('--chat-w')
   }
-  applyWidth(readChatWidth(storage))
+  anchorWidth()
 
   const layerTitle = /** @param {string} id */ id => session.artifact.layers.find(l => l.id === id)?.title
   const pointTitle = /** @param {string} fp */ fp =>
@@ -1603,10 +1607,13 @@ export function wireChat(options) {
     return true
   }
 
-  const stopResize = wireResize(pane, root, storage, applyWidth)
+  const stopResize = wireResize(pane, root, storage)
   const panel = wireChatPanel(root, pane, {
     minimized: readChatMinimized(storage),
-    onMinimizedChange: minimized => writeChatMinimized(storage, minimized),
+    onMinimizedChange: minimized => {
+      writeChatMinimized(storage, minimized)
+      if (!minimized) anchorWidth()
+    },
     onShownChange: shown => {
       paneShown = shown
       seeOpenThread()
@@ -1785,24 +1792,58 @@ export function wireChat(options) {
 }
 
 /**
- * Dragging the pane's edge changes its width, between the two bounds, and the browser remembers
- * it. Arrow keys move it too, so the handle works without a pointer.
+ * The widest a docked pane gets: from the reading column's right edge to its own, which is the
+ * layout's. A drag stops there, so the pane never covers the text.
+ * @param {HTMLElement} pane
+ * @param {HTMLElement} root
+ */
+function fillWidth(pane, root) {
+  const main = qs('#main', root)
+  const right = pane.getBoundingClientRect().right
+  return Math.round(right - (main?.getBoundingClientRect().right ?? 0))
+}
+
+/**
+ * Dragging the pane's edge changes its width, from the minimum up to the reading column, and the
+ * browser remembers it. Only the pane changes: the room the layout keeps for it is set when it
+ * opens. Arrow keys move it too, so the handle works without a pointer.
  * @param {HTMLElement} pane
  * @param {HTMLElement} root
  * @param {Storage | null} storage
- * @param {(width: number) => void} applyWidth
  */
-export function wireResize(pane, root, storage, applyWidth) {
+export function wireResize(pane, root, storage) {
   const handle = qs('#chat-handle', root)
   if (!(handle instanceof HTMLElement)) {
     return () => undefined
   }
   let dragging = false
-  const widthNow = () => readChatWidth(storage)
+  /** The width the drag under way has shown, null until the pointer moves. */
+  /** @type {number | null} */
+  let dragged = null
+
+  /** @param {number} width @param {number} fill */
+  const describe = (width, fill) => {
+    handle.setAttribute('aria-valuenow', String(width))
+    handle.setAttribute('aria-valuemax', String(Math.max(CHAT_WIDTH_MIN, fill)))
+  }
+  /**
+   * Shows the pane at `width`, kept between the minimum and the space right of the text.
+   * @param {number} width
+   * @returns {number} the width shown
+   */
+  const resizeTo = width => {
+    const fill = fillWidth(pane, root)
+    const shown = Math.max(CHAT_WIDTH_MIN, Math.min(fill, Math.round(width)))
+    root.style.setProperty('--chat-w', `${shown}px`)
+    describe(shown, fill)
+    return shown
+  }
+  const onFocus = () => describe(Math.round(pane.getBoundingClientRect().width), fillWidth(pane, root))
 
   /** @param {PointerEvent} event */
   const onDown = event => {
     dragging = true
+    dragged = null
     event.preventDefault()
   }
   /** @param {PointerEvent} event */
@@ -1811,15 +1852,16 @@ export function wireResize(pane, root, storage, applyWidth) {
       return
     }
     // The pane is on the right, so dragging left makes it wider.
-    const width = clampWidth(window.innerWidth - event.clientX)
-    applyWidth(width)
+    dragged = resizeTo(pane.getBoundingClientRect().right - event.clientX)
   }
   const onUp = () => {
     if (!dragging) {
       return
     }
     dragging = false
-    writeChatWidth(storage, pane.getBoundingClientRect().width || widthNow())
+    if (dragged !== null) {
+      writeChatWidth(storage, dragged)
+    }
   }
   /** @param {KeyboardEvent} event */
   const onKey = event => {
@@ -1828,9 +1870,7 @@ export function wireResize(pane, root, storage, applyWidth) {
       return
     }
     event.preventDefault()
-    const width = clampWidth(widthNow() + step)
-    applyWidth(width)
-    writeChatWidth(storage, width)
+    writeChatWidth(storage, resizeTo(pane.getBoundingClientRect().width + step))
   }
 
   handle.addEventListener('pointerdown', /** @type {EventListener} */ (onDown))
@@ -1838,11 +1878,13 @@ export function wireResize(pane, root, storage, applyWidth) {
   document.addEventListener('pointerup', onUp)
   document.addEventListener('pointercancel', onUp)
   handle.addEventListener('keydown', /** @type {EventListener} */ (onKey))
+  handle.addEventListener('focus', onFocus)
   return () => {
     handle.removeEventListener('pointerdown', /** @type {EventListener} */ (onDown))
     document.removeEventListener('pointermove', /** @type {EventListener} */ (onMove))
     document.removeEventListener('pointerup', onUp)
     document.removeEventListener('pointercancel', onUp)
     handle.removeEventListener('keydown', /** @type {EventListener} */ (onKey))
+    handle.removeEventListener('focus', onFocus)
   }
 }
