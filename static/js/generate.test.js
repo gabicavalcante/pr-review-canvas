@@ -16,8 +16,10 @@ import {
   generationStatusHtml,
   QUIET_MS,
   runningLabel,
+  runningVerb,
   skillHtml,
 } from './generate.js'
+import { staleBarHtml } from './empty-state.js'
 import { isRunning } from './generation-phases.js'
 
 /** @typedef {import('./contract-types.js').PrBundle} PrBundle */
@@ -375,6 +377,16 @@ describe('generationStatusHtml', () => {
   it('labels the header command with the running job', () => {
     expect(runningLabel(job(), NOW)).toBe('generating · 3m 12s')
     expect(runningLabel(job({ stopping: true }), NOW)).toBe('stopping · 3m 12s')
+    expect(runningLabel(job(), NOW, 'updating')).toBe('updating · 3m 12s')
+  })
+
+  it.each([
+    ['generate', false, 'generating'],
+    ['update', false, 'updating'],
+    ['update', true, 'regenerating'],
+    ['regenerate', false, 'regenerating'],
+  ])('names a run started from %s with force %s as %s', (label, force, verb) => {
+    expect(runningVerb(job({ force }), label)).toBe(verb)
   })
 })
 
@@ -513,13 +525,27 @@ describe('createGeneration', () => {
     generation.attach(bundle())
     await flush()
     const button = root.querySelector('#regenerate')
-    expect(button?.textContent).toBe('generating · 3m 12s')
+    expect(button?.textContent).toBe('regenerating · 3m 12s')
     expect(button?.getAttribute('title')).toBe('Show the canvas generation')
 
     // A render replaces the header; attaching again puts the job on the new command.
-    root.innerHTML = '<header><div class="hdr-actions"><button id="regenerate">update</button></div></header>'
+    root.innerHTML =
+      '<header><div class="hdr-actions"><button id="regenerate">update</button></div></header>' +
+      staleBarHtml(
+        {
+          canvasHeadSha: 'a'.repeat(40),
+          currentHeadSha: 'b'.repeat(40),
+          relation: 'ancestor',
+          commitsBehind: 1,
+        },
+        'branch'
+      )
     generation.attach(bundle())
-    expect(root.querySelector('#regenerate')?.textContent).toBe('generating · 3m 12s')
+    // The new header offers an update, so the run it shows is named one.
+    expect(root.querySelector('#regenerate')?.textContent).toBe('updating · 3m 12s')
+    // The outdated bar says the update is under way rather than offer a second one.
+    expect(root.querySelector('#stale-generate')?.hasAttribute('hidden')).toBe(true)
+    expect(root.querySelector('.stale-updating')?.hasAttribute('hidden')).toBe(false)
 
     generation.open(bundle())
     const dialog = root.querySelector(`#${GENERATE_DIALOG_ID}`)

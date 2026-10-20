@@ -280,9 +280,22 @@ export function autoUpdateNoticeHtml(job) {
  * What the header's generate command says while a job runs.
  * @param {GenerationJob} job
  * @param {Date} now
+ * @param {string} [verb] what the job does while it runs
  */
-export function runningLabel(job, now) {
-  return `${job.stopping ? 'stopping' : 'generating'} · ${elapsedText(job, now)}`
+export function runningLabel(job, now, verb = 'generating') {
+  return `${job.stopping ? 'stopping' : verb} · ${elapsedText(job, now)}`
+}
+
+/**
+ * What a running job is doing, from the command that was on the header when it started: a blank
+ * page rewrites the canvas whatever the header offered, and an update carries the earlier one.
+ * @param {GenerationJob} job
+ * @param {string} label the header command's own label: generate, update, or regenerate
+ * @returns {string}
+ */
+export function runningVerb(job, label) {
+  if (job.force || label === 'regenerate') return 'regenerating'
+  return label === 'update' ? 'updating' : 'generating'
 }
 
 /**
@@ -432,9 +445,13 @@ export function createGeneration(root, opts) {
     const label = (button.dataset['label'] ??= String(button.textContent))
     const title = (button.dataset['title'] ??= button.title)
     const running = job !== null && isRunning(job) ? job : null
-    button.textContent = running === null ? label : runningLabel(running, now())
+    button.textContent = running === null ? label : runningLabel(running, now(), runningVerb(running, label))
     button.title = running === null ? title : 'Show the canvas generation'
     button.classList.toggle('gen-running', running !== null)
+    // While a job runs, the outdated bar's command would only ask for a second one, which the
+    // server refuses; the bar says the update is under way instead.
+    root.querySelector('#stale-generate')?.toggleAttribute('hidden', running !== null)
+    root.querySelector('.stale-updating')?.toggleAttribute('hidden', running === null)
   }
 
   /**

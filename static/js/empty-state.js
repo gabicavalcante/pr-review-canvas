@@ -207,7 +207,8 @@ export function staleBarHtml(stale, local) {
     'outdated-bar',
     `outdated:${stale.canvasHeadSha}:${stale.currentHeadSha}${stale.relation === 'other-base' ? `:${stale.currentMergeBaseSha}` : ''}`,
     `<strong>Canvas is outdated.</strong> You are reading ${stale.relation === 'other-base' ? 'an older diff' : 'an older commit'}. ${esc(staleSummary(stale, local))} ` +
-      '<button class="cmd" type="button" id="stale-generate" aria-haspopup="dialog">generate for current head</button>'
+      '<button class="cmd" type="button" id="stale-generate" aria-haspopup="dialog">generate for current head</button>' +
+      '<span class="stale-updating" hidden>Updating it now…</span>'
   )
 }
 

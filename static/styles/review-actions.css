@@ -70,23 +70,39 @@ tr.composer .x {
 .toast:empty {
   display: none;
 }
-/* An update the page started by itself, in the corner the toast leaves free. */
+/* An update the page started by itself, in the corner the toast leaves free. It changes the
+   canvas under the reader, so it is drawn to be seen: accent edge, bold text, a pulsing dot. */
 .gen-notice {
   position: fixed;
   left: 16px;
   bottom: 16px;
   z-index: 30;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  background: var(--panel);
-  border: 1px solid var(--ink);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
   box-shadow: 2px 2px 0 var(--shadow);
-  padding: 6px 8px 6px 12px;
-  font-size: 12px;
-  max-width: 340px;
+  padding: 10px 12px 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 380px;
+}
+.gen-notice[data-state='running']::before {
+  content: '';
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pending-pulse 2s ease-in-out infinite;
+}
+.gen-notice .cmd {
+  font-weight: 500;
 }
 .gen-notice.failed {
+  background: var(--panel);
   border-color: var(--bad);
   color: var(--bad);
 }
