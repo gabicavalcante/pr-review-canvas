@@ -99,12 +99,15 @@ async function lineInDiff(
   if (entry === undefined) {
     return null
   }
-  const [writtenAt, shownAt] =
-    decision.side === 'new' ? [commit, src.headSha] : [`${commit}^`, src.mergeBaseSha]
-  const [written, shown] = await Promise.all([
-    fileLines(src.git, writtenAt, decision.path),
-    fileLines(src.git, shownAt, decision.path),
-  ])
+  // A renamed file has its old name at the merge base.
+  const [written, shown] = await Promise.all(
+    decision.side === 'new'
+      ? [fileLines(src.git, commit, decision.path), fileLines(src.git, src.headSha, decision.path)]
+      : [
+          fileLines(src.git, `${commit}^`, decision.path),
+          fileLines(src.git, src.mergeBaseSha, entry.oldPath ?? entry.path),
+        ]
+  )
   const line =
     written === null || shown === null ? undefined : unchangedLines(written, shown)?.get(decision.line)
   if (line === undefined) {
