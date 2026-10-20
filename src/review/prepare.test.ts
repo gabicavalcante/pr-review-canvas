@@ -461,7 +461,8 @@ describe('prepare with a basis canvas', () => {
       side: 'new' as const,
       body: 'The author settled this in commit `abc1234` on 2026-10-13.',
       layerId: 'other',
-      origin: 'decision' as const,
+      origin: 'model' as const,
+      decisionCommit: 'a'.repeat(40),
       audience: 'author' as const,
     }
     await t.ctx.canvases.write(

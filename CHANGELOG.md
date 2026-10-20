@@ -68,7 +68,8 @@
   `judging-surfacing.md` merges in the bundled copies' definitions of impact. `pr-review upgrade`
   and `doctor` do not name this one, since it adds no token. Without them, every generated decide
   point comes back with `POINT_IMPACT`, and the agent picks an impact without the definitions.
-- Teammates on 0.9.0 can still open new canvases; they do not see the impact.
+- Teammates on 0.9.0 can still open new canvases; they do not see the impact, and see a settled
+  decision as a point the author resolved, without the commit it came from.
 
 ## 0.9.0
 

@@ -325,8 +325,17 @@ export const PointSchema = z.object({
   audience: z.enum(POINT_AUDIENCES).default('reviewer'),
   id: z.string().min(1),
   fingerprint: z.string().min(1),
-  /** Who wrote the point: the generator, publish for a missing test, or publish for a settled decision. */
-  origin: z.enum(['model', 'tests', 'decision']),
+  /** Who wrote the point: the generator, or publish for a missing test. */
+  origin: z.enum(['model', 'tests']),
+  /**
+   * The commit whose `Settled-decision` line publish made the point from; absent on every other
+   * point. Such a point keeps origin `model`, so a release that predates settled decisions still
+   * opens the canvas and shows it as a resolved point.
+   */
+  decisionCommit: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .optional(),
   /** The layer that owns the point's hunk; publish fills it from the file's layer. */
   layerId: z.string().optional(),
 })

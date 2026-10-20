@@ -221,7 +221,7 @@ async function resolveResolutions(
   const points = artifact.points.flatMap(p => {
     const settlement = settled[p.fingerprint]
     // Publish writes a settled decision's point again on every run, from the commit's message.
-    return settlement === undefined || p.origin === 'decision'
+    return settlement === undefined || p.decisionCommit !== undefined
       ? []
       : [{ kind: p.kind, path: p.path, title: p.title, origin: p.origin, reason: settlement.reason }]
   })

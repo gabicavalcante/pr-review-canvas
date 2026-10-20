@@ -199,7 +199,7 @@ describe('settled decisions against a real repository', () => {
       [REVISED, null],
     ])
     // The deleted line's decision asks a question, which titles its point; the answer resolves it.
-    const decided = artifact.points.filter(point => point.origin === 'decision')
+    const decided = artifact.points.filter(point => point.decisionCommit !== undefined)
     expect(decided.map(point => point.path)).toEqual(['src/old.ts'])
     expect(decided[0]).toMatchObject({ path: 'src/old.ts', side: 'old', title: KEEP_TWO })
     expect(artifact.settled?.[decisionFp(`${KEEP_TWO} ${DROPPED}`, 'src/old.ts')]?.reason).toBe(DROPPED)
@@ -208,8 +208,17 @@ describe('settled decisions against a real repository', () => {
   it('adds the decision as a resolved point, and again on the next canvas, which copies none of it', async () => {
     const expected = { reason: REASON, at: expect.any(String), commit: heads.decided }
     const first = await published(heads.decided)
-    expect(first.artifact.points.filter(point => point.origin === 'decision')).toEqual([
-      expect.objectContaining({ kind: 'decision', level: 'fyi', audience: 'author', title: ASKED, line: 5 }),
+    expect(first.artifact.points.filter(point => point.decisionCommit !== undefined)).toEqual([
+      // Origin `model`, so a release that predates settled decisions still opens the canvas.
+      expect.objectContaining({
+        kind: 'decision',
+        level: 'fyi',
+        audience: 'author',
+        title: ASKED,
+        line: 5,
+        origin: 'model',
+        decisionCommit: heads.decided,
+      }),
     ])
     expect(first.artifact.settled).toEqual({ [decidedFp]: expected })
 
@@ -217,7 +226,7 @@ describe('settled decisions against a real repository', () => {
     expect(second.context.basis?.canvasSha).toBe(heads.decided)
     expect(second.context.basis?.points.map(point => point.title)).not.toContain(ASKED)
     expect(
-      second.artifact.points.filter(point => point.origin === 'decision').map(point => point.line)
+      second.artifact.points.filter(point => point.decisionCommit !== undefined).map(point => point.line)
     ).toEqual([7])
     expect(second.artifact.settled).toEqual({ [decidedFp]: expected })
   })
@@ -226,9 +235,9 @@ describe('settled decisions against a real repository', () => {
     await published(heads.decided)
     await published(heads.shifted)
     const { artifact } = await published(heads.revised)
-    expect(artifact.points.filter(point => point.origin === 'decision').map(point => point.title)).toEqual([
-      ASKED,
-    ])
+    expect(
+      artifact.points.filter(point => point.decisionCommit !== undefined).map(point => point.title)
+    ).toEqual([ASKED])
     expect(artifact.settled).toEqual({
       [decisionFp(`${ASKED} ${REVISED}`)]: { reason: REVISED, at: expect.any(String), commit: heads.revised },
     })
@@ -247,7 +256,7 @@ describe('settled decisions against a real repository', () => {
 
   it('shows a later answer to the same question over the reason the author wrote on the canvas for the earlier one', async () => {
     const { artifact } = await published(heads.decided)
-    const [point] = artifact.points.filter(candidate => candidate.origin === 'decision')
+    const [point] = artifact.points.filter(candidate => candidate.decisionCommit !== undefined)
     const reworded = { reason: 'Reworded on the canvas.', at: '2026-10-13T12:00:00.000Z' }
     await harness.ctx.canvases.revise(
       heads.decided,

@@ -219,7 +219,8 @@ function decisionPoints(
       // two points, and a revised answer is a new one, so a reason written on the canvas for the
       // old answer does not cover it.
       fingerprint: fingerprint({ kind: 'decision', path: decision.path, title: decisionLine(decision) }),
-      origin: 'decision',
+      origin: 'model',
+      decisionCommit: decision.commit,
     }
     const layerId = layerIdForLine(layers, files, decision.path, decision.side, decision.line)
     if (layerId !== undefined) {
@@ -324,7 +325,7 @@ export function artifactToModelOutput(artifact: ReviewArtifact): ModelOutput {
       return out
     }),
     points: artifact.points
-      .filter(p => p.origin === 'model')
+      .filter(p => p.origin === 'model' && p.decisionCommit === undefined)
       .map(({ id: _id, fingerprint: _fp, origin: _origin, layerId: _layerId, ...p }) => p),
   }
 }

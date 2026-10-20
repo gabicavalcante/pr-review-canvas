@@ -280,7 +280,7 @@ describe('normalize', () => {
         decision('c-3', 'not in the diff', null),
       ],
     })
-    const points = artifact.points.filter(point => point.origin === 'decision')
+    const points = artifact.points.filter(point => point.decisionCommit !== undefined)
     expect(points.map(point => [point.title, point.line, point.layerId])).toEqual([
       [
         `${long
@@ -293,6 +293,8 @@ describe('normalize', () => {
       ['Settled decision…', 4, 'run-path'],
     ])
     expect(points[0]).toMatchObject({
+      origin: 'model',
+      decisionCommit: commit,
       kind: 'decision',
       level: 'fyi',
       audience: 'author',
@@ -326,7 +328,7 @@ describe('normalize', () => {
       ...input(),
       decisions: [decision('c-1', 'Should run() multiply?', 2), decision('c-2', long, 4)],
     })
-    const [short, cut] = artifact.points.filter(point => point.origin === 'decision')
+    const [short, cut] = artifact.points.filter(point => point.decisionCommit !== undefined)
     expect(short).toMatchObject({
       title: 'Should run() multiply?',
       body: 'The author settled this in commit `ccccccc` on 2026-10-13.',
@@ -353,7 +355,7 @@ describe('normalize', () => {
       ...input(),
       decisions: [decision('c-1', 'Yes: the sum is wanted.', 2), decision('c-2', 'No: a leftover.', 4)],
     })
-    const points = artifact.points.filter(point => point.origin === 'decision')
+    const points = artifact.points.filter(point => point.decisionCommit !== undefined)
     expect(
       points.map(point => [point.title, point.line, artifact.settled?.[point.fingerprint]?.reason])
     ).toEqual([
