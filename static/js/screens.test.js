@@ -296,14 +296,14 @@ describe('header', () => {
     expect(step?.querySelector('a')?.getAttribute('href')).toBe(artifact.pr.url)
   })
 
-  it('draws no sign-off and no refresh on a local review, which has no pull request to post to', () => {
+  it('draws no pending review, no sign-off and no refresh on a local review, which has no pull request to post to', () => {
     document.body.innerHTML = renderHeader(bundle({ local: 'branch' }), {
       host: 'h',
       theme: 'auto',
       skin: 'terminal',
       now: NOW,
     })
-    expect(document.querySelector('.signoff, .capability-note')).toBeNull()
+    expect(document.querySelector('.signoff, .capability-note, .pending-bar-host')).toBeNull()
     expect(document.querySelector('.ptext')?.textContent).toBe('0 of 1 layers reviewed')
     expect(document.querySelector('#refresh')).toBeNull()
     expect(document.querySelector('#regenerate')).not.toBeNull()

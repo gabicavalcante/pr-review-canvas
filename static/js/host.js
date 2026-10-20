@@ -19,6 +19,23 @@ export function currentHost() {
   return current
 }
 
+/**
+ * Whether the page reviews a pull request. Work reviewed before it has one is on no forge, so its
+ * page draws none of the commands that only a pull request can take: posting, the pending review,
+ * and its sign-off, rather than drawing them disabled for a reason that never goes away. `app.js`
+ * sets it once per render, before the first renderer reads it.
+ */
+let onPullRequest = true
+
+/** @param {boolean} on */
+export function setOnPullRequest(on) {
+  onPullRequest = on
+}
+
+export function isOnPullRequest() {
+  return onPullRequest
+}
+
 /** `GitHub` or `GitLab`, for sentences. */
 export function hostLabel() {
   return current.label

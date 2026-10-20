@@ -2,6 +2,7 @@
 // The key map of the review page. `keyAction` is the whole decision: which key does what, when
 // the page is listening at all, and how the two-key `g o` sequence works.
 import { esc } from './dom.js'
+import { isOnPullRequest } from './host.js'
 
 /**
  * @typedef {'next-layer' | 'prev-layer' | 'next-file' | 'prev-file' | 'next-point' | 'prev-point'
@@ -19,7 +20,7 @@ export const KEY_HELP = [
   },
   { keys: 'r', what: 'mark the file in focus reviewed' },
   { keys: 'R', what: 'mark the layer in focus reviewed and move on to the next open layer on screen' },
-  { keys: 'c', what: 'comment on the line in focus or on the selection' },
+  { keys: 'c', what: 'comment on the line in focus or on the selection', pullRequest: true },
   { keys: 'd', what: 'dismiss the attention point in focus' },
   { keys: 'f', what: 'step through how much code is hidden: light, moderate, aggressive' },
   { keys: 'g o', what: 'go to the overview' },
@@ -28,6 +29,11 @@ export const KEY_HELP = [
   { keys: 'a', what: 'ask AI Chat about the card, point, or selection in focus' },
   { keys: '/', what: 'put the cursor in the AI Chat box' },
 ]
+
+/** The keys of this page: the ones that act on a pull request are left out of work with none. */
+export function keyHelp() {
+  return KEY_HELP.filter(row => row.pullRequest !== true || isOnPullRequest())
+}
 
 /**
  * True while the reader is typing, when no key of this map should fire.
@@ -87,7 +93,7 @@ export function keyAction(event, opts = {}) {
     case 'R':
       return { action: 'reviewed-layer', pendingG: false }
     case 'c':
-      return { action: 'comment', pendingG: false }
+      return isOnPullRequest() ? { action: 'comment', pendingG: false } : none
     case 'd':
       return { action: 'dismiss', pendingG: false }
     case 'f':
@@ -108,9 +114,9 @@ export function keyAction(event, opts = {}) {
 export const HELP_DIALOG_ID = 'help-dialog'
 
 export function helpDialogHtml() {
-  const rows = KEY_HELP.map(r => `<tr><td class="mono">${esc(r.keys)}</td><td>${esc(r.what)}</td></tr>`).join(
-    ''
-  )
+  const rows = keyHelp()
+    .map(r => `<tr><td class="mono">${esc(r.keys)}</td><td>${esc(r.what)}</td></tr>`)
+    .join('')
   return (
     `<dialog id="${HELP_DIALOG_ID}" class="help" aria-labelledby="help-h"><form method="dialog">` +
     '<h2 id="help-h">Keyboard</h2>' +

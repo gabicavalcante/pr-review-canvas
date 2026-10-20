@@ -1,8 +1,10 @@
 // @ts-check
 // The pane on the right of the review: AI Chat, its threads, and the review being written share it
 // as tabs. With AI Chat off the pane holds the review alone, and stays minimized until the reader
-// opens it.
+// opens it. Work with no pull request has no review to write, so its pane is AI Chat and its
+// threads, and without AI Chat there is no pane.
 import { wireChatPanel } from './chat-panel.js'
+import { isOnPullRequest } from './host.js'
 import { REVIEW_PANEL_ID } from './review-panel.js'
 
 /** @typedef {'chat' | 'threads' | 'review'} SideTab */
@@ -27,7 +29,7 @@ function sideTabOf(name) {
 /**
  * The tab strip at the top of the pane, which also holds the command that minimizes it.
  * @param {{ chat: boolean }} opts `chat` adds the AI Chat and Threads tabs; without it the review
- *   is alone
+ *   is alone. The review tab is there only on a pull request.
  */
 export function sideTabsHtml(opts) {
   const tab =
@@ -44,7 +46,14 @@ export function sideTabsHtml(opts) {
       ? tab('chat', `AI Chat${CHAT_NEW_BADGE}`, 'chat-log', true) +
         tab('threads', 'Threads<span class="threads-new" hidden></span>', THREADS_PANEL_ID, false)
       : '') +
-    tab('review', 'Your review <span class="review-count" data-empty>0</span>', REVIEW_PANEL_ID, !opts.chat) +
+    (isOnPullRequest()
+      ? tab(
+          'review',
+          'Your review <span class="review-count" data-empty>0</span>',
+          REVIEW_PANEL_ID,
+          !opts.chat
+        )
+      : '') +
     `<button class="cmd chat-minimize" type="button" id="chat-minimize" aria-label="Minimize ${opts.chat ? 'AI Chat' : 'your review'}">minimize</button>` +
     '</div>'
   )
@@ -52,9 +61,13 @@ export function sideTabsHtml(opts) {
 
 /**
  * The pane with the review alone, for a page without AI Chat. It uses the chat's ids for its
- * dialog, launcher, and minimize command, so the same panel wiring docks and floats it.
+ * dialog, launcher, and minimize command, so the same panel wiring docks and floats it. Off a pull
+ * request it would hold nothing, so it is not drawn.
  */
 export function reviewPaneHtml() {
+  if (!isOnPullRequest()) {
+    return ''
+  }
   return (
     '<aside class="chat review-only" aria-label="Your review" data-tab="review" hidden>' +
     sideTabsHtml({ chat: false }) +
@@ -67,11 +80,16 @@ export function reviewPaneHtml() {
 
 /**
  * Shows one tab of the pane and hides the others. The chat's parts stay mounted while another tab
- * is shown, so a draft message and the transcript's place survive the switch.
+ * is shown, so a draft message and the transcript's place survive the switch. A tab the pane does
+ * not draw is never selected: the pane stays on the tab it shows.
  * @param {HTMLElement} pane
  * @param {SideTab} tab
+ * @returns {boolean} whether the pane has that tab
  */
 export function selectSideTab(pane, tab) {
+  if (pane.querySelector(`[data-side-tab="${tab}"]`) === null) {
+    return false
+  }
   pane.setAttribute('data-tab', tab)
   for (const button of Array.from(pane.querySelectorAll('[data-side-tab]'))) {
     const selected = button.getAttribute('data-side-tab') === tab
@@ -84,6 +102,7 @@ export function selectSideTab(pane, tab) {
   }
   pane.querySelector(`#${REVIEW_PANEL_ID}`)?.toggleAttribute('hidden', tab !== 'review')
   pane.querySelector(`#${THREADS_PANEL_ID}`)?.toggleAttribute('hidden', tab !== 'threads')
+  return true
 }
 
 /**
@@ -133,12 +152,15 @@ export function wireSideTabs(pane, onSelect) {
 }
 
 /**
- * Shows the review tab, opening the pane when it is minimized, and puts the focus on the tab.
+ * Shows the review tab, opening the pane when it is minimized, and puts the focus on the tab. A
+ * pane with no review tab is left as it is.
  * @param {HTMLElement} pane
  * @param {{ open: () => void }} panel
  */
 export function openReviewTab(pane, panel) {
-  selectSideTab(pane, 'review')
+  if (!selectSideTab(pane, 'review')) {
+    return
+  }
   panel.open()
   const tab = pane.querySelector('#side-tab-review')
   if (tab instanceof HTMLElement) {

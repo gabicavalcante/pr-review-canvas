@@ -5,6 +5,10 @@ import { createHubApp } from '../src/hub/hub-app.js'
 import { createHub } from '../src/hub/hub.js'
 import { resolveVendorRoots } from '../src/server/context.js'
 import { DEFAULT_PROJECT_CONFIG } from '../src/project-config.js'
+import { artifactToModelOutput } from '../src/review/normalize.js'
+import { prepare } from '../src/review/prepare.js'
+import { publish } from '../src/review/publish.js'
+import { writeTextAtomic } from '../src/store/atomic-json.js'
 import { createFakeRunner, type FakeRunnerOptions } from '../src/testing/fake-runner.js'
 import {
   createFakeCheckoutGit,
@@ -20,6 +24,7 @@ import {
   GH_REVIEW_COMMENTS,
   ghFor42,
   gitFor42,
+  gitForLocal,
   syntheticArtifact,
 } from '../src/testing/synthetic.js'
 
@@ -75,6 +80,8 @@ export const test = base.extend<{
   selfReviewUrl: string
   noChatUrl: string
   chatServer: (options?: ChatServerOptions) => Promise<ChatServer>
+  /** The review of uncommitted work in a clone with no pull request, with the synthetic canvas. */
+  localReview: (options: { chat: boolean }) => Promise<string>
 }>({
   chatOpened: [true, { option: true }],
   pointsDensity: ['detailed', { option: true }],
@@ -103,6 +110,36 @@ export const test = base.extend<{
       stops.push(server.stop)
       await options.setup?.(server.t)
       return { url: server.url, ctx: server.t.ctx }
+    })
+    for (const stop of stops) {
+      await stop()
+    }
+  },
+  localReview: async ({ page }, use) => {
+    const stops: Array<() => Promise<void>> = []
+    await use(async ({ chat }) => {
+      const server = await startServer(page, {
+        git: gitForLocal(),
+        fixtureArtifact: null,
+        projectConfig: {
+          config: { ...DEFAULT_PROJECT_CONFIG, chat: { ...DEFAULT_PROJECT_CONFIG.chat, enabled: chat } },
+          warnings: [],
+          source: null,
+        },
+        ...(chat ? { runner: createFakeRunner(), checkoutGit: createFakeCheckoutGit() } : {}),
+      })
+      stops.push(server.stop)
+      const quiet = { force: false, log: () => undefined }
+      const target = { kind: 'local', base: 'origin/main', source: 'uncommitted' } as const
+      const prepared = await prepare(server.t.ctx, target, quiet)
+      const model = artifactToModelOutput(syntheticArtifact())
+      await writeTextAtomic(`${prepared.canvasDir}/model.json`, JSON.stringify(model))
+      await publish(server.t.ctx, prepared.canvasDir, {
+        agent: 'claude',
+        harness: 'claude-code',
+        allowStale: false,
+      })
+      return server.url.replace(/review\/42$/, 'review/uncommitted')
     })
     for (const stop of stops) {
       await stop()

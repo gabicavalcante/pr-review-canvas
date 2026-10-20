@@ -1,6 +1,6 @@
 // @ts-check
 import { esc } from './dom.js'
-import { postToLabel } from './host.js'
+import { isOnPullRequest, postToLabel } from './host.js'
 import { normalizedCommentBody } from './proposed-comment.js'
 
 /** @param {string} url */
@@ -66,7 +66,7 @@ export function isQueuedComment(proposed, pending) {
  * for getting onto the forge: the link to the comment it was posted as, the note that it is
  * waiting in the review, or the two ways to send it. It keeps both ways while a review is open:
  * its text is written in advance, so firing one off on its own is a use of its own, not a comment
- * jumping the queue.
+ * jumping the queue. Work with no pull request has nowhere to send it, so it offers neither.
  * @param {{
  *   kind: 'point' | 'proposed',
  *   id: string,
@@ -85,6 +85,9 @@ export function sendCommandsHtml(opts) {
   }
   if (opts.queued === true) {
     return '<span class="pill pending queued">in your review</span>'
+  }
+  if (!isOnPullRequest()) {
+    return ''
   }
   const target = `data-${opts.kind}="${esc(opts.id)}"`
   const post = `<button class="cmd" type="button" data-act="${opts.kind}-post" ${target} data-needs-post>${postToLabel()}</button>`

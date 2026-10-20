@@ -59,7 +59,7 @@ import { openSettingsDialog } from './settings.js'
 import { wireAppearanceCommands } from './appearance-commands.js'
 import { readSkin } from './skin.js'
 import { readTheme } from './theme.js'
-import { hostLabel, setHost } from './host.js'
+import { hostLabel, setHost, setOnPullRequest } from './host.js'
 
 /** @typedef {import('./contract-types.js').ReviewKey} ReviewKey */
 /** @typedef {import('./contract-types.js').ReviewBootstrap} Bootstrap */
@@ -338,8 +338,9 @@ export class PrAppElement extends HTMLElement {
     const storage = typeof localStorage === 'undefined' ? null : localStorage
     const chatMinimized = chatEnabled && readChatMinimized(storage)
     setPointsDensity(document.documentElement, readPointsDensity(storage))
-    // The renderers read this while they build the cards, so it is set before the first one.
+    // The renderers read these while they build the cards, so they are set before the first one.
     setChatEnabled(chatEnabled)
+    setOnPullRequest(bundle.local === undefined)
     setMentionCanvas(bundle.mentionCanvas)
     if (bundle.artifact && showsCanvas) {
       const { artifact } = bundle

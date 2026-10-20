@@ -6,6 +6,7 @@
 import { diffWordsWithSpace } from 'diff'
 import hljs from 'hljs'
 import { esc } from './dom.js'
+import { isOnPullRequest } from './host.js'
 import { parseHunkHeader } from './hunks.js'
 import { buildLineId, hunkAnchorId, hunkId } from './keys.js'
 
@@ -731,7 +732,7 @@ export function rowHtml(e, key) {
   const commentSide = e.type === 'del' ? 'old' : 'new'
   const commentLine = commentSide === 'old' ? e.oldLine : e.newLine
   const plus =
-    commentLine === null
+    commentLine === null || !isOnPullRequest()
       ? ''
       : `<button class="plus" type="button" data-act="comment-line" data-needs-post data-key="${esc(key)}" data-side="${commentSide}" data-line="${commentLine}" aria-label="Comment on line ${commentLine}">+</button>`
   return (

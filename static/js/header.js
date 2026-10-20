@@ -156,7 +156,7 @@ export function renderHeader(bundle, opts) {
  * @param {{ pr?: PrBundle['pr'], readerIsAuthor?: boolean, local?: boolean }} [opts] `pr` the pull
  *   request as the page has it now, whose diff the drafts belong to and whose state words the
  *   author's step; `readerIsAuthor` as the bundle says it; `local` for work with no pull request,
- *   which has nowhere to post a review, so it gets no sign-off at all
+ *   which has nowhere to post a review, so it gets neither the pending-review bar nor sign-off
  */
 export function progressHtml(artifact, state, opts = {}) {
   const { pr = artifact.pr, readerIsAuthor = false, local = false } = opts
@@ -169,6 +169,12 @@ export function progressHtml(artifact, state, opts = {}) {
       `${blocked === null ? ` title="${approveTitle}"` : ` disabled data-disabled-reason="${esc(blocked)}" title="${esc(blocked)}"`}>approve on ${esc(currentHost().kind)}</button>` +
       `<button class="cmd" type="button" id="request-changes" data-tooltip="Write and preview a review requesting changes on ${esc(hostLabel())}" title="Write and preview a review requesting changes on ${esc(hostLabel())}" data-act="signoff" data-event="REQUEST_CHANGES" data-needs-post>request changes</button>`
   const commentTitle = `Write and preview a review with no verdict on ${esc(hostLabel())}`
+  const pendingBar = local
+    ? ''
+    : `<div class="pending-bar-host${pendingCount(state) > 0 ? ' has-pending' : ''}">${pendingBarHtml(
+        pendingCount(state),
+        draftsByCommit(state, pr).earlier.length
+      )}</div>`
   const signoff = local
     ? ''
     : `<div class="signoff">${verdicts}` +
@@ -177,10 +183,7 @@ export function progressHtml(artifact, state, opts = {}) {
   return (
     `<div class="progress"><div class="pline" role="progressbar" aria-valuenow="${p.done}" aria-valuemin="0" aria-valuemax="${p.total}" aria-label="Layers reviewed"><span style="width:${p.percent}%"></span></div>` +
     `<span class="ptext">${p.done} of ${p.total} layers reviewed</span></div>` +
-    `<div class="pending-bar-host${pendingCount(state) > 0 ? ' has-pending' : ''}">${pendingBarHtml(
-      pendingCount(state),
-      draftsByCommit(state, pr).earlier.length
-    )}</div>` +
+    pendingBar +
     signoff
   )
 }

@@ -19,6 +19,7 @@
 import { findRow } from './anchors.js'
 import { askButtonHtml } from './ask.js'
 import { esc } from './dom.js'
+import { isOnPullRequest } from './host.js'
 
 /**
  * @param {Selection | null} selection
@@ -101,15 +102,19 @@ export function selectionLabel(selection) {
 }
 
 /**
- * The little bar under a selection: comment on those lines, or ask the chat about them.
+ * The little bar under a selection: comment on those lines, on a pull request, or ask the chat
+ * about them.
  * @param {Selection} selection
  */
 export function selectionToolbarHtml(selection) {
   const label = selectionLabel(selection)
+  const comment = isOnPullRequest()
+    ? '<button class="cmd" type="button" data-act="comment-selection" data-needs-post>comment</button>'
+    : ''
   return (
     `<tr class="sel-bar" data-decoration="selection"><td class="ln" colspan="3"></td><td class="code x">` +
     `<span class="lbl">${esc(label)}</span>` +
-    '<span class="tbtns"><button class="cmd" type="button" data-act="comment-selection" data-needs-post>comment</button>' +
+    `<span class="tbtns">${comment}` +
     askButtonHtml({
       kind: 'lines',
       path: selection.path,

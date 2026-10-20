@@ -188,9 +188,15 @@ one never disturbs the other.
   `<project>/review/<number>`.
 - **No forge side.** A local canvas posts nothing: comments, sign-off, canvas import, and
   attachment discovery are refused for it. The page draws no import drop zone and no shared-canvas
-  callout, and the comment and sign-off commands stay disabled with the reason. A canvas of a working-tree
-  snapshot is never offered as a pull request's canvas, or as the branch review's, because its
-  commit is on no branch.
+  callout, and none of the commands that only act on a pull request, rather than drawing them
+  disabled: attention points have no **post to github** or **add to review**, diff lines and line
+  selections have no comment command, a comment AI Chat proposes keeps only **copy**, and there is
+  no [pending review](#pending-reviews) bar, no sign-off, and no **Your review** tab. The side pane
+  holds **AI Chat** and its **Threads**; with AI Chat off there is no side pane. The `c` key does
+  nothing, and the keyboard help leaves it out. Resolve, dismiss, copy, ask, mark reviewed,
+  regenerate or update, export zip, and settings work as on a pull request. A canvas of a
+  working-tree snapshot is never offered as a pull request's canvas, or as the branch review's,
+  because its commit is on no branch.
 
 For a comparison between two commits that both exist, name them instead:
 
@@ -938,8 +944,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ### Comments and sign-off
 
-You can post inline comments, replies, PR-level comments, and attention points. Inline comments
-must target lines in the diff. Posting uses your `gh` or `glab` account and remains subject to its
+On a pull request's review you can post inline comments, replies, PR-level comments, and attention
+points; a [local review](#reviewing-before-the-pull-request-exists) offers none of these. Inline
+comments must target lines in the diff. Posting uses your `gh` or `glab` account and remains subject to its
 repository permissions.
 
 Click a line number to comment on one line. Shift-click a second line number, or drag across a
@@ -949,7 +956,8 @@ chunk of the diff.
 
 ### Pending reviews
 
-A pending review holds comments on your machine until you submit them together.
+A pending review holds comments on your machine until you submit them together. Only a pull
+request's review has one: a local review draws nothing that starts or shows it.
 
 - **post to github** on a diff-line comment posts it at once. **start a review** adds it to a new
   pending review instead.
@@ -1155,8 +1163,9 @@ To send every ask to the open thread instead, clear **A thread per place** under
 An ask then only chooses the context of your next message, which the line above the message box
 names; choosing another target replaces it, and **clear** returns to the whole PR.
 
-Chat can propose an inline comment. A valid proposal appears with controls to post, edit,
-or copy it. A proposal outside the current diff remains text with an explanation.
+Chat can propose an inline comment. On a pull request a valid proposal appears with controls to
+add it to the review, post, edit, or copy it; on a local review, which has nowhere to send it, it
+offers **copy** alone. A proposal outside the current diff remains text with an explanation.
 
 Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time. While an answer is
 coming in, ask, the Threads tab and **new thread** still open any thread, and the answer keeps

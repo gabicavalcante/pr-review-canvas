@@ -29,6 +29,7 @@ import {
 import { runCommand, toast } from './commands.js'
 import { isQueuedComment, postedCommentUrl, sendCommandsHtml } from './comment-link.js'
 import { esc, flash, qs, scrollIntoViewSafe } from './dom.js'
+import { isOnPullRequest } from './host.js'
 import { cssEscape } from './anchors.js'
 import { getRenderContext } from './layers.js'
 import { lineLink } from './links.js'
@@ -67,7 +68,7 @@ export function renderChatShell(opts) {
   // The launcher starts hidden and `wireChatPanel` reveals it where it belongs, so a docked
   // chat never paints a launcher over itself on the first frame.
   return (
-    `<aside class="chat" aria-label="AI Chat and your review" data-tab="chat"${opts.minimized ? ' hidden' : ''}>` +
+    `<aside class="chat" aria-label="${isOnPullRequest() ? 'AI Chat and your review' : 'AI Chat'}" data-tab="chat"${opts.minimized ? ' hidden' : ''}>` +
     `<button class="handle" type="button" id="chat-handle" role="separator" aria-orientation="vertical" aria-label="Resize AI Chat" aria-valuenow="${width}" aria-valuemin="${CHAT_WIDTH_MIN}" aria-valuemax="${CHAT_WIDTH_MAX}"></button>` +
     sideTabsHtml({ chat: true }) +
     // The tab names the pane on screen; the heading stays for screen readers and the dialog's name.
@@ -93,7 +94,9 @@ export function renderChatShell(opts) {
     '<div class="tbtns"><button class="cmd fill" type="submit" id="chat-send">send</button>' +
     '<button class="cmd" type="button" id="chat-stop" hidden>stop</button>' +
     '<span class="muted small">enter to send</span></div></form>' +
-    `<section class="review-panel" id="${REVIEW_PANEL_ID}" role="tabpanel" aria-labelledby="side-tab-review" hidden></section>` +
+    (isOnPullRequest()
+      ? `<section class="review-panel" id="${REVIEW_PANEL_ID}" role="tabpanel" aria-labelledby="side-tab-review" hidden></section>`
+      : '') +
     '</aside>' +
     '<dialog class="chat-dialog" id="chat-dialog" aria-labelledby="chat-h"></dialog>' +
     `<button class="chat-launcher" id="chat-launcher" type="button" hidden aria-controls="chat-dialog" aria-expanded="false">AI Chat${CHAT_NEW_BADGE}</button>`
@@ -293,8 +296,9 @@ export function checkoutWarningHtml(event) {
 /**
  * The commands under a card. `add to review` leads, as it does on a diff-line comment, and both
  * ways of sending go through the same paths as every other post and draft, so capability gating
- * and the pending state apply here too. `data-key` names what the send commands show, so a
- * change of state redraws only the cards it changed.
+ * and the pending state apply here too. `edit` opens the comment's composer, which only sends, so
+ * work with no pull request keeps `copy` alone. `data-key` names what the send commands show, so
+ * a change of state redraws only the cards it changed.
  * @param {ProposedComment} comment
  * @param {string} id the key the pane stores this card's comment under
  * @param {SendState} send
@@ -311,7 +315,9 @@ function proposedCommandsHtml(comment, id, send) {
   return (
     `<span class="tbtns" data-key="${shown}">` +
     sendCommandsHtml({ kind: 'proposed', id, ...send, leadWithQueue: true }) +
-    `<button class="cmd" type="button" data-act="proposed-edit" data-proposed="${esc(id)}" data-needs-post>edit</button>` +
+    (isOnPullRequest()
+      ? `<button class="cmd" type="button" data-act="proposed-edit" data-proposed="${esc(id)}" data-needs-post>edit</button>`
+      : '') +
     `<button class="cmd" type="button" data-copy="${esc(comment.body)}">copy</button>` +
     '</span>'
   )
@@ -320,7 +326,8 @@ function proposedCommandsHtml(comment, id, send) {
 /**
  * The line that says which attention point the agent tied the comment to. Sending the comment
  * carries the link to the point, which then shows the comment as its draft or its posted reply;
- * until then the reader can take the link off when the agent judged wrong.
+ * until then the reader can take the link off when the agent judged wrong. Work with no pull
+ * request sends nothing, so the tie only names the point there.
  * @param {string} id
  * @param {SendState} send
  */
@@ -329,9 +336,10 @@ function proposedPointHtml(id, send) {
     return ''
   }
   const open = send.postedUrl === undefined && send.submitted !== true && send.queued !== true
-  const unlink = open
-    ? ` <button class="cmd" type="button" data-act="proposed-unlink" data-proposed="${esc(id)}">unlink</button>`
-    : ''
+  const unlink =
+    open && isOnPullRequest()
+      ? ` <button class="cmd" type="button" data-act="proposed-unlink" data-proposed="${esc(id)}">unlink</button>`
+      : ''
   // The key is what the line shows: the point, and whether it can still come off.
   const key = `${send.point.fingerprint}:${open ? 'open' : 'sent'}`
   return `<p class="proposed-point muted small" data-key="${esc(key)}">about the point “${esc(send.point.title)}”${unlink}</p>`

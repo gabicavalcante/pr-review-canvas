@@ -163,9 +163,9 @@ export function pointContext(p) {
 
 /**
  * The commands a point carries, by where it stands. An open point offers every way to act on it:
- * `copy` puts the markdown on the clipboard, `post to github` posts it at the anchor, `add to
- * review` holds it as a draft instead, `resolve` lets the author answer it for every reviewer, and
- * `dismiss` takes it off this reader's list. A point already acted on keeps `copy` and `ask`, and
+ * `copy` puts the markdown on the clipboard, `post to github` posts it at the anchor and `add to
+ * review` holds it as a draft instead (on a pull request only), `resolve` lets the author answer
+ * it for every reviewer, and `dismiss` takes it off this reader's list. A point already acted on keeps `copy` and `ask`, and
  * offers the way back from what was done to it: its draft carries its own edit and delete,
  * `reopen` takes back a resolution, and `restore` a dismissal.
  * @param {Point} p
