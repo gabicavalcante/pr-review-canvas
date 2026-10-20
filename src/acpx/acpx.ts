@@ -18,6 +18,7 @@ import {
 } from './events.js'
 import type { ModelUpgrades } from './models.js'
 import { createNdjsonSplitter, NdjsonError } from './ndjson.js'
+import { BWRAP_BIN } from './sandbox.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -32,6 +33,17 @@ export const SHOW_TIMEOUT_SEC = 20
 /** The runner's deadline sits this far past acpx's, so acpx reports its own timeout first. */
 export const DEADLINE_SLACK_MS = 15_000
 
+/**
+ * A turn that may change code. acpx runs inside the box, so the agent and the process acpx keeps
+ * alive between turns do too; every tool is approved, and the agent has a terminal.
+ */
+export interface WriteTurn {
+  /** The box's arguments up to `--` (see `bwrapArgs` in `./sandbox.ts`); acpx follows them. */
+  box: readonly string[]
+  /** Variables on top of the runner's environment, such as the git guard's. */
+  env: Readonly<Record<string, string>>
+}
+
 export interface AgentRunOptions {
   agent: string
   /** The acpx session name, which is what a chat thread is. */
@@ -41,6 +53,7 @@ export interface AgentRunOptions {
   timeoutSec: number
   model?: string | undefined
   maxTurns?: number | undefined
+  writes?: WriteTurn | undefined
   /**
    * Every acpx line the raw event log may keep. The scrubbing happens here rather than in the
    * caller, so no caller can write a file's content to disk by mistake.
@@ -67,7 +80,14 @@ export interface AgentRunner {
    * Creates the named session when it does not exist yet. `prompt -s <name>` refuses an unknown
    * session on some agents (codex says so and exits), so a thread's first turn ensures it.
    */
-  ensureSession(options: { agent: string; session: string; cwd: string; timeoutSec: number }): Promise<void>
+  ensureSession(options: {
+    agent: string
+    session: string
+    cwd: string
+    timeoutSec: number
+    /** A session a turn that changes code will run in is created inside the same box. */
+    writes?: WriteTurn | undefined
+  }): Promise<void>
   /** One real round trip, used by the settings probe. */
   exec(options: { agent: string; prompt: string; cwd: string; timeoutSec: number }): Promise<AgentExecResult>
   /** The acpx version, or null when acpx is not on PATH. */
@@ -105,8 +125,38 @@ export function commonAcpxArgs(cwd: string, timeoutSec: number): string[] {
   ]
 }
 
+/**
+ * The flags of a turn that changes code: what the read-only flags deny is approved instead, and
+ * the agent keeps its terminal. The box and the git guard are what hold it in, not these flags.
+ */
+export function writeAcpxArgs(cwd: string, timeoutSec: number): string[] {
+  return [
+    '--cwd',
+    cwd,
+    '--format',
+    'json',
+    '--json-strict',
+    '--suppress-reads',
+    '--approve-all',
+    '--timeout',
+    String(timeoutSec),
+  ]
+}
+
+/** The command that runs acpx with `args`: acpx itself, or bubblewrap in front of it. */
+export function boxedCommand(
+  bin: string,
+  args: string[],
+  writes: WriteTurn | undefined
+): { file: string; args: string[] } {
+  return writes === undefined ? { file: bin, args } : { file: BWRAP_BIN, args: [...writes.box, bin, ...args] }
+}
+
 export function buildPromptArgs(options: AgentRunOptions): string[] {
-  const args = commonAcpxArgs(options.cwd, options.timeoutSec)
+  const args =
+    options.writes === undefined
+      ? commonAcpxArgs(options.cwd, options.timeoutSec)
+      : writeAcpxArgs(options.cwd, options.timeoutSec)
   if (options.model !== undefined && options.model !== '') {
     args.push('--model', options.model)
   }
@@ -121,8 +171,15 @@ export function buildCancelArgs(agent: string, session: string, cwd: string): st
   return [...commonAcpxArgs(cwd, CANCEL_TIMEOUT_SEC), agent, 'cancel', '-s', session]
 }
 
-export function buildEnsureArgs(agent: string, session: string, cwd: string, timeoutSec: number): string[] {
-  return [...commonAcpxArgs(cwd, timeoutSec), agent, 'sessions', 'ensure', '-s', session]
+export function buildEnsureArgs(
+  agent: string,
+  session: string,
+  cwd: string,
+  timeoutSec: number,
+  writes = false
+): string[] {
+  const flags = writes ? writeAcpxArgs(cwd, timeoutSec) : commonAcpxArgs(cwd, timeoutSec)
+  return [...flags, agent, 'sessions', 'ensure', '-s', session]
 }
 
 export function buildShowArgs(agent: string, session: string, cwd: string): string[] {
@@ -260,9 +317,17 @@ export function createAgentRunner(opts: CreateAgentRunnerOptions = {}): AgentRun
   const execQuiet = async (
     file: string,
     args: string[],
-    options: { cwd?: string; timeoutSec?: number; killSignal?: NodeJS.Signals } = {}
+    options: {
+      cwd?: string
+      timeoutSec?: number
+      killSignal?: NodeJS.Signals
+      extraEnv?: Readonly<Record<string, string>>
+    } = {}
   ): Promise<{ ok: boolean; stdout: string; stderr: string; error?: unknown }> => {
-    const call: Parameters<ExecFileImpl>[2] = { maxBuffer: 4 * 1024 * 1024, env }
+    const call: Parameters<ExecFileImpl>[2] = {
+      maxBuffer: 4 * 1024 * 1024,
+      env: options.extraEnv === undefined ? env : { ...env, ...options.extraEnv },
+    }
     if (options.cwd !== undefined) {
       call.cwd = options.cwd
     }
@@ -302,9 +367,22 @@ export function createAgentRunner(opts: CreateAgentRunnerOptions = {}): AgentRun
     },
 
     async ensureSession(options) {
-      await execQuiet(bin, buildEnsureArgs(options.agent, options.session, options.cwd, options.timeoutSec), {
+      const { writes } = options
+      const command = boxedCommand(
+        bin,
+        buildEnsureArgs(
+          options.agent,
+          options.session,
+          options.cwd,
+          options.timeoutSec,
+          writes !== undefined
+        ),
+        writes
+      )
+      await execQuiet(command.file, command.args, {
         cwd: options.cwd,
         timeoutSec: options.timeoutSec + DEADLINE_SLACK_MS / 1000,
+        ...(writes === undefined ? {} : { extraEnv: writes.env }),
       })
     },
 
@@ -474,9 +552,10 @@ function startRun(
 
   let child: ChildProcess
   try {
-    child = spawnImpl(bin, buildPromptArgs(options), {
+    const command = boxedCommand(bin, buildPromptArgs(options), options.writes)
+    child = spawnImpl(command.file, command.args, {
       cwd: options.cwd,
-      env,
+      env: options.writes === undefined ? env : { ...env, ...options.writes.env },
       stdio: ['pipe', 'pipe', 'pipe'],
     })
   } catch {

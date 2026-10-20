@@ -10,6 +10,7 @@ import { PACKAGE_ROOT } from '../paths.js'
 import {
   acpxEnv,
   type AgentRunner,
+  boxedCommand,
   buildCancelArgs,
   buildEnsureArgs,
   buildExecArgs,
@@ -18,8 +19,10 @@ import {
   createAgentRunner,
   findOnPath,
   readExecStream,
+  writeAcpxArgs,
 } from './acpx.js'
 import type { AgentEvent } from './events.js'
+import { BWRAP_BIN } from './sandbox.js'
 
 const FAKE = path.join(PACKAGE_ROOT, 'src', 'testing', 'fake-acpx.mjs')
 
@@ -455,6 +458,70 @@ describe('the environment acpx runs under', () => {
     })
     await agentRunner.acpxVersion()
     expect(seen[0]?.['CLAUDE_CODE_EXECUTABLE']).toBe('/opt/claude')
+  })
+})
+
+describe('a turn that changes code', () => {
+  const writes = { box: ['--ro-bind', '/', '/', '--'], env: { PR_REVIEW_BRANCH: 'refs/heads/feat' } }
+
+  it('approves every tool and keeps the terminal, instead of the read-only flags', () => {
+    const args = buildPromptArgs({ ...RUN, cwd: '/repo', writes })
+    expect(args).toContain('--approve-all')
+    expect(args).not.toContain('--approve-reads')
+    expect(args).not.toContain('--no-terminal')
+    expect(args.slice(0, 2)).toEqual(['--cwd', '/repo'])
+    expect(writeAcpxArgs('/repo', 60)).toEqual([
+      '--cwd',
+      '/repo',
+      '--format',
+      'json',
+      '--json-strict',
+      '--suppress-reads',
+      '--approve-all',
+      '--timeout',
+      '60',
+    ])
+    expect(buildEnsureArgs('codex', 'sess', '/repo', 60, true)).toContain('--approve-all')
+  })
+
+  it('runs acpx behind the box, and leaves a read-only turn as it was', () => {
+    expect(boxedCommand('acpx', ['a'], writes)).toEqual({
+      file: BWRAP_BIN,
+      args: ['--ro-bind', '/', '/', '--', 'acpx', 'a'],
+    })
+    expect(boxedCommand('acpx', ['a'], undefined)).toEqual({ file: 'acpx', args: ['a'] })
+  })
+
+  it('spawns the turn through the box, with its variables on top of the environment', async () => {
+    const seen: Array<{ file: string; args: string[]; env: NodeJS.ProcessEnv | undefined }> = []
+    const agentRunner = createAgentRunner({
+      bin: 'acpx',
+      env: { PATH: '', KEPT: 'yes' },
+      spawnImpl: (file, args, options) => {
+        seen.push({ file, args, env: options.env })
+        return spawn(process.execPath, ['-e', 'process.exit(0)'], options)
+      },
+    })
+    await collect(agentRunner.run({ ...RUN, writes }).events)
+    expect(seen[0]?.file).toBe(BWRAP_BIN)
+    expect(seen[0]?.args.slice(0, 5)).toEqual(['--ro-bind', '/', '/', '--', 'acpx'])
+    expect(seen[0]?.env).toMatchObject({ KEPT: 'yes', PR_REVIEW_BRANCH: 'refs/heads/feat' })
+  })
+
+  it('creates the session inside the same box', async () => {
+    const seen: Array<{ file: string; args: string[]; env: NodeJS.ProcessEnv | undefined }> = []
+    const agentRunner = createAgentRunner({
+      bin: 'acpx',
+      env: { PATH: '' },
+      execFileImpl: async (file, args, options) => {
+        seen.push({ file, args, env: options.env })
+        return { stdout: '', stderr: '' }
+      },
+    })
+    await agentRunner.ensureSession({ agent: 'claude', session: 's', cwd: '/repo', timeoutSec: 30, writes })
+    expect(seen[0]?.file).toBe(BWRAP_BIN)
+    expect(seen[0]?.args).toContain('--approve-all')
+    expect(seen[0]?.env).toMatchObject({ PR_REVIEW_BRANCH: 'refs/heads/feat' })
   })
 })
 
