@@ -891,6 +891,101 @@ describe('a thread per place', () => {
     expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(true)
   })
 
+  /** A point's thread whose answer comes in when the test ends it. */
+  const heldAnswer = () => {
+    /** @type {{ end: (() => void) | null }} */
+    const stream = { end: null }
+    const mounted = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: (_pr, input, opts) =>
+        new Promise(resolve => {
+          opts.onEvent({ event: 'turn', data: { thread: input.thread, agent: 'claude', seeded: false } })
+          stream.end = () => resolve(undefined)
+        }),
+    })
+    return { ...mounted, stream }
+  }
+  /** @param {ParentNode} root */
+  const badges = root =>
+    Array.from(root.querySelectorAll('.chat-new')).map(b =>
+      b instanceof HTMLElement && !b.hidden ? b.textContent : null
+    )
+
+  it('counts an answer that ended in the open thread while the pane was minimized, until it opens', async () => {
+    const { root, chat, stream } = heldAnswer()
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    el(root, '#chat-minimize').click()
+    stream.end?.()
+    await flush()
+    // The AI Chat tab and the launcher both count it.
+    expect(badges(root)).toEqual(['1', '1'])
+    expect(el(root, '#chat-launcher .chat-new').getAttribute('aria-label')).toBe('1 answer you have not seen')
+    expect(el(root, '#chat-thread-marks').textContent).toContain('"new answer"')
+    el(root, '#chat-launcher').click()
+    expect(badges(root)).toEqual([null, null])
+    expect(el(root, '#chat-thread-marks').textContent).not.toContain('new answer')
+    expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(true)
+  })
+
+  it('counts an answer that ended in the open thread while another tab showed, until AI Chat does', async () => {
+    const { root, chat, stream } = heldAnswer()
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    el(root, '#side-tab-review').click()
+    stream.end?.()
+    await flush()
+    expect(badges(root)).toEqual(['1', '1'])
+    // The Threads tab shows the thread's answer as new; it is not seen there.
+    el(root, '#side-tab-threads').click()
+    expect(badges(root)).toEqual(['1', '1'])
+    el(root, '#side-tab-chat').click()
+    expect(badges(root)).toEqual([null, null])
+  })
+
+  it('keeps the count of a thread an ask moves away from as the pane opens', async () => {
+    const { root, chat, stream } = heldAnswer()
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    await sendMessage(root, 'is the sum intended?')
+    el(root, '#chat-minimize').click()
+    stream.end?.()
+    await flush()
+    // The pane opens on the layer's thread: the point's answer is still not seen.
+    chat.ask(LAYER)
+    await flush()
+    expect(badges(root)).toEqual(['1', '1'])
+    expect(el(root, '[data-thread-open="pr-review-a-b-42-claude-t1"] .thread-new').textContent).toBe(
+      'new answer'
+    )
+  })
+
+  it('counts every answer not seen, and shows 9 for more than 9', async () => {
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      streamChat: async (_pr, input, opts) => {
+        opts.onEvent({ event: 'turn', data: { thread: input.thread, agent: 'claude', seeded: false } })
+      },
+    })
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    el(root, '#chat-minimize').click()
+    for (let i = 1; i <= 10; i += 1) {
+      await sendMessage(root, `question ${i}`)
+      await flush()
+      expect(badges(root)).toEqual([String(Math.min(i, 9)), String(Math.min(i, 9))])
+    }
+    expect(el(root, '#side-tab-chat .chat-new').getAttribute('aria-label')).toBe(
+      '10 answers you have not seen'
+    )
+  })
+
   it('brings the thread open last time back without taking the reader off their tab', async () => {
     /** @type {{ list: ((value: typeof PLACED) => void) | null }} */
     const pending = { list: null }

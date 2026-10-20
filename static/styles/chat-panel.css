@@ -34,6 +34,11 @@
 .chat-launcher[hidden] {
   display: none;
 }
+/* The launcher is the accent already, so its count takes the colors the other way round. */
+.chat-launcher .chat-new {
+  background: var(--bg);
+  color: var(--accent);
+}
 /* Always the last thing on its row, whether or not the header wraps. */
 .chat-minimize {
   margin-left: auto;

@@ -1029,9 +1029,10 @@ thread is a session of its own with the agent. The canvas goes with a thread's f
 again when the PR's head, the folder the agent reads, or your right to resolve points changes. A
 place's thread belongs to the chat agent it was made with: after you switch agents, an ask about the
 place starts a new thread. The ask command of a place with a thread carries a dot, which fills with
-the accent when an answer arrived there while you were reading another thread; the **Threads** tab
-carries the same dot until you open that thread. **go to code** at the top of a thread leads back to
-its place. The `a` key asks about the focused target, and `/` focuses the message box.
+the accent when an answer arrived there while you were not reading it: you were reading another
+thread, the pane was minimized, or it showed another tab. The **Threads** tab carries the same dot,
+and the **AI Chat** tab and its launcher count those answers, up to 9, until you see each thread.
+**go to code** at the top of a thread leads back to its place. The `a` key asks about the focused target, and `/` focuses the message box.
 
 The **Threads** tab lists the review's threads by kind of place (attention points, lines, files,
 layers, whole PR) with the number of questions in each; pick one to open it in **AI Chat**. **new

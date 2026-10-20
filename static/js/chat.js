@@ -38,13 +38,22 @@ import { pointStatus, resolvable } from './points.js'
 import { proposalFingerprint, splitChatAnswer, targetsFromFiles } from './proposed-comment.js'
 import { REVIEW_PANEL_ID } from './review-panel.js'
 import { canSettle } from './self-review.js'
-import { THREADS_PANEL_ID, openReviewTab, selectSideTab, sideTabsHtml, wireSideTabs } from './side-pane.js'
+import {
+  CHAT_NEW_BADGE,
+  THREADS_PANEL_ID,
+  openReviewTab,
+  selectSideTab,
+  sideTabsHtml,
+  wireSideTabs,
+} from './side-pane.js'
 
 export const CHAT_WIDTH_KEY = 'pr-review.chat-width'
 export const CHAT_MINIMIZED_KEY = 'pr-review.chat-minimized'
-export const CHAT_WIDTH_MIN = 280
+// The narrowest pane still fits its tab strip with every count on it: AI Chat at 9, the Threads
+// dot, and a two-digit review.
+export const CHAT_WIDTH_MIN = 360
 export const CHAT_WIDTH_MAX = 560
-export const CHAT_WIDTH_DEFAULT = 340
+export const CHAT_WIDTH_DEFAULT = 380
 
 /**
  * @param {{ enabled: boolean, width?: number, minimized?: boolean }} opts
@@ -87,7 +96,7 @@ export function renderChatShell(opts) {
     `<section class="review-panel" id="${REVIEW_PANEL_ID}" role="tabpanel" aria-labelledby="side-tab-review" hidden></section>` +
     '</aside>' +
     '<dialog class="chat-dialog" id="chat-dialog" aria-labelledby="chat-h"></dialog>' +
-    '<button class="chat-launcher" id="chat-launcher" type="button" hidden aria-controls="chat-dialog" aria-expanded="false">AI Chat</button>'
+    `<button class="chat-launcher" id="chat-launcher" type="button" hidden aria-controls="chat-dialog" aria-expanded="false">AI Chat${CHAT_NEW_BADGE}</button>`
   )
 }
 
@@ -617,11 +626,16 @@ export function wireChat(options) {
   /** Set once the pane is taken down: a turn that ends after it starts nothing. */
   let stopped = false
   /**
-   * The threads whose answer ended while the reader was reading another one. An answer comes in
-   * only while the page is open, so this lives as long as the page does.
-   * @type {Set<string>}
+   * The answers the reader has not seen, counted by thread: one that ended while the reader was
+   * reading another thread, or while the AI Chat tab was off screen. An answer comes in only while
+   * the page is open, so this lives as long as the page does.
+   * @type {Map<string, number>}
    */
-  const unseen = new Set()
+  const unseen = new Map()
+  /** Whether the pane is on screen, as the panel last drew it. */
+  let paneShown = false
+  /** Whether the reader sees the AI Chat tab, and with it the open thread. */
+  const chatOnScreen = () => paneShown && pane.getAttribute('data-tab') === 'chat'
   /**
    * The badge on every ask command whose place has a thread, as CSS: cards drawn later, and the
    * selection toolbar, pick it up without being visited.
@@ -777,6 +791,7 @@ export function wireChat(options) {
   const showThread = () => {
     selectSideTab(pane, 'chat')
     drawHead()
+    seeOpenThread()
   }
 
   const INDEX_GROUPS = /** @type {const} */ ([
@@ -791,6 +806,15 @@ export function wireChat(options) {
     for (const dot of Array.from(root.querySelectorAll('.threads-new'))) {
       dot.toggleAttribute('hidden', unseen.size === 0)
       dot.setAttribute('title', 'A thread has an answer you have not seen')
+    }
+    // The AI Chat tab and its launcher count every answer not seen yet, up to 9.
+    const count = [...unseen.values()].reduce((sum, n) => sum + n, 0)
+    const counted = count === 1 ? '1 answer you have not seen' : `${count} answers you have not seen`
+    for (const badge of Array.from(root.querySelectorAll('.chat-new'))) {
+      badge.toggleAttribute('hidden', count === 0)
+      badge.textContent = String(Math.min(count, 9))
+      badge.setAttribute('aria-label', counted)
+      badge.setAttribute('title', counted)
     }
     if (threads.length === 0) {
       index.innerHTML =
@@ -1305,9 +1329,11 @@ export function wireChat(options) {
       live = null
       // A pane taken down has nothing on screen to finish, and nothing to send after this turn.
       if (!stopped) {
-        // An answer that ended off screen waits to be seen, marked on its place and in Threads.
-        if (!current.shown && current.thread !== null && agentTookTurn) {
-          unseen.add(current.thread)
+        // An answer that ended off screen waits to be seen, marked on its place, in Threads, and
+        // counted on the AI Chat tab and launcher. Its own thread is off screen too while the
+        // pane is minimized or shows another tab.
+        if ((!current.shown || !chatOnScreen()) && current.thread !== null && agentTookTurn) {
+          unseen.set(current.thread, (unseen.get(current.thread) ?? 0) + 1)
         }
         void refreshThreads().catch(() => undefined)
         stopActivity()
@@ -1355,6 +1381,15 @@ export function wireChat(options) {
     drawThreads(data)
     if (activeThread !== null) {
       await loadHistory(activeThread)
+    }
+  }
+
+  /** The open thread's new answers are seen once the AI Chat tab is on screen. */
+  const seeOpenThread = () => {
+    if (activeThread !== null && unseen.has(activeThread) && chatOnScreen()) {
+      unseen.delete(activeThread)
+      drawMarks()
+      drawIndex()
     }
   }
 
@@ -1557,8 +1592,12 @@ export function wireChat(options) {
   const panel = wireChatPanel(root, pane, {
     minimized: readChatMinimized(storage),
     onMinimizedChange: minimized => writeChatMinimized(storage, minimized),
+    onShownChange: shown => {
+      paneShown = shown
+      seeOpenThread()
+    },
   })
-  const stopTabs = wireSideTabs(pane)
+  const stopTabs = wireSideTabs(pane, seeOpenThread)
 
   /**
    * Leads the canvas to the open thread's place, while the canvas has it. A pane floating over the
@@ -1593,6 +1632,7 @@ export function wireChat(options) {
   const openChat = () => {
     selectSideTab(pane, 'chat')
     panel.open()
+    seeOpenThread()
   }
 
   form.addEventListener('submit', onSubmit)
@@ -1621,13 +1661,14 @@ export function wireChat(options) {
     },
     /** @param {ChatContext} next */
     ask(next) {
-      openChat()
-      // Off, an ask only says what the open thread's next question is about.
+      // Off, an ask only says what the open thread's next question is about. The thread goes on
+      // screen before the pane opens, so the answers seen are its own and not the one it replaces.
       if (threadPerPlace) {
         void goToThread(next)
       } else {
         setContext(next)
       }
+      openChat()
     },
     /**
      * Follows the settings the reader saved, without a reload: whether an ask opens its place's
@@ -1681,13 +1722,12 @@ export function wireChat(options) {
      * @param {string} question
      */
     askQuestion(next, question) {
-      openChat()
       void (async () => {
-        if (threadPerPlace) {
-          await goToThread(next)
-        } else {
-          setContext(next)
-        }
+        // As for an ask, the thread goes on screen before the pane opens.
+        const going = threadPerPlace ? goToThread(next) : null
+        if (!threadPerPlace) setContext(next)
+        openChat()
+        await going
         if (box.disabled) {
           toast(
             root,

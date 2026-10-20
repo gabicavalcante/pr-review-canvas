@@ -11,6 +11,12 @@ import { REVIEW_PANEL_ID } from './review-panel.js'
 export const THREADS_PANEL_ID = 'threads-panel'
 
 /**
+ * The count of answers the reader has not seen, on the AI Chat tab and its launcher. The chat
+ * fills it in and shows it.
+ */
+export const CHAT_NEW_BADGE = '<span class="chat-new" hidden></span>'
+
+/**
  * @param {string | null} name
  * @returns {SideTab}
  */
@@ -35,7 +41,7 @@ export function sideTabsHtml(opts) {
   return (
     '<div class="side-tabs" role="tablist" aria-label="Side pane">' +
     (opts.chat
-      ? tab('chat', 'AI Chat', 'chat-log', true) +
+      ? tab('chat', `AI Chat${CHAT_NEW_BADGE}`, 'chat-log', true) +
         tab('threads', 'Threads<span class="threads-new" hidden></span>', THREADS_PANEL_ID, false)
       : '') +
     tab('review', 'Your review <span class="review-count" data-empty>0</span>', REVIEW_PANEL_ID, !opts.chat) +
@@ -83,9 +89,10 @@ export function selectSideTab(pane, tab) {
 /**
  * Clicking a tab shows it; the arrow keys move between the tabs, the way a tab list works.
  * @param {HTMLElement} pane
+ * @param {(tab: SideTab) => void} [onSelect] runs after the reader shows a tab
  * @returns {() => void} the undo
  */
-export function wireSideTabs(pane) {
+export function wireSideTabs(pane, onSelect) {
   /** @param {Event} event */
   const tabOf = event => {
     const button = event.target instanceof Element ? event.target.closest('[data-side-tab]') : null
@@ -95,7 +102,9 @@ export function wireSideTabs(pane) {
   const onClick = event => {
     const button = tabOf(event)
     if (button !== null) {
-      selectSideTab(pane, sideTabOf(button.getAttribute('data-side-tab')))
+      const tab = sideTabOf(button.getAttribute('data-side-tab'))
+      selectSideTab(pane, tab)
+      onSelect?.(tab)
     }
   }
   /** @param {KeyboardEvent} event */
@@ -109,7 +118,9 @@ export function wireSideTabs(pane) {
       tabs[(tabs.indexOf(button) + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length]
     if (next instanceof HTMLElement) {
       event.preventDefault()
-      selectSideTab(pane, sideTabOf(next.getAttribute('data-side-tab')))
+      const tab = sideTabOf(next.getAttribute('data-side-tab'))
+      selectSideTab(pane, tab)
+      onSelect?.(tab)
       next.focus()
     }
   }

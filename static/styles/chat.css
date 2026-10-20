@@ -312,6 +312,20 @@ textarea {
   background: var(--line);
   color: var(--fg-muted);
 }
+/* How many answers the reader has not seen, on the AI Chat tab and its launcher. */
+.chat-new {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+.chat-new[hidden] {
+  display: none;
+}
 /* The review tab hides the chat's parts without unmounting them, so a draft message survives. */
 .chat[data-tab='review'] > :is(.chat-h, .transcript, .chat-composer) {
   display: none;

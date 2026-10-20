@@ -49,7 +49,9 @@
   **new thread** starts one about the whole PR; an ask about the whole PR comes back to the latest
   of those. It replaces the thread list in the pane's head.
 - The ask command of a place with a thread carries a dot. The dot fills, and the **Threads** tab
-  shows one too, when an answer arrived there while the reader was reading another thread.
+  shows one too, when an answer arrived there while the reader was not reading it: in another
+  thread, with the pane minimized, or on another tab. The **AI Chat** tab and its launcher count
+  those answers, up to 9.
 - While an answer comes in, ask, the Threads tab and **new thread** still open any thread, and the
   answer keeps arriving in its own. A question asked elsewhere meanwhile is sent once it ends.
 - The open thread comes back when the page is reloaded.
