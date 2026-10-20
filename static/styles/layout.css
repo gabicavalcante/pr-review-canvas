@@ -1,11 +1,7 @@
 /* ---- Layout: rail | main | AI chat, column lines painted once ---- */
-/* On a wide screen the columns stay side by side in the middle: the reading column stops at
-   --main-max, and the grid is only as wide as its columns. */
 .layout {
   display: grid;
-  max-width: calc(var(--rail-w) + var(--main-max) + var(--chat-w));
   width: 100%;
-  margin-inline: auto;
   grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--chat-w);
   flex: 1;
   align-items: start;
@@ -14,10 +10,38 @@
     linear-gradient(var(--ink), var(--ink)) calc(100% - var(--chat-w)) 0 / 1px 100% no-repeat,
     linear-gradient(var(--ink), var(--ink)) 100% 0 / 1px 100% no-repeat;
 }
+/* Without AI Chat docked, the rail and the reading column, which stops at --main-max, sit side by
+   side in the middle of a wide screen. */
 .layout.no-chat {
   max-width: calc(var(--rail-w) + var(--main-max));
+  margin-inline: auto;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
   background: linear-gradient(var(--ink), var(--ink)) calc(var(--rail-w) - 1px) 0 / 1px 100% no-repeat;
+}
+/* With AI Chat docked on a wide screen, the chat keeps the right edge at full height, and the rail
+   and the reading column sit side by side in the middle of what is left. The line after the rail
+   moves with them. */
+@media (width > 1360px) {
+  .layout:not(.no-chat) {
+    grid-template-columns: minmax(0, 1fr) var(--rail-w) minmax(0, var(--main-max)) minmax(0, 1fr) var(
+        --chat-w
+      );
+    background:
+      linear-gradient(var(--ink), var(--ink))
+        calc(max(0px, (100% - var(--rail-w) - var(--main-max) - var(--chat-w)) / 2) + var(--rail-w) - 1px) 0 /
+        1px 100% no-repeat,
+      linear-gradient(var(--ink), var(--ink)) calc(100% - var(--chat-w)) 0 / 1px 100% no-repeat,
+      linear-gradient(var(--ink), var(--ink)) 100% 0 / 1px 100% no-repeat;
+  }
+  .layout:not(.no-chat) > .rail {
+    grid-column: 2;
+  }
+  .layout:not(.no-chat) > #main {
+    grid-column: 3;
+  }
+  .layout:not(.no-chat) > aside.chat {
+    grid-column: 5;
+  }
 }
 .rail,
 .chat {
