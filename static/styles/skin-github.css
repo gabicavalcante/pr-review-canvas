@@ -483,6 +483,10 @@
     border: 1px solid var(--line);
     border-radius: var(--r);
   }
+  /* The conversation closes the overview, so it keeps the inset below it too. */
+  .lbl.sub + .conversation {
+    margin-bottom: var(--inset);
+  }
   /* A square before the title says what the section holds: green for tests, purple for points. */
   .lbl.sub:is(:has(+ .testmap), :has(+ .findings))::before {
     content: '';
