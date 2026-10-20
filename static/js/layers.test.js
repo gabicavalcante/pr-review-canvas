@@ -47,6 +47,7 @@ import {
   setFoldLevel,
   setRenderContext,
   testCoverage,
+  shortPathLabels,
   testMapHtml,
   threadsForHunks,
 } from './layers.js'
@@ -174,8 +175,31 @@ describe('layer sections', () => {
     const rows = [...document.querySelectorAll('tbody tr')]
     expect(rows.map(r => r.querySelector('.st')?.textContent)).toEqual(['covered', 'missing', 'not-needed'])
     expect(rows[0]?.querySelector('a.loc')?.getAttribute('href')).toBe('#file:src/app.test.ts')
+    // The column names the file; the full path is on hover.
+    expect(rows[0]?.querySelector('a.loc')?.textContent).toBe('app.test.ts')
+    expect(rows[0]?.querySelector('a.loc')?.getAttribute('title')).toBe('src/app.test.ts')
     expect(rows[1]?.querySelector('.muted.small')?.textContent?.trim()).toBe('y is unused')
     expect(testMapHtml({ ...layer, tests: [] }, paths)).toBe('')
+  })
+
+  it('names each test file by the shortest tail that tells it apart from the others', () => {
+    const labels = shortPathLabels([
+      'common/tests/saml/test_endpoints.py',
+      'common/tests/django/test_endpoints.py',
+      'common/tests/saml/test_cross_firm_login.py',
+      'common/tests/saml/test_cross_firm_login.py',
+      'a/x/tests/test_b.py',
+      'b/x/tests/test_b.py',
+      'test_root.py',
+    ])
+    expect(Object.fromEntries(labels)).toEqual({
+      'common/tests/saml/test_endpoints.py': 'saml/test_endpoints.py',
+      'common/tests/django/test_endpoints.py': 'django/test_endpoints.py',
+      'common/tests/saml/test_cross_firm_login.py': 'test_cross_firm_login.py',
+      'a/x/tests/test_b.py': 'a/x/tests/test_b.py',
+      'b/x/tests/test_b.py': 'b/x/tests/test_b.py',
+      'test_root.py': 'test_root.py',
+    })
   })
 
   it('labels the coverage from the behaviors that need a test', () => {

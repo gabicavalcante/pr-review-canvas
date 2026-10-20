@@ -212,9 +212,14 @@ export function testMapHtml(layer, paths) {
   if (layer.tests.length === 0) {
     return ''
   }
+  const labels = shortPathLabels(layer.tests.flatMap(t => (t.testPath ? [t.testPath] : [])))
   const rows = layer.tests
     .map(t => {
-      const where = t.testPath ? `<a class="loc" href="#file:${esc(t.testPath)}">${esc(t.testPath)}</a>` : ''
+      // Most rows name the same test file, so the column shows its name and the full path is
+      // on hover; the link still opens the file.
+      const where = t.testPath
+        ? `<a class="loc" href="#file:${esc(t.testPath)}" title="${esc(t.testPath)}">${esc(labels.get(t.testPath) ?? t.testPath)}</a>`
+        : ''
       const note = t.note ? `<div class="muted small">${renderMarkdown(t.note, { paths })}</div>` : ''
       return `<tr><td>${esc(t.behavior)}${note}</td><td class="st ${t.status}">${esc(t.status)}</td><td>${where}</td></tr>`
     })
@@ -224,6 +229,31 @@ export function testMapHtml(layer, paths) {
     `<details class="test-map">${detailsSummaryHtml(`<h3>Tests</h3><span class="pill test-cov ${coverage.level}">${coverage.label}</span>`, 'Toggle tests', 'lbl sub')}` +
     `<table class="testmap"><thead><tr><th scope="col">Behavior</th><th scope="col">Status</th><th scope="col">Test</th></tr></thead><tbody>${rows}</tbody></table></details>`
   )
+}
+
+/**
+ * Names each path by its shortest tail that no other path in the list shares: the file name, plus
+ * only as many folders as tell it apart from another file of the same name.
+ * @param {ReadonlyArray<string>} paths
+ * @returns {Map<string, string>}
+ */
+export function shortPathLabels(paths) {
+  const unique = [...new Set(paths)]
+  const tail = (/** @type {string} */ path, /** @type {number} */ depth) =>
+    path.split('/').slice(-depth).join('/')
+  const labels = new Map()
+  for (const path of unique) {
+    const segments = path.split('/').length
+    let depth = 1
+    while (
+      depth < segments &&
+      unique.some(other => other !== path && tail(other, depth) === tail(path, depth))
+    ) {
+      depth += 1
+    }
+    labels.set(path, tail(path, depth))
+  }
+  return labels
 }
 
 /**
