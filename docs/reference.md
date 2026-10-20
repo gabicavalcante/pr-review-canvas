@@ -880,11 +880,13 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   the decision becomes context, or rewrite the commit; reopening its point on the canvas lasts only
   until the canvas is generated again, because the commit still says it.
 - Publish adds each decision in the diff to the canvas as a `decision` point for the author,
-  titled with its question (or with the decision when the line asks none), on its line, and resolved with its reason as of its commit. These
-  points are not the generator's to write and do not count toward its attention points. A canvas
-  holds at most 36 of them; past that, the oldest are context. A reason the author wrote on the
-  canvas for such a point stands over the commit's when the canvas is generated again; a reason
-  an earlier canvas took from a commit gives way to the decisions read now.
+  titled with its question (or with the decision when the line asks none), on its line, and
+  resolved with its reason as of its commit. These points are not the generator's to write and do
+  not count toward its attention points. A canvas holds at most 36 of them; past that, the oldest
+  are context. A reason the author wrote on the canvas for such a point stands over the commit's
+  when the canvas is generated again, while the decision's line stays the same; a later commit
+  that changes the answer replaces it. A reason an earlier canvas took from a commit gives way to
+  the decisions read now.
 - The review loop skill in this repository writes these lines for the decisions its gate asks.
 
 ### Comments and sign-off

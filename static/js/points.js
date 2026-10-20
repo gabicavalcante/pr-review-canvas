@@ -302,7 +302,7 @@ function statusPartsHtml(p, status, ctx, opts) {
       const first = reason.split('\n')[0] ?? ''
       return {
         pill,
-        // A settled decision's title is its reason, so the line would only repeat it.
+        // A settled decision that states no question is titled by its reason; the line would repeat it.
         summary: first === p.title ? '' : line(`Resolved by the author: ${esc(first)}`),
         outcome:
           '<div class="p-outcome"><h4 class="lbl">Author’s reason</h4>' +

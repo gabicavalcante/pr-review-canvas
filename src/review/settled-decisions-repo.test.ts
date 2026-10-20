@@ -33,8 +33,10 @@ async function commit(dir: string, paragraphs: string[], ...flags: string[]): Pr
 }
 
 const APP = 'a\nb\nc\nd\nE!\nf\ng\nh\n'
-const REASON = 'keep E! uppercase; the callers compare it raw'
-const REVISED = 'keep E! uppercase until the callers move to the enum'
+// The decision and its revision ask one question; each answer is its own decision.
+const ASKED = 'Should E! be lowercased?'
+const REASON = 'No: the callers compare it raw'
+const REVISED = 'Not until the callers move to the enum'
 const KEEP_TWO = 'Should two stay for old readers?'
 const DROPPED = 'No: nothing reads it since the reader moved'
 
@@ -61,7 +63,7 @@ describe('settled decisions against a real repository', () => {
     heads.decided = await commit(dir, [
       'fix(app): keep E uppercase',
       'Why it stays.',
-      `Settled-decision: src/app.ts:5 ${REASON}`,
+      `Settled-decision: src/app.ts:5 ${ASKED} ${REASON}`,
       'Co-Authored-By: Claude <noreply@anthropic.com>',
     ])
     await write(dir, 'src/app.ts', APP.replace('b\n', 'B\n'))
@@ -77,7 +79,10 @@ describe('settled decisions against a real repository', () => {
     await write(dir, 'src/old.ts', 'zero\none\ntwo\nthree\n')
     heads.shifted = await commit(dir, ['docs: add headers'])
     await write(dir, 'src/app.ts', `// header\n// more\n${APP.replace('b\n', 'B\n').replace('h\n', 'H\n')}`)
-    heads.revised = await commit(dir, ['fix(app): capitalize h', `Settled-decision: src/app.ts:7 ${REVISED}`])
+    heads.revised = await commit(dir, [
+      'fix(app): capitalize h',
+      `Settled-decision: src/app.ts:7 ${ASKED} ${REVISED}`,
+    ])
     await write(dir, 'src/old.ts', 'zero\none\nthree\n')
     heads.deleted = await commit(dir, [
       'refactor(old): drop two',
@@ -141,8 +146,10 @@ describe('settled decisions against a real repository', () => {
     return { context, artifact }
   }
 
-  const decisionFp = (title: string, file = 'src/app.ts') =>
-    fingerprint({ kind: 'decision', path: file, title })
+  // A decision point is named by its whole line, the question with the answer.
+  const decisionFp = (line: string, file = 'src/app.ts') =>
+    fingerprint({ kind: 'decision', path: file, title: line })
+  const decidedFp = decisionFp(`${ASKED} ${REASON}`)
 
   it('reads the decision past a blank line that keeps it apart from the attribution, and lists it', async () => {
     const { context, prompt } = await prepared(heads.decided)
@@ -152,6 +159,7 @@ describe('settled decisions against a real repository', () => {
         id,
         commit: heads.decided,
         date: expect.any(String),
+        question: ASKED,
         text: REASON,
         path: 'src/app.ts',
         side: 'new',
@@ -194,24 +202,24 @@ describe('settled decisions against a real repository', () => {
     const decided = artifact.points.filter(point => point.origin === 'decision')
     expect(decided.map(point => point.path)).toEqual(['src/old.ts'])
     expect(decided[0]).toMatchObject({ path: 'src/old.ts', side: 'old', title: KEEP_TWO })
-    expect(artifact.settled?.[decisionFp(KEEP_TWO, 'src/old.ts')]?.reason).toBe(DROPPED)
+    expect(artifact.settled?.[decisionFp(`${KEEP_TWO} ${DROPPED}`, 'src/old.ts')]?.reason).toBe(DROPPED)
   })
 
   it('adds the decision as a resolved point, and again on the next canvas, which copies none of it', async () => {
     const expected = { reason: REASON, at: expect.any(String), commit: heads.decided }
     const first = await published(heads.decided)
     expect(first.artifact.points.filter(point => point.origin === 'decision')).toEqual([
-      expect.objectContaining({ kind: 'decision', level: 'fyi', audience: 'author', title: REASON, line: 5 }),
+      expect.objectContaining({ kind: 'decision', level: 'fyi', audience: 'author', title: ASKED, line: 5 }),
     ])
-    expect(first.artifact.settled).toEqual({ [decisionFp(REASON)]: expected })
+    expect(first.artifact.settled).toEqual({ [decidedFp]: expected })
 
     const second = await published(heads.shifted)
     expect(second.context.basis?.canvasSha).toBe(heads.decided)
-    expect(second.context.basis?.points.map(point => point.title)).not.toContain(REASON)
+    expect(second.context.basis?.points.map(point => point.title)).not.toContain(ASKED)
     expect(
       second.artifact.points.filter(point => point.origin === 'decision').map(point => point.line)
     ).toEqual([7])
-    expect(second.artifact.settled).toEqual({ [decisionFp(REASON)]: expected })
+    expect(second.artifact.settled).toEqual({ [decidedFp]: expected })
   })
 
   it("replaces a decision's reason with a later one on the same line, over the canvas it builds on", async () => {
@@ -219,10 +227,10 @@ describe('settled decisions against a real repository', () => {
     await published(heads.shifted)
     const { artifact } = await published(heads.revised)
     expect(artifact.points.filter(point => point.origin === 'decision').map(point => point.title)).toEqual([
-      REVISED,
+      ASKED,
     ])
     expect(artifact.settled).toEqual({
-      [decisionFp(REVISED)]: { reason: REVISED, at: expect.any(String), commit: heads.revised },
+      [decisionFp(`${ASKED} ${REVISED}`)]: { reason: REVISED, at: expect.any(String), commit: heads.revised },
     })
   })
 
@@ -231,9 +239,22 @@ describe('settled decisions against a real repository', () => {
     const reworded = { reason: 'Reworded on the canvas.', at: '2026-10-13T12:00:00.000Z' }
     await harness.ctx.canvases.revise(
       heads.decided,
-      withSettlement(artifact, decisionFp(REASON), reworded, reworded.at)
+      withSettlement(artifact, decidedFp, reworded, reworded.at)
     )
     const again = await published(heads.decided, true)
-    expect(again.artifact.settled).toEqual({ [decisionFp(REASON)]: reworded })
+    expect(again.artifact.settled).toEqual({ [decidedFp]: reworded })
+  })
+
+  it('shows a later answer to the same question over the reason the author wrote on the canvas for the earlier one', async () => {
+    const { artifact } = await published(heads.decided)
+    const [point] = artifact.points.filter(candidate => candidate.origin === 'decision')
+    const reworded = { reason: 'Reworded on the canvas.', at: '2026-10-13T12:00:00.000Z' }
+    await harness.ctx.canvases.revise(
+      heads.decided,
+      withSettlement(artifact, point!.fingerprint, reworded, reworded.at)
+    )
+    await published(heads.shifted)
+    const { artifact: revised } = await published(heads.revised)
+    expect(Object.values(revised.settled ?? {}).map(settlement => settlement.reason)).toEqual([REVISED])
   })
 })

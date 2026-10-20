@@ -50,6 +50,9 @@ export function parseSettledDecision(value: string): ParsedDecision | null {
   }
   // Paths in the diff are relative to the repository root, so a leading `./` names the same file.
   const path = anchor.replace(/^(\.\/)+/, '')
+  if (path === '') {
+    return null
+  }
   const side = old === undefined ? 'new' : 'old'
   const asked = QUESTION.exec(rest.trim())
   const [, question = '', answer = ''] = asked ?? []

@@ -333,7 +333,34 @@ describe('normalize', () => {
     })
     expect(artifact.settled?.[short!.fingerprint]?.reason).toBe('No: the spec says sum.')
     expect(cut?.title.endsWith('…')).toBe(true)
+    expect(cut?.fingerprint).not.toBe(short?.fingerprint)
     expect(cut?.body).toBe(`${long}\n\nThe author settled this in commit \`ccccccc\` on 2026-10-13.`)
+  })
+
+  it('keeps two decisions asking one question on one file apart, each with its own answer', () => {
+    const commit = 'c'.repeat(40)
+    const decision = (id: string, text: string, line: number) => ({
+      id,
+      commit,
+      date: '2026-10-13T10:00:00-03:00',
+      question: 'Is this intended?',
+      text,
+      path: 'src/app.ts',
+      side: 'new' as const,
+      line,
+    })
+    const artifact = normalize(artifactToModelOutput(syntheticArtifact()), {
+      ...input(),
+      decisions: [decision('c-1', 'Yes: the sum is wanted.', 2), decision('c-2', 'No: a leftover.', 4)],
+    })
+    const points = artifact.points.filter(point => point.origin === 'decision')
+    expect(
+      points.map(point => [point.title, point.line, artifact.settled?.[point.fingerprint]?.reason])
+    ).toEqual([
+      ['Is this intended?', 2, 'Yes: the sum is wanted.'],
+      ['Is this intended?', 4, 'No: a leftover.'],
+    ])
+    expect(new Set(points.map(point => point.fingerprint)).size).toBe(2)
   })
 
   it('keeps the fingerprint stable across spacing and case, and distinct across kind or path', () => {

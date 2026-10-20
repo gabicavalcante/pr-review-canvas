@@ -179,6 +179,11 @@ function shortTitle(text: string, cap: number, fallback: string): string {
   }…`
 }
 
+/** A decision as its line states it: the question, when there is one, then the answer. */
+function decisionLine(decision: SettledDecision): string {
+  return decision.question === undefined ? decision.text : `${decision.question} ${decision.text}`
+}
+
 /**
  * One resolved point for each settled decision in the diff, on its line, titled by the question it
  * answers (or by the decision itself when the line states no question) and resolved with the
@@ -210,7 +215,10 @@ function decisionPoints(
       // A question cut to fit the title is given whole in the body.
       body: decision.question !== undefined && title !== asked ? `${asked}\n\n${settledIn}` : settledIn,
       audience: 'author',
-      fingerprint: fingerprint({ kind: 'decision', path: decision.path, title }),
+      // The whole line, not the title, names the decision: two decisions asking one question are
+      // two points, and a revised answer is a new one, so a reason written on the canvas for the
+      // old answer does not cover it.
+      fingerprint: fingerprint({ kind: 'decision', path: decision.path, title: decisionLine(decision) }),
       origin: 'decision',
     }
     const layerId = layerIdForLine(layers, files, decision.path, decision.side, decision.line)

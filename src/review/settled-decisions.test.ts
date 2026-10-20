@@ -62,12 +62,16 @@ describe('parseSettledDecision', () => {
     expect(parseSettledDecision('src/gone.ts:1:old: dropped')).toMatchObject({ side: 'old', text: 'dropped' })
   })
 
-  it.each(['no anchor here', 'src/app.ts:x keep it', 'src/app.ts:0 keep it', 'src/app.ts:2', ''])(
-    'reads %j as no decision',
-    value => {
-      expect(parseSettledDecision(value)).toBeNull()
-    }
-  )
+  it.each([
+    'no anchor here',
+    './:3 a path of nothing but its prefix',
+    'src/app.ts:x keep it',
+    'src/app.ts:0 keep it',
+    'src/app.ts:2',
+    '',
+  ])('reads %j as no decision', value => {
+    expect(parseSettledDecision(value)).toBeNull()
+  })
 })
 
 describe('readSettledDecisions', () => {
