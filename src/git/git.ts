@@ -249,7 +249,7 @@ export function createGit(cwd: string, exec: GitExec = execGit): Git {
         .map(record => {
           const [sha = '', authorEmail = '', date = '', message = ''] = record.split('\x1f')
           const values = message
-            .split('\n')
+            .split(/\r?\n/)
             .map(line => keyed.exec(line)?.[1]?.trim() ?? '')
             .filter(value => value !== '')
           return { sha, authorEmail, date, values }

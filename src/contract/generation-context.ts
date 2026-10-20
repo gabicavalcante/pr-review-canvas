@@ -142,7 +142,9 @@ export const SettledDecisionSchema = z.object({
   commit: z.string().regex(/^[0-9a-f]{40}$/),
   /** The commit's author date. */
   date: z.string(),
-  /** The decision and its reason, as the line states them. */
+  /** The question the decision answers, when the line states one before the answer. */
+  question: z.string().min(1).optional(),
+  /** The decision and its reason, as the line states them after any question. */
   text: z.string().min(1),
   path: z.string().min(1),
   side: SideSchema,

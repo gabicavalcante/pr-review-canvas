@@ -309,6 +309,33 @@ describe('normalize', () => {
     )
   })
 
+  it('titles a decision point by the question its line asks, resolved with the answer, and gives a cut question whole', () => {
+    const commit = 'c'.repeat(40)
+    const decision = (id: string, question: string, line: number) => ({
+      id,
+      commit,
+      date: '2026-10-13T10:00:00-03:00',
+      question,
+      text: 'No: the spec says sum.',
+      path: 'src/app.ts',
+      side: 'new' as const,
+      line,
+    })
+    const long = `Should run() ${'multiply the results instead of adding them '.repeat(3)}?`
+    const artifact = normalize(artifactToModelOutput(syntheticArtifact()), {
+      ...input(),
+      decisions: [decision('c-1', 'Should run() multiply?', 2), decision('c-2', long, 4)],
+    })
+    const [short, cut] = artifact.points.filter(point => point.origin === 'decision')
+    expect(short).toMatchObject({
+      title: 'Should run() multiply?',
+      body: 'The author settled this in commit `ccccccc` on 2026-10-13.',
+    })
+    expect(artifact.settled?.[short!.fingerprint]?.reason).toBe('No: the spec says sum.')
+    expect(cut?.title.endsWith('…')).toBe(true)
+    expect(cut?.body).toBe(`${long}\n\nThe author settled this in commit \`ccccccc\` on 2026-10-13.`)
+  })
+
   it('keeps the fingerprint stable across spacing and case, and distinct across kind or path', () => {
     const a = fingerprint({ kind: 'risk', path: 'src/a.ts', title: 'Retry  loop' })
     expect(fingerprint({ kind: 'risk', path: 'src/a.ts', title: '  retry LOOP ' })).toBe(a)

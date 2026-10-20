@@ -49,7 +49,7 @@ An attention point the author answered with a reason saved in the canvas. The au
 _Avoid_: Dismissed, approved, closed
 
 **Settled decision**:
-A question about the change that the author answered before the canvas existed, recorded as a `Settled-decision` line in the message of the commit that carries the answer. The canvas shows it as a resolved point with the author's reason instead of asking it again.
+A question about the change that the author answered before the canvas existed, recorded as a `Settled-decision` line, with the question and then the answer, in the message of the commit that carries the answer. The canvas shows it as a resolved point titled by the question, with the author's answer as its reason, instead of asking it again.
 _Avoid_: Waiver, accepted finding
 
 **Dismissal**:

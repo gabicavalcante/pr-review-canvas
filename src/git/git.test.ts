@@ -258,6 +258,10 @@ describe('createGit (real adapter)', () => {
       ]
       await inRepo(dir, 'commit', '-q', '--allow-empty', ...apart.flatMap(paragraph => ['-m', paragraph]))
       const second = await inRepo(dir, 'rev-parse', 'HEAD')
+      // A message committed verbatim keeps the CRLF line ends another tool wrote.
+      const crlf = 'third\r\n\r\nSettled-decision: d.ts:4 four\r\nCo-Authored-By: Someone <s@example.com>'
+      await inRepo(dir, 'commit', '-q', '--allow-empty', '--cleanup=verbatim', '-m', crlf)
+      const third = await inRepo(dir, 'rev-parse', 'HEAD')
       const git = createGit(dir, execGitAsRepoConfig)
       expect(await git.commitKeyedLines(base, 'HEAD', 'Settled-decision')).toEqual([
         {
@@ -272,8 +276,14 @@ describe('createGit (real adapter)', () => {
           date: expect.any(String),
           values: ['c.ts:3:old three'],
         },
+        {
+          sha: third,
+          authorEmail: 'test@example.com',
+          date: expect.any(String),
+          values: ['d.ts:4 four'],
+        },
       ])
-      expect(await git.commitKeyedLines(second, 'HEAD', 'Settled-decision')).toEqual([])
+      expect(await git.commitKeyedLines(third, 'HEAD', 'Settled-decision')).toEqual([])
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

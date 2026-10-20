@@ -35,7 +35,8 @@ async function commit(dir: string, paragraphs: string[], ...flags: string[]): Pr
 const APP = 'a\nb\nc\nd\nE!\nf\ng\nh\n'
 const REASON = 'keep E! uppercase; the callers compare it raw'
 const REVISED = 'keep E! uppercase until the callers move to the enum'
-const DROPPED = 'two goes; nothing reads it since the reader moved'
+const KEEP_TWO = 'Should two stay for old readers?'
+const DROPPED = 'No: nothing reads it since the reader moved'
 
 describe('settled decisions against a real repository', () => {
   let dir: string
@@ -80,7 +81,7 @@ describe('settled decisions against a real repository', () => {
     await write(dir, 'src/old.ts', 'zero\none\nthree\n')
     heads.deleted = await commit(dir, [
       'refactor(old): drop two',
-      `Settled-decision: src/old.ts:3:old ${DROPPED}`,
+      `Settled-decision: src/old.ts:3:old ${KEEP_TWO} ${DROPPED}`,
     ])
     await write(
       dir,
@@ -189,9 +190,11 @@ describe('settled decisions against a real repository', () => {
       [REASON, null],
       [REVISED, null],
     ])
-    expect(artifact.points.filter(point => point.origin === 'decision').map(point => point.path)).toEqual([
-      'src/old.ts',
-    ])
+    // The deleted line's decision asks a question, which titles its point; the answer resolves it.
+    const decided = artifact.points.filter(point => point.origin === 'decision')
+    expect(decided.map(point => point.path)).toEqual(['src/old.ts'])
+    expect(decided[0]).toMatchObject({ path: 'src/old.ts', side: 'old', title: KEEP_TWO })
+    expect(artifact.settled?.[decisionFp(KEEP_TWO, 'src/old.ts')]?.reason).toBe(DROPPED)
   })
 
   it('adds the decision as a resolved point, and again on the next canvas, which copies none of it', async () => {

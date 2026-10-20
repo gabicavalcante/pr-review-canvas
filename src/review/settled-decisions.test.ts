@@ -27,6 +27,41 @@ describe('parseSettledDecision', () => {
     })
   })
 
+  it('reads a question up to its first `?` that a space follows, and the answer after it', () => {
+    expect(
+      parseSettledDecision('src/retry.ts:14 Should retries add jitter? No: one worker calls it')
+    ).toEqual({
+      path: 'src/retry.ts',
+      line: 14,
+      side: 'new',
+      question: 'Should retries add jitter?',
+      text: 'No: one worker calls it',
+    })
+    expect(parseSettledDecision('src/a.ts:3:old Keep it?  Yes? Mostly.')).toMatchObject({
+      side: 'old',
+      question: 'Keep it?',
+      text: 'Yes? Mostly.',
+    })
+    // A `?` inside a word or a URL, or one that ends the line, starts no answer.
+    expect(parseSettledDecision('src/a.ts:3 keep it; see https://x.test/?q=1 for why')).toEqual({
+      path: 'src/a.ts',
+      line: 3,
+      side: 'new',
+      text: 'keep it; see https://x.test/?q=1 for why',
+    })
+    expect(parseSettledDecision('src/a.ts:3 Keep it?')).not.toHaveProperty('question')
+  })
+
+  it('reads a colon after the line number and a leading `./` as part of the anchor', () => {
+    expect(parseSettledDecision('./src/app.ts:2: keep the import')).toEqual({
+      path: 'src/app.ts',
+      line: 2,
+      side: 'new',
+      text: 'keep the import',
+    })
+    expect(parseSettledDecision('src/gone.ts:1:old: dropped')).toMatchObject({ side: 'old', text: 'dropped' })
+  })
+
   it.each(['no anchor here', 'src/app.ts:x keep it', 'src/app.ts:0 keep it', 'src/app.ts:2', ''])(
     'reads %j as no decision',
     value => {
@@ -141,11 +176,17 @@ describe('readSettledDecisions', () => {
     ])
   })
 
-  it('cuts a reason longer than a settlement may be', async () => {
-    const { decisions } = read([commit(HEAD_SHA, [`src/app.ts:2 ${'x'.repeat(SETTLEMENT_REASON_MAX + 50)}`])])
-    const [only] = await decisions
-    expect(only?.text).toHaveLength(SETTLEMENT_REASON_MAX)
-    expect(only?.text.endsWith('…')).toBe(true)
+  it('keeps the question apart from the answer, and cuts either one longer than a settlement may be', async () => {
+    const long = 'x'.repeat(SETTLEMENT_REASON_MAX + 50)
+    const { decisions } = read([
+      commit(HEAD_SHA, [`src/app.ts:2 ${long}`, `src/app.ts:4 Why ${long}? Because.`]),
+    ])
+    const [plain, asked] = await decisions
+    expect(plain?.text).toHaveLength(SETTLEMENT_REASON_MAX)
+    expect(plain?.text.endsWith('…')).toBe(true)
+    expect(plain).not.toHaveProperty('question')
+    expect(asked?.question).toHaveLength(SETTLEMENT_REASON_MAX)
+    expect(asked?.text).toBe('Because.')
   })
 
   it('keeps the oldest decisions past the point budget as context', async () => {

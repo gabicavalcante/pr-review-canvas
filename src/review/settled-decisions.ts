@@ -1,7 +1,7 @@
 // The author's settled decisions, read from the commits under review. A decision the author already
 // took, in the review loop or by hand, is a `Settled-decision` line of the commit that carries it:
-// `<path>:<line>[:old] <the decision and its reason>`. `prepare` reads them, and publish shows each
-// one in the diff as a resolved point, so the canvas does not ask the question again.
+// `<path>:<line>[:old] [<the question>? ]<the decision and its reason>`. `prepare` reads them, and
+// publish shows each one in the diff as a resolved point, so the canvas does not ask the question again.
 import type { SettledDecision } from '../contract/generation-context.js'
 import {
   ARTIFACT_MAX_POINTS,
@@ -26,23 +26,36 @@ export interface ParsedDecision {
   path: string
   line: number
   side: Side
+  /** The question the decision answers, up to its first `?`; absent when the line states none. */
+  question?: string
+  /** The decision and its reason: the answer, after the question when there is one. */
   text: string
 }
 
-const DECISION_VALUE = /^(\S+):(\d+)(:old)?\s+(\S.*)$/
+// A colon after the line number, as in `src/app.ts:4: keep it`, is read as part of the anchor.
+const DECISION_VALUE = /^(\S+):(\d+)(:old)?:?\s+(\S.*)$/
+// The question runs to the first `?` that a space follows, so a `?` inside a URL stays in place.
+const QUESTION = /^(.*?\?)\s+(\S.*)$/
 
-/** One value, or null when it does not read as `<path>:<line>[:old] <text>`. */
+/** One value, or null when it does not read as `<path>:<line>[:old] [<question>? ]<text>`. */
 export function parseSettledDecision(value: string): ParsedDecision | null {
   const match = DECISION_VALUE.exec(value.trim())
   if (match === null) {
     return null
   }
-  const [, path = '', lineText = '', old, text = ''] = match
+  const [, anchor = '', lineText = '', old, rest = ''] = match
   const line = Number(lineText)
   if (line < 1) {
     return null
   }
-  return { path, line, side: old === undefined ? 'new' : 'old', text: text.trim() }
+  // Paths in the diff are relative to the repository root, so a leading `./` names the same file.
+  const path = anchor.replace(/^(\.\/)+/, '')
+  const side = old === undefined ? 'new' : 'old'
+  const asked = QUESTION.exec(rest.trim())
+  const [, question = '', answer = ''] = asked ?? []
+  return asked === null
+    ? { path, line, side, text: rest.trim() }
+    : { path, line, side, question: question.trim(), text: answer.trim() }
 }
 
 export interface DecisionSources {
@@ -113,6 +126,7 @@ export async function readSettledDecisions(src: DecisionSources): Promise<Settle
           id: `${commit.sha.slice(0, 7)}-${position + 1}`,
           commit: commit.sha,
           date: commit.date,
+          ...(parsed.question === undefined ? {} : { question: capReason(parsed.question) }),
           text: capReason(parsed.text),
           path: parsed.path,
           side: parsed.side,

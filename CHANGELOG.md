@@ -143,9 +143,10 @@ Changes since 0.8.0.
 ### Settled decisions
 
 - A question the author already answered is recorded in the commit that carries the answer, as a
-  `Settled-decision: <path>:<line> <decision and reason>` line, and publish adds it to the canvas
-  as a resolved attention point with that reason, so the canvas does not ask it again. The point
-  costs the generator none of its own.
+  `Settled-decision: <path>:<line> <question>? <decision and reason>` line, and publish adds it to
+  the canvas as a resolved attention point titled by the question, with the answer as its reason,
+  so the canvas does not ask it again. The question is optional. The point costs the generator
+  none of its own.
 - `prepare` reads the decisions of the author's own commits, and on a pull request only when its
   author prepares the canvas. A decision is carried to its line while later commits only move it,
   and kept as context the generator does not reopen once its line changes. The line counts

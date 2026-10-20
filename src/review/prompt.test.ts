@@ -403,7 +403,8 @@ describe('renderPrompt', () => {
             id: 'abc1234-2',
             commit: `abc1234${'0'.repeat(33)}`,
             date: '2026-10-13T10:00:00-03:00',
-            text: 'other() stays private',
+            question: 'Should other() be exported?',
+            text: 'No: it stays private',
             path: 'src/app.ts',
             side: 'new',
             line: null,
@@ -417,7 +418,7 @@ describe('renderPrompt', () => {
         '- `abc1234-1` on `src/app.ts` new-side line 4 (commit `abc1234`, 2026-10-13): keep the sum; the spec says sum\n\n**Not in this diff**'
       )
       expect(prompt).toContain(
-        '- `abc1234-2` on `src/app.ts` (commit `abc1234`, 2026-10-13): other() stays private'
+        '- `abc1234-2` on `src/app.ts` (commit `abc1234`, 2026-10-13): Should other() be exported? No: it stays private'
       )
       expect(prompt).not.toContain('settledDecision')
     }

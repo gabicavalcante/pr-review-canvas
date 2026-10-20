@@ -846,14 +846,20 @@ fix(app): keep the sum in run()
 
 The spec says sum; a product would double-count retries.
 
-Settled-decision: src/app.ts:4 keep the sum; the spec says sum, not product
+Settled-decision: src/app.ts:4 Should run() multiply instead? No: the spec says sum, not product
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 - `<path>:<line>` is the line the decision is about, in that commit's version of the file. Write
-  `<path>:<line>:old` for a line the change deleted, numbered as in the commit's parent. The rest
-  of the line is the decision and its reason, which becomes the resolution's reason; a longer one
-  is cut at the reason limit. A line that does not read this way is not a decision and is skipped.
+  `<path>:<line>:old` for a line the change deleted, numbered as in the commit's parent. A colon
+  after the number and a leading `./` on the path are allowed. A line that does not read this way
+  is not a decision and is skipped.
+- The rest of the line is the question the decision answers, then the decision and its reason.
+  The question runs to the first `?` followed by a space, and titles the point; the answer after
+  it becomes the resolution's reason. Leave the question out and the whole text is both. Either
+  part longer than the reason limit is cut. Only a `?` followed by a space ends the question, so
+  one inside a URL does not, but a reason with a `?` mid-sentence and no question in front is
+  split there: start such a line with its question.
 - The line counts wherever it sits in the message, at the start of a line, in any letter case. It
   need not be in the block git reads as trailers, so a blank line before `Co-Authored-By` loses
   nothing.
@@ -874,7 +880,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   the decision becomes context, or rewrite the commit; reopening its point on the canvas lasts only
   until the canvas is generated again, because the commit still says it.
 - Publish adds each decision in the diff to the canvas as a `decision` point for the author,
-  titled with the decision, on its line, and resolved with its reason as of its commit. These
+  titled with its question (or with the decision when the line asks none), on its line, and resolved with its reason as of its commit. These
   points are not the generator's to write and do not count toward its attention points. A canvas
   holds at most 36 of them; past that, the oldest are context. A reason the author wrote on the
   canvas for such a point stands over the commit's when the canvas is generated again; a reason

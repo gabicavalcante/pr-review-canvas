@@ -180,9 +180,10 @@ function shortTitle(text: string, cap: number, fallback: string): string {
 }
 
 /**
- * One resolved point for each settled decision in the diff, on its line, with the decision as its
- * title and its reason as the resolution. Publish writes these, not the generator, so a decision
- * costs the generator none of its points and reads the same in every canvas built from its commit.
+ * One resolved point for each settled decision in the diff, on its line, titled by the question it
+ * answers (or by the decision itself when the line states no question) and resolved with the
+ * decision and its reason. Publish writes these, not the generator, so a decision costs the
+ * generator none of its points and reads the same in every canvas built from its commit.
  */
 function decisionPoints(
   decisions: readonly SettledDecision[],
@@ -196,7 +197,9 @@ function decisionPoints(
     if (decision.line === null) {
       continue
     }
-    const title = shortTitle(decision.text, titleCap, 'Settled decision')
+    const asked = decision.question ?? decision.text
+    const title = shortTitle(asked, titleCap, 'Settled decision')
+    const settledIn = `The author settled this in commit \`${decision.commit.slice(0, 7)}\` on ${decision.date.slice(0, 10)}.`
     const point: Unassigned = {
       kind: 'decision',
       level: 'fyi',
@@ -204,7 +207,8 @@ function decisionPoints(
       path: decision.path,
       line: decision.line,
       side: decision.side,
-      body: `The author settled this in commit \`${decision.commit.slice(0, 7)}\` on ${decision.date.slice(0, 10)}.`,
+      // A question cut to fit the title is given whole in the body.
+      body: decision.question !== undefined && title !== asked ? `${asked}\n\n${settledIn}` : settledIn,
       audience: 'author',
       fingerprint: fingerprint({ kind: 'decision', path: decision.path, title }),
       origin: 'decision',
