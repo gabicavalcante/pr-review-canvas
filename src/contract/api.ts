@@ -145,6 +145,13 @@ export interface PrBundle {
    * describes the current head. The page then offers to settle attention points.
    */
   selfReview: boolean
+  /**
+   * True when the login that runs the server wrote the pull request or merge request, whether or
+   * not the canvas describes the current head. The header then offers the author no approve or
+   * request changes, which the forge refuses on one's own change, and shows their next step.
+   * False on a local review, which has no forge.
+   */
+  readerIsAuthor: boolean
   /** Set on a local review: work that has no pull request, so the forge side of the page is off. */
   local?: LocalKey
   comments: CommentsPayload

@@ -8,6 +8,7 @@
 /** @typedef {import('./contract-types.js').Settlement} Settlement */
 import { runCommand, showCommandError } from './commands.js'
 import { esc } from './dom.js'
+import { currentHost } from './host.js'
 import { SETTLEMENT_REASON_MAX } from './proposed-comment.js'
 
 let selfReview = false
@@ -102,7 +103,7 @@ export function selfReviewNoteHtml(points) {
     return '<p class="self-review-note" hidden></p>'
   }
   const open = points.filter(p => settlementOf(p) === undefined)
-  const yours = open.filter(p => p.audience === 'author').length
+  const yours = pointsStillYours(points)
   const theirs = open.length - yours
   const lead =
     yours === 0
@@ -118,6 +119,40 @@ export function selfReviewNoteHtml(points) {
       : `Resolve what you can answer now with a reason, including a reviewer point that does not apply; ${where}. `) +
     `${theirs} ${theirs === 1 ? 'point goes' : 'points go'} to the reviewer.</p>`
   )
+}
+
+/**
+ * How many points the author can still answer: written for the author and not settled. A personal
+ * dismissal answers nothing, so it does not count. The overview note and the author's next step in
+ * the header count the same points.
+ * @param {ReadonlyArray<Point>} points every point on the canvas
+ * @param {Readonly<Record<string, Settlement>>} [settledPoints] the settled points; the ones set here by default
+ */
+export function pointsStillYours(points, settledPoints = settled) {
+  return points.filter(p => p.audience === 'author' && settledPoints[p.fingerprint] === undefined).length
+}
+
+/**
+ * Where reviewers approve or request changes, the author of an open pull request sees their next
+ * step: the points still theirs to answer, then, on the forge, marking a draft ready for review or
+ * asking for review, since the forge refuses both verdicts on one's own change. A merged or closed
+ * pull request has no next step. The page and the draft flag ride on the element, so the step is
+ * drawn again from it when a settlement changes the count.
+ * @param {number} yours points still the author's, as `pointsStillYours` counts them
+ * @param {Pick<import('./contract-types.js').Pr, 'url' | 'state' | 'draft'>} pr
+ */
+export function authorNextStepHtml(yours, pr) {
+  if (pr.state !== 'open') {
+    return ''
+  }
+  const forge = esc(currentHost().kind)
+  const link = (/** @type {string} */ label) =>
+    `ready to <a href="${esc(pr.url)}" target="_blank" rel="noopener noreferrer">${label} on ${forge}</a>`
+  const step =
+    yours > 0
+      ? `${yours} ${yours === 1 ? 'point' : 'points'} still yours`
+      : link(pr.draft ? 'mark it ready for review' : 'request review')
+  return `<span class="author-next" role="status" data-pr-url="${esc(pr.url)}"${pr.draft ? ' data-draft' : ''}>${step}</span>`
 }
 
 /**

@@ -9,6 +9,7 @@ import { createFakeRunner, type FakeRunnerOptions } from '../src/testing/fake-ru
 import {
   createFakeCheckoutGit,
   ghHandler,
+  ghJson,
   ghPost,
   makeTestContext,
   type TestContext,
@@ -109,21 +110,26 @@ export const test = base.extend<{
   },
   /** PR #42 with AI Chat turned off, so the side pane holds the review alone. */
   noChatUrl: async ({ page }, use) => {
-    const server = await startServer(page, {
-      projectConfig: {
-        config: { ...DEFAULT_PROJECT_CONFIG, chat: { ...DEFAULT_PROJECT_CONFIG.chat, enabled: false } },
-        warnings: [],
-        source: null,
+    const server = await startServer(
+      page,
+      {
+        projectConfig: {
+          config: { ...DEFAULT_PROJECT_CONFIG, chat: { ...DEFAULT_PROJECT_CONFIG.chat, enabled: false } },
+          warnings: [],
+          source: null,
+        },
       },
-    })
+      'reviewer'
+    )
     try {
       await use(server.url)
     } finally {
       await server.stop()
     }
   },
+  /** PR 42 read by a reviewer, who signs off with approve, request changes, or comment. */
   reviewUrl: async ({ page }, use) => {
-    const server = await startServer(page)
+    const server = await startServer(page, {}, 'reviewer')
     try {
       await use(server.url)
     } finally {
@@ -181,7 +187,9 @@ export const test = base.extend<{
 /** Serves PR 42 on a free port; `stop` fails the test if the page threw or a request 500ed. */
 async function startServer(
   page: Page,
-  extra: Partial<TestContextOptions> = {}
+  extra: Partial<TestContextOptions> = {},
+  /** The login that runs the server: octocat wrote PR 42, anyone else reads it as a reviewer. */
+  reader = 'octocat'
 ): Promise<{ url: string; t: TestContext; stop: () => Promise<void> }> {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -195,6 +203,7 @@ async function startServer(
     git: gitFor42(),
     gh: ghFor42({
       routes: {
+        user: ghJson({ login: reader }),
         'repos/acme/widgets/pulls/42/reviews/7001/comments': ghHandler(() =>
           submitted.map(
             ({ line: _line, start_line: _start, side: _side, original_line: _original, ...c }) => ({

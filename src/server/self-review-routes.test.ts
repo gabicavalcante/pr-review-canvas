@@ -388,7 +388,8 @@ describe('the bundle', () => {
   ])('offers self-review when %s runs the server: %s', async (login, selfReview) => {
     t = await withCanvas(gh({ routes: { user: ghJson({ login }) } }))
     const res = await createApp(t.ctx).request('/api/prs/42', { headers: { host: 'localhost:3010' } })
-    expect(((await res.json()) as { selfReview: boolean }).selfReview).toBe(selfReview)
+    // The author is also the reader the header offers no approve or request changes.
+    expect(await res.json()).toMatchObject({ selfReview, readerIsAuthor: selfReview })
   })
 
   it('offers no self-review on a canvas of another commit, which the settle route refuses', async () => {
@@ -403,7 +404,8 @@ describe('the bundle', () => {
       diff: SYNTHETIC_DIFF.replace('a() + b()', 'a() * c()'),
     })
     const res = await createApp(t.ctx).request('/api/prs/42', { headers: { host: 'localhost:3010' } })
-    expect(await res.json()).toMatchObject({ status: 'stale', selfReview: false })
+    // The author still wrote the pull request, so the header still offers them no verdict.
+    expect(await res.json()).toMatchObject({ status: 'stale', selfReview: false, readerIsAuthor: true })
   })
 
   it('says whether settling shares the canvas comment again', async () => {

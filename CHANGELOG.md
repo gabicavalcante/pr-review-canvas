@@ -77,6 +77,15 @@
   a point keeps its title where you clicked it, also at the end of the page. Raising **Hide code**
   closes the files it hides whole; lowering it no longer reopens them.
 
+### Sign-off
+
+- The author of the pull request or merge request no longer sees **approve** or **request
+  changes**, which the forge refuses on one's own change. The header shows their next step instead:
+  **N points still yours**, then **ready to request review**, or to mark a draft ready for review,
+  linking to the pull request; a merged or closed one shows no step. **comment** stays.
+- A local review of a branch or of uncommitted work no longer shows the sign-off commands, which
+  were always disabled there, nor the note that posting is off.
+
 ### AI Chat
 
 - On a wide screen AI Chat starts minimized until you open it once, so a canvas you do not chat

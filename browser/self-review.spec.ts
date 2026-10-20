@@ -4,6 +4,25 @@ import { artifactToModelOutput, normalize } from '../src/review/normalize.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../src/testing/synthetic.js'
 import { expect, test } from './fixtures.js'
 
+test('shows the author their next step where a reviewer has approve and request changes', async ({
+  page,
+  selfReviewUrl,
+  reviewUrl,
+}) => {
+  await page.goto(selfReviewUrl)
+  const signoff = page.locator('.signoff')
+  await expect(signoff.locator('.author-next')).toHaveText('2 points still yours')
+  await expect(signoff.locator('#approve, #request-changes')).toHaveCount(0)
+  await expect(signoff.locator('#comment-review')).toBeVisible()
+  await expect(page.locator('.ptext')).toHaveText('0 of 1 layers reviewed')
+
+  // A reviewer keeps the three verdicts.
+  await page.goto(reviewUrl)
+  await expect(page.locator('.signoff #approve')).toBeVisible()
+  await expect(page.locator('.signoff #request-changes')).toBeVisible()
+  await expect(page.locator('.signoff .author-next')).toHaveCount(0)
+})
+
 test('the author settles a reviewer point with a reason, reads it after a reload, and reopens it', async ({
   page,
   selfReviewUrl,

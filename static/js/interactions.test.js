@@ -83,6 +83,7 @@ function bundleFor(state, canvas = artifact) {
     chat: { enabled: false, acpx: true },
     largePr: false,
     selfReview: false,
+    readerIsAuthor: false,
     mentionCanvas: true,
     canvasComment: true,
     warnings: [],
@@ -98,7 +99,8 @@ function setup(opts = {}) {
   const state = opts.state ?? BASE
   const threadComments = opts.comments ?? comments
   const canvas = opts.artifact ?? artifact
-  const bundle = bundleFor(state, canvas)
+  // A reader who may settle the points here is the pull request's author.
+  const bundle = { ...bundleFor(state, canvas), readerIsAuthor: opts.selfReview ?? false }
   setSelfReview(opts.selfReview ?? false, canvas.settled)
   const ctx = {
     artifact: canvas,
@@ -707,6 +709,7 @@ describe('attention points', () => {
   it('lets the author settle a point with a reason, and collapses it with the reason', async () => {
     const { root, calls } = setup({ selfReview: true, artifact: authored })
     expect(root.querySelector('.self-review-note')?.textContent).toContain('3 points are marked yours')
+    expect(root.querySelector('.signoff .author-next')?.textContent).toBe('3 points still yours')
     click(root, '.findings [data-fingerprint="fp-1"] [data-act="point-settle"]')
     const box = root.querySelector('.findings .settle-box')
     expect(box?.querySelector('input[name="settle-comment"]')).not.toBeNull()
@@ -742,6 +745,9 @@ describe('attention points', () => {
     expect(card?.querySelector('.settled-reason')?.textContent).toContain('Covered by the e2e suite.')
     expect(root.querySelector('.point-statuses')?.textContent).toContain('1 resolved')
     expect(root.querySelector('.self-review-note')?.textContent).toContain('2 points are marked yours')
+    // The header's next step counts the same points, and keeps the link to the pull request.
+    expect(root.querySelector('.signoff .author-next')?.textContent).toBe('2 points still yours')
+    expect(root.querySelector('.signoff .author-next')?.getAttribute('data-pr-url')).toBe(artifact.pr.url)
     expect(root.querySelector('.toast')?.textContent).toContain('canvas comment is updated')
   })
 

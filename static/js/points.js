@@ -13,7 +13,9 @@ import { LEVELS, levelIconHtml, pointLevelText } from './point-level.js'
 import { renderMarkdown } from './markdown.js'
 import {
   audiencePillHtml,
+  authorNextStepHtml,
   canSettle,
+  pointsStillYours,
   reopenButtonHtml,
   selfReviewNoteHtml,
   settleButtonHtml,
@@ -495,6 +497,14 @@ export function applyPointStates(root, points, state, ctx) {
   )
   replaceWithHtml(root.querySelector('.sevsum'), () => sevsumHtml(open, ctx.layers ?? []))
   replaceWithHtml(root.querySelector('.self-review-note'), () => selfReviewNoteHtml(points))
+  // The step is drawn only for an open pull request, so the one on the page stays open.
+  replaceWithHtml(root.querySelector('.author-next'), host =>
+    authorNextStepHtml(pointsStillYours(points), {
+      url: host.getAttribute('data-pr-url') ?? '',
+      state: 'open',
+      draft: host.hasAttribute('data-draft'),
+    })
+  )
 }
 
 /**

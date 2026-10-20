@@ -66,6 +66,7 @@ function bundle(over = {}) {
     chat: { enabled: true, acpx: true },
     largePr: false,
     selfReview: false,
+    readerIsAuthor: false,
     mentionCanvas: true,
     canvasComment: true,
     warnings: [],
@@ -274,6 +275,69 @@ describe('header', () => {
     expect(hdr?.querySelector('.notice.large-pr')).toBeNull()
   })
 
+  it('offers the author their next step in place of approve and request changes, and keeps comment', () => {
+    const opts = /** @type {const} */ ({ host: 'h', theme: 'auto', skin: 'terminal', now: NOW })
+    document.body.innerHTML = renderHeader(bundle({ readerIsAuthor: true }), opts)
+    const hdr = document.querySelector('header.hdr')
+    expect(hdr?.querySelector('#approve, #request-changes')).toBeNull()
+    expect([...(hdr?.querySelectorAll('.signoff .cmd') ?? [])].map(b => b.textContent)).toEqual(['comment'])
+    expect(hdr?.querySelector('.ptext')?.textContent).toBe('0 of 1 layers reviewed')
+    expect(hdr?.querySelector('.pending-bar-host')).not.toBeNull()
+    // Two points of the canvas are written for the author.
+    expect(hdr?.querySelector('.signoff .author-next')?.textContent).toBe('2 points still yours')
+
+    // Once both are settled, the step is asking for review on the pull request's page.
+    const artifact = syntheticArtifact()
+    const settled = { at: NOW.toISOString(), reason: 'Answered.' }
+    const done = { ...artifact, settled: { 'fp-2': settled, 'fp-3': settled } }
+    document.body.innerHTML = renderHeader(bundle({ readerIsAuthor: true, artifact: done }), opts)
+    const step = document.querySelector('.signoff .author-next')
+    expect(step?.textContent).toBe('ready to request review on github')
+    expect(step?.querySelector('a')?.getAttribute('href')).toBe(artifact.pr.url)
+  })
+
+  it('draws no sign-off on a local review, which has no pull request to post to', () => {
+    document.body.innerHTML = renderHeader(bundle({ local: 'branch' }), {
+      host: 'h',
+      theme: 'auto',
+      skin: 'terminal',
+      now: NOW,
+    })
+    expect(document.querySelector('.signoff, .capability-note')).toBeNull()
+    expect(document.querySelector('.ptext')?.textContent).toBe('0 of 1 layers reviewed')
+  })
+
+  it('draws no sign-off for the author of an outdated canvas, where nothing is posted', () => {
+    document.body.innerHTML = renderHeader(
+      bundle({ status: 'stale', readerIsAuthor: true, selfReview: false }),
+      {
+        host: 'h',
+        theme: 'auto',
+        skin: 'terminal',
+        now: NOW,
+      }
+    )
+    expect(document.querySelector('.signoff')).toBeNull()
+    expect(document.querySelector('#approve, #request-changes, .author-next')).toBeNull()
+  })
+
+  it('words the step of the author from the state of the pull request', () => {
+    const opts = /** @type {const} */ ({ host: 'h', theme: 'auto', skin: 'terminal', now: NOW })
+    const artifact = syntheticArtifact()
+    const settled = { at: NOW.toISOString(), reason: 'Answered.' }
+    const done = { ...artifact, settled: { 'fp-2': settled, 'fp-3': settled } }
+    const draft = { ...artifact.pr, draft: true }
+    document.body.innerHTML = renderHeader(bundle({ readerIsAuthor: true, artifact: done, pr: draft }), opts)
+    expect(document.querySelector('.author-next')?.textContent).toBe(
+      'ready to mark it ready for review on github'
+    )
+    // Merged, the pull request asks nothing more of its author, who can still comment.
+    const merged = { ...artifact.pr, state: 'merged' }
+    document.body.innerHTML = renderHeader(bundle({ readerIsAuthor: true, pr: merged }), opts)
+    expect(document.querySelector('.author-next, #approve, #request-changes')).toBeNull()
+    expect([...document.querySelectorAll('.signoff .cmd')].map(b => b.textContent)).toEqual(['comment'])
+  })
+
   it('says the canvas was capped when the change set is large, on every screen', () => {
     document.body.innerHTML = renderHeader(bundle({ largePr: true }), {
       host: 'h',
@@ -370,6 +434,20 @@ describe('header', () => {
     expect(root.querySelector('#approve')?.getAttribute('title')).toBe(
       '1 layer is not reviewed yet: Run path'
     )
+  })
+
+  it('redraws the line of an author, who has no approve gate to update', () => {
+    const artifact = syntheticArtifact()
+    const base = emptyState('x')
+    document.body.innerHTML = `<div id="root">${progressHtml(artifact, base, { readerIsAuthor: true })}<nav class="rail"></nav></div>`
+    const root = document.querySelector('#root')
+    if (!(root instanceof HTMLElement)) {
+      throw new Error('no root')
+    }
+    const done = { ...base, reviewed: { 'layer:run-path': /** @type {const} */ (true) } }
+    expect(refreshProgress(root, artifact, done)).toEqual({ done: 1, total: 1, percent: 100 })
+    expect(root.querySelector('#approve')).toBeNull()
+    expect(root.querySelector('.author-next')?.textContent).toBe('2 points still yours')
   })
 
   it('changes nothing on a page that has no progress line', () => {

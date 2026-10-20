@@ -809,6 +809,10 @@ reviewer decision and click **resolve**. On a pull request, **also post the reas
 this line** is checked by default; the reason then also appears as a review comment on the point's
 line.
 
+While points marked yours are open, the header counts them where a reviewer has **approve** and
+**request changes**; once none is left, it links to the pull request to ask for review. See
+[Sign-off](#sign-off).
+
 **Dismiss** is available to every reader, the author too. It collapses the point on your own page
 only. It does not resolve the point: reviewers still see it, and the self-review note still counts
 it. To resolve a point you dismissed, **restore** it first.
@@ -994,6 +998,15 @@ Requesting changes and a comment-only review do not require that completion. On 
 **approve** calls GitLab's approve API; **request changes** and **comment** post the review body
 as a merge request note. If the head moves before submission, reload and review the current
 commit.
+
+The author of the pull request or merge request, the login that runs `pr-review serve`, gets no
+**approve** or **request changes**: GitHub refuses both on one's own pull request, and GitLab may,
+depending on the project. In their place the header shows the author's next step on an open pull
+request: **N points still yours** while points marked yours are open, then **ready to request
+review on GitHub**, or **ready to mark it ready for review on GitHub** for a draft, which links to
+the pull request. A merged or closed one shows no step. **comment**, the progress line, and the
+pending review stay. An outdated canvas posts nothing, so its header shows no sign-off for anyone.
+A local review shows no sign-off, since its work is on no pull request to post a review to.
 
 ### Outdated canvases
 

@@ -186,6 +186,9 @@ describe('the local reviews', () => {
       expect(bundle.files.length).toBeGreaterThan(0)
       expect(bundle.comments).toMatchObject({ reviewComments: [], issueComments: [] })
       expect(bundle.capabilities.canComment).toBe(false)
+      // Local work has no forge and no login, so its sign-off stays as it is, disabled.
+      expect(bundle.capabilities.login).toBeNull()
+      expect(bundle.readerIsAuthor).toBe(false)
       expect(bundle.artifact?.pr.headSha).toBe(HEAD_SHA)
       // The header's diffstat is counted from the files on screen, never from a cached copy.
       expect(bundle.pr).toMatchObject({
