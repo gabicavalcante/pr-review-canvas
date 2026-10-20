@@ -587,7 +587,14 @@ describe('overview', () => {
     const noBody = bundle()
     noBody.pr = { ...noBody.pr, body: '  ' }
     document.body.innerHTML = renderOverview(noBody, { paths, now: NOW })
-    expect(document.querySelector('.pr-desc.muted')?.textContent).toBe('No PR description.')
+    expect(document.querySelector('.pr-desc')).toBeNull()
+    expect(document.querySelector('.pr-conversation')).not.toBeNull()
+    // Local work has no pull request: no description, conversation, or comment command to draw.
+    document.body.innerHTML = renderOverview(bundle({ local: 'branch' }), { paths, now: NOW })
+    expect(document.querySelector('.pr-desc')).toBeNull()
+    expect(document.querySelector('.pr-conversation')).toBeNull()
+    expect(document.querySelector('[data-act="pr-comment"]')).toBeNull()
+    expect(document.querySelector('.summary')).not.toBeNull()
     document.body.innerHTML = renderOverview(bundle({ artifact: undefined }), { paths, now: NOW })
     expect(document.querySelector('.summary')).toBeNull()
     expect(document.querySelector('.sevsum')).toBeNull()

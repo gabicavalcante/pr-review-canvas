@@ -166,6 +166,10 @@ one never disturbs the other.
   anchor are per worktree as well. A pull request's review is the same in every worktree.
   Local reviews prepared in a linked worktree before this layout lived under the bare names, which
   are now the main checkout's; prepare them again in the worktree.
+- **No pull request on the page.** A local review reads nothing from GitHub or GitLab, so its
+  overview has no PR description, conversation, review history, or outdated comments. To read
+  what reviewers and bots wrote on an open pull request, open its review at
+  `<project>/review/<number>`.
 - **No forge side.** A local canvas posts nothing: comments, sign-off, canvas import, and
   attachment discovery are refused for it. The page draws no import drop zone and no shared-canvas
   callout, and the comment and sign-off commands stay disabled with the reason. A canvas of a working-tree

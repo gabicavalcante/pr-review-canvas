@@ -77,6 +77,9 @@ export function conversationHtml(comments, now) {
 }
 
 /**
+ * The canvas summary, then what the pull request itself says. A local review has no pull request
+ * to read, so it draws none of the description, conversation, or review blocks; an empty
+ * description is left out too, since there is nothing in it to read.
  * @param {PrBundle} bundle
  * @param {{ paths: ReadonlySet<string>, now: Date }} ctx
  * @returns {string}
@@ -88,15 +91,17 @@ export function renderOverview(bundle, ctx) {
   )
   const active = artifact ? openPoints(artifact.points, bundle.state) : []
   const summary = artifact ? summaryHtml(artifact.summary, ctx.paths) : ''
-  const description = bundle.pr.body.trim()
-    ? `<details class="pr-desc">${detailsSummaryHtml('<span>PR description (from GitHub)</span>', 'Toggle PR description')}<div class="body prose">${renderMarkdown(bundle.pr.body, { paths: ctx.paths, github: true })}</div></details>`
-    : '<div class="pr-desc body muted">No PR description.</div>'
+  const local = bundle.local !== undefined
+  const description =
+    !local && bundle.pr.body.trim()
+      ? `<details class="pr-desc">${detailsSummaryHtml('<span>PR description (from GitHub)</span>', 'Toggle PR description')}<div class="body prose">${renderMarkdown(bundle.pr.body, { paths: ctx.paths, github: true })}</div></details>`
+      : ''
   return (
     '<section class="panel" id="overview" aria-labelledby="ov-h">' +
     `<div class="panel-h"><h2 id="ov-h">Overview</h2>${artifact ? sevsumHtml(active, artifact.layers) : ''}</div>` +
     `<div class="body">${artifact ? selfReviewNoteHtml(artifact.points) : ''}${summary}</div>` +
     description +
-    conversationHtml(bundle.comments.issueComments, ctx.now) +
+    (local ? '' : conversationHtml(bundle.comments.issueComments, ctx.now)) +
     (reviews.length
       ? `<details class="review-history">${detailsSummaryHtml(`<span>Review history · ${reviews.length}</span>`, 'Toggle review history')}${reviews.map(review => `<div class="body review-entry"><span class="pill">${esc(review.state.toLowerCase().replaceAll('_', ' '))}</span>${issueCommentHtml(review, ctx.now)}</div>`).join('')}</details>`
       : '') +
