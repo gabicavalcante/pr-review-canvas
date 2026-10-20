@@ -69,7 +69,9 @@
   and `doctor` do not name this one, since it adds no token. Without them, every generated decide
   point comes back with `POINT_IMPACT`, and the agent picks an impact without the definitions.
 - Teammates on 0.9.0 can still open new canvases; they do not see the impact, and see a settled
-  decision as a point the author resolved, without the commit it came from.
+  decision as a point the author resolved. A pull request author who resolves or reopens a point
+  on 0.9.0 saves the canvas without the marks that tell settled decisions apart, so the next
+  canvas built on it can ask a decision's question again.
 
 ## 0.9.0
 

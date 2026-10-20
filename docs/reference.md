@@ -857,9 +857,10 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - The rest of the line is the question the decision answers, then the decision and its reason.
   The question runs to the first `?` followed by a space, and titles the point; the answer after
   it becomes the resolution's reason. Leave the question out and the whole text is both. Either
-  part longer than the reason limit is cut. Only a `?` followed by a space ends the question, so
-  one inside a URL does not, but a reason with a `?` mid-sentence and no question in front is
-  split there: start such a line with its question.
+  part longer than the reason limit is cut. Only a `?` followed by a space, outside backticks,
+  ends the question, so one inside a URL or quoted code such as `` `x ?? 0` `` does not, but a
+  reason with a `?` mid-sentence and no question in front is split there: start such a line with
+  its question.
 - The line counts wherever it sits in the message, at the start of a line, in any letter case. It
   need not be in the block git reads as trailers, so a blank line before `Co-Authored-By` loses
   nothing.
@@ -884,8 +885,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   resolved with its reason as of its commit. These points are not the generator's to write and do
   not count toward its attention points. A canvas holds at most 36 of them; past that, the oldest
   are context. A reason the author wrote on the canvas for such a point stands over the commit's
-  when the canvas is generated again, while the decision's line stays the same; a later commit
-  that changes the answer replaces it. A reason an earlier canvas took from a commit gives way to
+  when the canvas is generated again, while its `Settled-decision` line reads the same; a later
+  commit that changes its question or answer replaces it. A reason an earlier canvas took from a commit gives way to
   the decisions read now.
 - The review loop skill in this repository writes these lines for the decisions its gate asks.
 

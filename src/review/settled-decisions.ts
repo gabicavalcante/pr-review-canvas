@@ -26,7 +26,7 @@ export interface ParsedDecision {
   path: string
   line: number
   side: Side
-  /** The question the decision answers, up to its first `?`; absent when the line states none. */
+  /** The question the decision answers, up to its first ending `?`; absent when the line states none. */
   question?: string
   /** The decision and its reason: the answer, after the question when there is one. */
   text: string
@@ -34,8 +34,9 @@ export interface ParsedDecision {
 
 // A colon after the line number, as in `src/app.ts:4: keep it`, is read as part of the anchor.
 const DECISION_VALUE = /^(\S+):(\d+)(:old)?:?\s+(\S.*)$/
-// The question runs to the first `?` that a space follows, so a `?` inside a URL stays in place.
-const QUESTION = /^(.*?\?)\s+(\S.*)$/
+// The question runs to the first `?` that a space follows outside a code span, so a `?` inside a
+// URL or quoted code such as `x ?? 0` stays in place. A backtick with no closing one ends nothing.
+const QUESTION = /^((?:[^`?]|`[^`]*`|\?(?!\s))*\?)\s+(\S.*)$/
 
 /** One value, or null when it does not read as `<path>:<line>[:old] [<question>? ]<text>`. */
 export function parseSettledDecision(value: string): ParsedDecision | null {

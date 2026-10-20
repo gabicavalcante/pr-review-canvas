@@ -483,7 +483,7 @@
     border: 1px solid var(--line);
     border-radius: var(--r);
   }
-  /* The conversation closes the overview, so it keeps the inset below it too. */
+  /* The conversation box keeps the inset below it, as on its sides. */
   .lbl.sub + .conversation {
     margin-bottom: var(--inset);
   }

@@ -10,7 +10,7 @@ import type {
   FileDelta,
 } from '../contract/generation-context.js'
 import { extractLinks, parseLink } from '../contract/links.js'
-import type { Point, ReviewArtifact } from '../contract/review-artifact.js'
+import { isGeneratorPoint, type Point, type ReviewArtifact } from '../contract/review-artifact.js'
 import type { ReviewKey } from '../contract/review-key.js'
 import type { Git } from '../git/git.js'
 import type { CanvasEntry, CanvasStore } from '../store/canvas-store.js'
@@ -63,7 +63,7 @@ export function fileDelta(basis: Derived, head: Derived): FileDelta {
  */
 function linksStand(point: Point, unchanged: ReadonlySet<string>): boolean {
   return (
-    point.origin !== 'model' ||
+    !isGeneratorPoint(point) ||
     extractLinks(point.body).every(href => {
       const link = parseLink(href)
       return link === null || link.kind === 'layer' || unchanged.has(link.path)

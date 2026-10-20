@@ -3,7 +3,7 @@
 // generator stamp.
 import { missingTestAnchor } from './missing-tests.js'
 import { createHash } from 'node:crypto'
-import type { SettledDecision } from '../contract/generation-context.js'
+import { type SettledDecision, statedDecision } from '../contract/generation-context.js'
 import type {
   FileEntry,
   Generator,
@@ -19,7 +19,7 @@ import type {
   Side,
   TextCaps,
 } from '../contract/review-artifact.js'
-import { POINT_IMPACTS, POINT_LEVELS } from '../contract/review-artifact.js'
+import { isGeneratorPoint, POINT_IMPACTS, POINT_LEVELS } from '../contract/review-artifact.js'
 import { hunkForLine } from '../git/patch-lines.js'
 import type { HighRiskRule } from '../project-config.js'
 import { matchesGlob } from './glob.js'
@@ -179,11 +179,6 @@ function shortTitle(text: string, cap: number, fallback: string): string {
   }…`
 }
 
-/** A decision as its line states it: the question, when there is one, then the answer. */
-function decisionLine(decision: SettledDecision): string {
-  return decision.question === undefined ? decision.text : `${decision.question} ${decision.text}`
-}
-
 /**
  * One resolved point for each settled decision in the diff, on its line, titled by the question it
  * answers (or by the decision itself when the line states no question) and resolved with the
@@ -218,7 +213,7 @@ function decisionPoints(
       // The whole line, not the title, names the decision: two decisions asking one question are
       // two points, and a revised answer is a new one, so a reason written on the canvas for the
       // old answer does not cover it.
-      fingerprint: fingerprint({ kind: 'decision', path: decision.path, title: decisionLine(decision) }),
+      fingerprint: fingerprint({ kind: 'decision', path: decision.path, title: statedDecision(decision) }),
       origin: 'model',
       decisionCommit: decision.commit,
     }
@@ -325,7 +320,7 @@ export function artifactToModelOutput(artifact: ReviewArtifact): ModelOutput {
       return out
     }),
     points: artifact.points
-      .filter(p => p.origin === 'model' && p.decisionCommit === undefined)
+      .filter(isGeneratorPoint)
       .map(({ id: _id, fingerprint: _fp, origin: _origin, layerId: _layerId, ...p }) => p),
   }
 }

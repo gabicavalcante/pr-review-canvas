@@ -50,6 +50,16 @@ describe('parseSettledDecision', () => {
       text: 'keep it; see https://x.test/?q=1 for why',
     })
     expect(parseSettledDecision('src/a.ts:3 Keep it?')).not.toHaveProperty('question')
+    // Nor does one inside quoted code, while a code span inside the question stays in it.
+    expect(parseSettledDecision('src/a.ts:3 Should `x ?? 0` stay? Yes: x may be null')).toMatchObject({
+      question: 'Should `x ?? 0` stay?',
+      text: 'Yes: x may be null',
+    })
+    expect(parseSettledDecision('src/a.ts:3 keep `a ? b : c` as it reads')).not.toHaveProperty('question')
+    expect(parseSettledDecision('src/a.ts:3 Keep it? Yes, see `x')).toMatchObject({
+      question: 'Keep it?',
+      text: 'Yes, see `x',
+    })
   })
 
   it('reads a colon after the line number and a leading `./` as part of the anchor', () => {

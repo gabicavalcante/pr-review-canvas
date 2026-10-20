@@ -8,6 +8,7 @@ import {
   LARGE_PR,
   type Resolutions,
   type SettledDecision,
+  statedDecision,
 } from '../contract/generation-context.js'
 import { type FileEntry, modelOutputSchema } from '../contract/review-artifact.js'
 import { labelPatch } from '../git/patch-lines.js'
@@ -325,7 +326,7 @@ function decisionLine(decision: SettledDecision): string {
     decision.line === null
       ? `\`${decision.path}\``
       : `\`${decision.path}\` ${decision.side}-side line ${decision.line}`
-  return `- \`${decision.id}\` on ${where} (commit \`${decision.commit.slice(0, 7)}\`, ${decision.date.slice(0, 10)}): ${decision.question === undefined ? '' : `${decision.question} `}${decision.text}`
+  return `- \`${decision.id}\` on ${where} (commit \`${decision.commit.slice(0, 7)}\`, ${decision.date.slice(0, 10)}): ${statedDecision(decision)}`
 }
 
 /**

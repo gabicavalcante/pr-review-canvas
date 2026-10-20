@@ -325,7 +325,10 @@ export const PointSchema = z.object({
   audience: z.enum(POINT_AUDIENCES).default('reviewer'),
   id: z.string().min(1),
   fingerprint: z.string().min(1),
-  /** Who wrote the point: the generator, or publish for a missing test. */
+  /**
+   * Who wrote the point: the generator, or publish for a missing test. `model` also covers the
+   * point publish makes for a settled decision, which `decisionCommit` marks.
+   */
   origin: z.enum(['model', 'tests']),
   /**
    * The commit whose `Settled-decision` line publish made the point from; absent on every other
@@ -340,6 +343,11 @@ export const PointSchema = z.object({
   layerId: z.string().optional(),
 })
 export type Point = z.infer<typeof PointSchema>
+
+/** Whether the generator wrote the point: not a missing test's, and not a settled decision's. */
+export function isGeneratorPoint(point: Point): boolean {
+  return point.origin === 'model' && point.decisionCommit === undefined
+}
 
 // The longest reason the author may give for settling a point lives with the proposal parser, so a
 // resolution AI Chat proposes is checked against the same limit the route enforces.

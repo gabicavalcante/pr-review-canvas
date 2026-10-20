@@ -152,6 +152,11 @@ export const SettledDecisionSchema = z.object({
 })
 export type SettledDecision = z.infer<typeof SettledDecisionSchema>
 
+/** A decision as its line states it: the question, when there is one, then the answer. */
+export function statedDecision(decision: SettledDecision): string {
+  return decision.question === undefined ? decision.text : `${decision.question} ${decision.text}`
+}
+
 /**
  * `context.json`: everything the agent and `publish` need about one prepared canvas. Written by
  * `prepare` next to `prompt.md`; `publish` validates `model.json` against the hunk index and the
