@@ -5,7 +5,12 @@ import { ChatBusyError } from '../../chat/chat-manager.js'
 import { CheckoutBusyError } from '../../chat/checkouts.js'
 import { ChatContextError } from '../../chat/context.js'
 import type { ErrorEnvelope, HealthResponse } from '../../contract/api.js'
-import type { ChatEvent, ChatHistoryResponse, ChatThreadsResponse } from '../../contract/chat.js'
+import type {
+  ChangesCodeResponse,
+  ChatEvent,
+  ChatHistoryResponse,
+  ChatThreadsResponse,
+} from '../../contract/chat.js'
 import type {
   AgentProbeResult,
   AgentsResponse,
@@ -579,5 +584,40 @@ describe('toChatError', () => {
     expect(toChatError(app)).toBe(app)
     expect(toChatError(new Error('boom'))).toMatchObject({ code: 'INTERNAL', message: 'boom' })
     expect(toChatError('a string')).toMatchObject({ code: 'INTERNAL', message: 'a string' })
+  })
+})
+
+describe('/api/prs/:n/chat/changes-code', () => {
+  const put = async (on: boolean): Promise<Response> =>
+    createApp(t.ctx).request('/api/prs/42/chat/changes-code', {
+      method: 'PUT',
+      headers: POST,
+      body: JSON.stringify({ on }),
+    })
+
+  it('says the mode is off, and why a pull request does not offer it', async () => {
+    const res = await createApp(t.ctx).request('/api/prs/42/chat/changes-code', { headers: LOCAL })
+    expect(res.status).toBe(200)
+    expect(await json<ChangesCodeResponse>(res)).toEqual({
+      on: false,
+      status: { offered: false, reason: 'AI Chat changes code on a branch review only' },
+    })
+  })
+
+  it('refuses to turn it on where it is not offered, with the reason, and saves nothing', async () => {
+    const res = await put(true)
+    expect(res.status).toBe(409)
+    expect(await json<ErrorEnvelope>(res)).toMatchObject({
+      error: { code: 'CHANGES_CODE_UNAVAILABLE', message: 'AI Chat changes code on a branch review only' },
+    })
+    expect((await t.ctx.state.read(42)).changesCode).toBe(false)
+  })
+
+  it('turns it off whatever the conditions', async () => {
+    await t.ctx.state.update(42, state => ({ ...state, changesCode: true }))
+    const res = await put(false)
+    expect(res.status).toBe(200)
+    expect(await json<ChangesCodeResponse>(res)).toMatchObject({ on: false })
+    expect((await t.ctx.state.read(42)).changesCode).toBe(false)
   })
 })

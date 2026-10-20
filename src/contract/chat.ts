@@ -80,6 +80,20 @@ export interface ChatHistoryResponse {
   turns: ChatTurn[]
 }
 
+/** Whether AI Chat may change code on a review now; when it may not, the reason the page shows. */
+export type ChangesCodeStatus =
+  | { offered: true; /** `refs/heads/<name>` the checkout is on. */ branchRef: string }
+  | { offered: false; reason: string }
+
+/** The body that turns the mode on or off. */
+export const ChangesCodeSetSchema = z.object({ on: z.boolean() })
+
+export interface ChangesCodeResponse {
+  /** Whether the reader turned the mode on for this review. */
+  on: boolean
+  status: ChangesCodeStatus
+}
+
 /** The SSE frames the chat route writes, named the same on both sides. */
 export const CHAT_EVENTS = [
   'turn',

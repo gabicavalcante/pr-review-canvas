@@ -6,6 +6,7 @@ import path from 'node:path'
 import { Writable } from 'node:stream'
 import { stripVTControlCharacters } from 'node:util'
 import type { AgentRunner } from '../acpx/acpx.js'
+import type { SandboxSupport } from '../acpx/sandbox.js'
 import type { CheckoutGit } from '../chat/checkouts.js'
 import type { RuntimeConfig } from '../config.js'
 import { GITHUB_HOST, type Host } from '../host/host.js'
@@ -423,6 +424,8 @@ export interface TestContextOptions {
   clone?: CloneShared
   now?: () => Date
   vendorRoots?: VendorRoots
+  /** Whether the box can start; it cannot by default, so no test starts one by accident. */
+  sandbox?: () => Promise<SandboxSupport>
 }
 
 export interface TestContext {
@@ -499,7 +502,8 @@ export async function makeTestContext(opts: TestContextOptions = {}): Promise<Te
       now,
       git,
       clone,
-      opts.projectConfig?.config.prompts
+      opts.projectConfig?.config.prompts,
+      opts.sandbox ?? (async () => ({ available: false, reason: 'tests start no box' }))
     ),
     now,
     version: '0.0.0-test',

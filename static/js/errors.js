@@ -115,6 +115,10 @@ export const ERROR_CARDS = {
     title: 'Only the author resolves points',
     action: 'Dismiss the point instead: a dismissal stays on your machine.',
   },
+  CHANGES_CODE_UNAVAILABLE: {
+    title: 'AI Chat cannot change code here now',
+    action: 'Do what the message asks, then turn it on again.',
+  },
   COMMENT_LINE_NOT_IN_DIFF: {
     title: 'Comments must sit on lines the diff shows',
     action: 'Pick a line inside a chunk of this pull request.',

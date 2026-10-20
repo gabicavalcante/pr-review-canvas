@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { type AgentRunner, createAgentRunner } from '../acpx/acpx.js'
 import { type AgentDirectory, createAgentDirectory } from '../acpx/agents.js'
 import { createPreflightProbe, type PreflightProbe } from '../acpx/preflight.js'
+import { type SandboxSupport, sandboxSupport } from '../acpx/sandbox.js'
 import { type ChatManager, createChatManager, type RunningTurns } from '../chat/chat-manager.js'
 import {
   type CheckoutGit,
@@ -84,6 +85,8 @@ export interface AppContext {
   transcripts: TranscriptStore
   /** The review checkouts AI Chat reads code from, one per review. */
   checkouts: ReviewCheckouts
+  /** Whether this machine can start the box a turn that changes code runs in. */
+  sandbox: () => Promise<SandboxSupport>
   now: () => Date
   version: string
   staticDir: string
@@ -198,6 +201,18 @@ export interface ChatSet {
   chat: ChatManager
   transcripts: TranscriptStore
   checkouts: ReviewCheckouts
+  sandbox: () => Promise<SandboxSupport>
+}
+
+/** Asks once whether the box can start; the answer holds while the server runs. */
+export function onceSandboxSupport(
+  ask: () => Promise<SandboxSupport> = sandboxSupport
+): () => Promise<SandboxSupport> {
+  let answer: Promise<SandboxSupport> | null = null
+  return () => {
+    answer ??= ask()
+    return answer
+  }
 }
 
 /** Where the review checkouts of one repository live, next to its canvases. */
@@ -213,7 +228,8 @@ export function createChatSet(
   now: () => Date,
   git: Git,
   clone: CloneShared,
-  prompts?: PromptOverrides
+  prompts?: PromptOverrides,
+  sandbox: () => Promise<SandboxSupport> = onceSandboxSupport()
 ): ChatSet {
   const settings = createSettingsStore(config.dataDir)
   const checkouts = checkoutsFor(clone.checkouts, config.worktree)
@@ -225,6 +241,7 @@ export function createChatSet(
     preflight,
     transcripts,
     checkouts,
+    sandbox,
     agents: createAgentDirectory({ runner, preflight, cwd: config.repoRoot, now }),
     chat: createChatManager({
       runner,

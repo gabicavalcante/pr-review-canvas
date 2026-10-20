@@ -6,8 +6,14 @@ import { ChatBusyError } from '../../chat/chat-manager.js'
 import { CheckoutBusyError } from '../../chat/checkouts.js'
 import { ChatContextError } from '../../chat/context.js'
 import { isThreadNameFor } from '../../chat/threads.js'
-import type { ChatEvent, ChatHistoryResponse } from '../../contract/chat.js'
-import { ChatSendSchema } from '../../contract/chat.js'
+import { checkoutGitExec, writeModeStatus } from '../../chat/write-mode.js'
+import type {
+  ChangesCodeResponse,
+  ChangesCodeStatus,
+  ChatEvent,
+  ChatHistoryResponse,
+} from '../../contract/chat.js'
+import { ChangesCodeSetSchema, ChatSendSchema } from '../../contract/chat.js'
 import type { Pr, ReviewArtifact } from '../../contract/review-artifact.js'
 import type { CheckoutsResponse, SettingsResponse } from '../../contract/settings.js'
 import { isChatAgent, SettingsInputSchema } from '../../contract/settings.js'
@@ -241,6 +247,27 @@ export function chatRoutes(ctx: AppContext, loader: PrLoader): Hono {
     return c.json({ cancelled: await ctx.chat.cancel(key) })
   })
 
+  api.get('/prs/:n/chat/changes-code', async c => {
+    const key = parseTargetKey(c.req.param('n'))
+    const [state, status] = await Promise.all([ctx.state.read(key), changesCodeStatus(ctx, loader, key)])
+    const body: ChangesCodeResponse = { on: state.changesCode, status }
+    return c.json(body)
+  })
+
+  api.put('/prs/:n/chat/changes-code', async c => {
+    const key = parseTargetKey(c.req.param('n'))
+    const input = await readJsonBody(c.req.raw, ChangesCodeSetSchema, '{ "on": true }')
+    const status = await changesCodeStatus(ctx, loader, key)
+    // Turning it off needs nothing; turning it on needs every condition now, so the page learns
+    // at once why it cannot, rather than at the next question.
+    if (input.on && !status.offered) {
+      throw new AppError('CHANGES_CODE_UNAVAILABLE', status.reason, 409)
+    }
+    await ctx.state.update(key, state => ({ ...state, changesCode: input.on }))
+    const body: ChangesCodeResponse = { on: input.on, status }
+    return c.json(body)
+  })
+
   api.post('/prs/:n/chat', async c => {
     const key = parseTargetKey(c.req.param('n'))
     const input = await readJsonBody(
@@ -289,6 +316,36 @@ export function chatRoutes(ctx: AppContext, loader: PrLoader): Hono {
   })
 
   return api
+}
+
+/**
+ * Whether AI Chat may change code on this review now: a branch review whose current canvas the
+ * checkout is at (see `writeModeStatus`). A review with no canvas yet has nothing to change code
+ * against.
+ */
+export async function changesCodeStatus(
+  ctx: AppContext,
+  loader: PrLoader,
+  key: ReviewKey
+): Promise<ChangesCodeStatus> {
+  let canvasSha: string | null = null
+  if (key === 'branch') {
+    try {
+      const subject = await subjectForChat(ctx, key, await loader.currentTarget(key))
+      canvasSha = subject.current ? subject.diff.headSha : null
+    } catch (err) {
+      if (err instanceof AppError && err.code === 'CANVAS_NOT_FOUND') {
+        return { offered: false, reason: 'there is no canvas for this branch yet' }
+      }
+      throw err
+    }
+  }
+  return writeModeStatus({
+    key,
+    canvasSha,
+    git: checkoutGitExec(ctx.config.repoRoot),
+    sandbox: ctx.sandbox,
+  })
 }
 
 /**

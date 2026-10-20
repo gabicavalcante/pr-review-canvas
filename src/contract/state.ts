@@ -89,6 +89,11 @@ export const PrStateSchema = z.preprocess(
     /** Submitted drafts, retained even when the forge's comment receipt could not be read. */
     submitted: z.array(PendingCommentSchema).default([]),
     chat: z.object({ threads: z.array(ChatThreadSchema), activeThread: z.string().optional() }),
+    /**
+     * Whether the reader let AI Chat change code on this review. Each turn still checks that it
+     * may (see `src/chat/write-mode.ts`). Off by default, and for state files of older versions.
+     */
+    changesCode: z.boolean().default(false),
     updatedAt: z.string(),
   })
 )
@@ -105,6 +110,7 @@ export function emptyState(updatedAt: string): PrState {
     pending: [],
     submitted: [],
     chat: { threads: [] },
+    changesCode: false,
     updatedAt,
   }
 }

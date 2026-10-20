@@ -39,8 +39,14 @@ describe('small contracts', () => {
       pending: [],
       submitted: [],
       chat: { threads: [] },
+      changesCode: false,
       updatedAt: '2026-09-10T12:00:00.000Z',
     })
+  })
+
+  it('reads a state file from before AI Chat could change code as the mode off', () => {
+    const { changesCode: _changesCode, ...older } = emptyState('2026-09-10T12:00:00.000Z')
+    expect(PrStateSchema.parse(older).changesCode).toBe(false)
   })
 
   it('rejects the previous tool version state shape', () => {
