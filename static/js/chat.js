@@ -794,13 +794,19 @@ export function wireChat(options) {
     seeOpenThread()
   }
 
-  const INDEX_GROUPS = /** @type {const} */ ([
-    ['point', 'Attention points'],
-    ['lines', 'Lines'],
-    ['file', 'Files'],
-    ['layer', 'Layers'],
-    ['pr', 'Whole PR'],
-  ])
+  /**
+   * The Threads tab's group for each kind of place, in the order the tab draws them. Typed over
+   * every kind, so a new kind of place does not build until it has a group.
+   * @type {Record<ChatContext['kind'], string>}
+   */
+  const INDEX_LABELS = {
+    point: 'Attention points',
+    lines: 'Lines',
+    file: 'Files',
+    layer: 'Layers',
+    pr: 'Whole PR',
+  }
+  const INDEX_GROUPS = /** @type {Array<[ChatContext['kind'], string]>} */ (Object.entries(INDEX_LABELS))
 
   const drawIndex = () => {
     for (const dot of Array.from(root.querySelectorAll('.threads-new'))) {
@@ -1609,24 +1615,26 @@ export function wireChat(options) {
       return
     }
     panel.uncover()
-    if (anchor.kind === 'point') {
-      const el = root.querySelector(`[data-point][data-fingerprint="${cssEscape(anchor.fingerprint)}"]`)
-      if (el instanceof HTMLElement) {
-        scrollIntoViewSafe(el)
-        flash(el)
+    switch (anchor.kind) {
+      case 'point': {
+        const el = root.querySelector(`[data-point][data-fingerprint="${cssEscape(anchor.fingerprint)}"]`)
+        if (el instanceof HTMLElement) {
+          scrollIntoViewSafe(el)
+          flash(el)
+        }
+        return
       }
-      return
+      case 'layer': {
+        const key = session.artifact.layers.find(l => l.id === anchor.layerId)?.key
+        if (key !== undefined) navigateLink(`#layer:${key}`, root)
+        return
+      }
+      case 'file':
+        navigateLink(`#file:${anchor.path}`, root)
+        return
+      case 'lines':
+        navigateLink(lineLink(anchor), root)
     }
-    if (anchor.kind === 'layer') {
-      const key = session.artifact.layers.find(l => l.id === anchor.layerId)?.key
-      if (key !== undefined) navigateLink(`#layer:${key}`, root)
-      return
-    }
-    if (anchor.kind === 'file') {
-      navigateLink(`#file:${anchor.path}`, root)
-      return
-    }
-    navigateLink(lineLink(anchor), root)
   }
   // Whatever asks the chat for something shows its tab first.
   const openChat = () => {
