@@ -886,8 +886,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   not count toward its attention points. A canvas holds at most 36 of them; past that, the oldest
   are context. A reason the author wrote on the canvas for such a point stands over the commit's
   when the canvas is generated again, while its `Settled-decision` line reads the same; a later
-  commit that changes its question or answer replaces it. A reason an earlier canvas took from a commit gives way to
-  the decisions read now.
+  commit that changes its question or answer replaces it. A reason an earlier canvas took from a
+  commit gives way to the decisions read now.
 - The review loop skill in this repository writes these lines for the decisions its gate asks.
 
 ### Comments and sign-off
