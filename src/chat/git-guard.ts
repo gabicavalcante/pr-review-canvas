@@ -4,7 +4,8 @@
  * switch, a new branch, tag or stash) before git applies it. git 2.53 runs no such hook declared in
  * configuration, so `core.hooksPath` points at a folder of pr-review's whose every hook runs the
  * repository's own afterwards. It is set through `GIT_CONFIG_*` in the turn's environment, so
- * nothing is written to the repository, and git run anywhere else is untouched.
+ * nothing is written to the repository, and git run anywhere else is untouched. A push is refused
+ * twice over: push URLs are rewritten to none that works, and the pre-push hook refuses.
  *
  * It guards against the agent's mistakes, not against an agent set on getting around it: one
  * `git -c core.hooksPath=` skips it. The check after the turn reports what got past.
@@ -80,8 +81,23 @@ function shim(hook: (typeof CLIENT_HOOKS)[number]): string {
       '',
     ].join('\n')
   }
+  if (hook === 'pre-push') {
+    // Pushing is the reader's to do, after reading the change: the turn's commits stay local.
+    return ['#!/bin/sh', 'echo "pr-review: an AI Chat turn does not push" >&2', 'exit 1', ''].join('\n')
+  }
   return ['#!/bin/sh', original, '[ -x "$orig" ] || exit 0', 'exec "$orig" "$@"', ''].join('\n')
 }
+
+/**
+ * Every push URL a remote can have rewritten to one no transport serves, so a push fails before it
+ * connects while fetches keep their URLs. A remote given as a plain path is not rewritten; the
+ * pre-push hook refuses that one. Each needs its own way around: `-c` here, `--no-verify` there.
+ */
+const PUSH_URL_PREFIXES = ['https://', 'http://', 'git@', 'ssh://', 'git://', 'file://']
+export const PUSH_GUARD_PAIRS: readonly [string, string][] = PUSH_URL_PREFIXES.map(prefix => [
+  'url.pr-review-push-blocked:///.pushInsteadOf',
+  prefix,
+])
 
 /** Writes the guard and a shim per client hook into `dir`. Writing again leaves the same files. */
 export async function writeGuardHooks(dir: string): Promise<void> {
@@ -137,7 +153,7 @@ export async function repositoryHooksDir(checkout: string): Promise<string> {
 /** The git configuration pair that turns the guard on, and the variables its hooks read. */
 export function gitGuardConfig(guard: GitGuard): { pairs: [string, string][]; env: Record<string, string> } {
   return {
-    pairs: [['core.hooksPath', guard.hooksDir]],
+    pairs: [['core.hooksPath', guard.hooksDir], ...PUSH_GUARD_PAIRS],
     env: { PR_REVIEW_BRANCH: guard.branchRef, PR_REVIEW_ORIG_HOOKS: guard.originalHooksDir },
   }
 }

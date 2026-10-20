@@ -157,4 +157,43 @@ describe('the guard in a real repository', () => {
     await git(repo, ['config', 'core.hooksPath', '.githooks'])
     expect(await repositoryHooksDir(repo)).toBe(path.join(repo, '.githooks'))
   })
+
+  /** A repository with a bare remote `origin` at `url`, which the remote's path is turned into. */
+  const withRemote = async (url: (bare: string) => string): Promise<{ repo: string; bare: string }> => {
+    const repo = await repository()
+    const bare = await mkdtemp(path.join(root, 'remote-'))
+    await git(bare, ['init', '-q', '--bare'])
+    await git(repo, ['remote', 'add', 'origin', url(bare)])
+    await git(repo, ['push', '-q', 'origin', 'feat'])
+    await writeFile(path.join(repo, 'f'), 'c\n')
+    await git(repo, ['commit', '-q', '-am', 'c'])
+    return { repo, bare }
+  }
+
+  const remoteHead = async (bare: string): Promise<string> =>
+    (await git(bare, ['rev-parse', 'refs/heads/feat'])).stdout.trim()
+
+  it('refuses a push to a URL, even past the pre-push hook', async () => {
+    const { repo, bare } = await withRemote(dir => `file://${dir}`)
+    const before = await remoteHead(bare)
+    expect(await guarded(repo, ['push', '-q', 'origin', 'feat'])).toMatchObject({ refused: true })
+    expect(await guarded(repo, ['push', '-q', '--no-verify', 'origin', 'feat'])).toMatchObject({
+      refused: true,
+    })
+    expect(await remoteHead(bare)).toBe(before)
+  })
+
+  it('refuses a push to a remote given as a plain path, which no URL rewrite covers', async () => {
+    const { repo, bare } = await withRemote(dir => dir)
+    const before = await remoteHead(bare)
+    const result = await guarded(repo, ['push', '-q', 'origin', 'feat'])
+    expect(result).toMatchObject({ refused: true })
+    expect(result.message).toContain('does not push')
+    expect(await remoteHead(bare)).toBe(before)
+  })
+
+  it('still fetches', async () => {
+    const { repo } = await withRemote(dir => `file://${dir}`)
+    expect(await guarded(repo, ['fetch', '-q', 'origin'])).toMatchObject({ refused: false })
+  })
 })
