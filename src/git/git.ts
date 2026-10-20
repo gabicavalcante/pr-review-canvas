@@ -48,7 +48,7 @@ export interface Git {
    */
   authorEmail(): Promise<string | null>
   /**
-   * The commits of `from..to` whose message has lines `<key>: <value>`, oldest first, with each
+   * The commits of `from..to` whose message has lines `<key>: <value>`, parents first, with each
    * value. The key is matched without regard to case, at the start of a line anywhere in the
    * message: a trailer block git would not recognize, such as one a blank line keeps apart from
    * `Co-Authored-By`, still counts.
@@ -239,7 +239,15 @@ export function createGit(cwd: string, exec: GitExec = execGit): Git {
     },
     commitKeyedLines: async (from, to, key) => {
       // Unit and record separators keep the message apart from the fields around it, whatever it says.
-      const out = await run(['log', '--reverse', '--format=%H%x1f%ae%x1f%aI%x1f%B%x1d', `${from}..${to}`])
+      // Parents come before their children whatever the commit dates say, so a later decision on a
+      // line is the one a later commit in the history wrote.
+      const out = await run([
+        'log',
+        '--topo-order',
+        '--reverse',
+        '--format=%H%x1f%ae%x1f%aI%x1f%B%x1d',
+        `${from}..${to}`,
+      ])
       // The key is one of this tool's own names, letters and dashes, so it needs no escaping.
       const keyed = new RegExp(`^${key}:(.*)$`, 'i')
       return out

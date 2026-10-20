@@ -12,7 +12,7 @@ import {
 } from '../contract/review-artifact.js'
 import type { Git } from '../git/git.js'
 import { hunkForLine } from '../git/patch-lines.js'
-import { unchangedLines } from './point-carry.js'
+import { rowsOnSide, unchangedLines } from './point-carry.js'
 
 export const SETTLED_DECISION_KEY = 'Settled-decision'
 
@@ -67,6 +67,8 @@ export interface DecisionSources {
   mergeBaseSha: string
   headSha: string
   files: readonly FileEntry[]
+  /** Each file's patch, by its key: the rows that say whether the diff deletes a line. */
+  patches: Readonly<Record<string, string>>
   /**
    * The email of whoever prepares the canvas, as they commit. Only their own commits' decisions
    * count, so a commit someone else pushed to the branch cannot answer the author's questions;
@@ -82,10 +84,11 @@ async function fileLines(git: DecisionSources['git'], ref: string, path: string)
 
 /**
  * The decision's line in this diff, or null. A new-side line is numbered as in the commit that wrote
- * it and is carried to the head; an old-side line, one the change deleted, is numbered as in that
- * commit's parent and is carried to the merge base. Either is carried only while the commits in
- * between leave it as it was, and kept only when it falls inside a chunk. The number trusts the
- * commit's own version, which a rebase rewrites without touching the message.
+ * it and is carried to the head, and kept when it falls inside a chunk; an old-side line, one the
+ * change deleted, is numbered as in that commit's parent and is carried to the merge base, and kept
+ * while the diff still deletes it. Either is carried only while it reads the same at both ends, as
+ * a shortest edit script between the two versions leaves it. The number trusts the commit's own
+ * version, which a rebase rewrites without touching the message.
  */
 async function lineInDiff(
   src: DecisionSources,
@@ -104,7 +107,18 @@ async function lineInDiff(
   ])
   const line =
     written === null || shown === null ? undefined : unchangedLines(written, shown)?.get(decision.line)
-  return line !== undefined && hunkForLine(entry.hunks, decision.side, line) !== null ? line : null
+  if (line === undefined) {
+    return null
+  }
+  // A later commit that restored a deleted line leaves it as context, where the decision about
+  // deleting it no longer holds.
+  const inDiff =
+    decision.side === 'new'
+      ? hunkForLine(entry.hunks, 'new', line) !== null
+      : rowsOnSide(src.patches[entry.key] ?? '', 'old')
+          .get(line)
+          ?.startsWith('-') === true
+  return inDiff ? line : null
 }
 
 function capReason(text: string): string {

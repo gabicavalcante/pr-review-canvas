@@ -871,13 +871,16 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   when that person is the pull request's author, the same rule as **resolve**; a canvas anyone
   else generates resolves no decision.
 - A new-side line is carried from its commit to the head, and an old-side line from the commit's
-  parent to the merge base, while the commits in between leave it as it was. When one of them
-  changed the line, or the line is outside the diff, the decision is context: the generator does
-  not raise its question again unless the code contradicts the answer, and the canvas gets no
-  point for it. A rebase rewrites the versions the numbers refer to while the lines keep their
+  parent to the merge base, while it reads the same at both ends: a commit that changes the line
+  and a later one that changes it back leave the decision on it. An old-side decision also needs
+  the diff to still delete its line, so a later commit that restores the line ends it. When the
+  line no longer reads the same, is no longer deleted, or is outside the diff, the decision is
+  context: the generator does not raise its question again unless the code contradicts the answer,
+  and the canvas gets no point for it. A rebase rewrites the versions the numbers refer to while the lines keep their
   text, so after one a decision can land on another line, or be lost; regenerate with care, or
   write the decision again.
 - Two decisions on the same line: the later commit's stands, which is how a decision is revised.
+  Later means later in the history, parents before children, whatever the commit dates say.
   There is no line that withdraws one. To ask its question again, change the line it is about, so
   the decision becomes context, or rewrite the commit; reopening its point on the canvas lasts only
   until the canvas is generated again, because the commit still says it.

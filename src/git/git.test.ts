@@ -289,6 +289,64 @@ describe('createGit (real adapter)', () => {
     }
   })
 
+  it('reads a merged history parents first, even when the commit dates run backwards', async () => {
+    const dir = await makeTempDir('pr-review-git-topo-')
+    // Each commit gets its own dates, so the date order can disagree with the history.
+    const inRepo = async (date: string, ...args: string[]): Promise<string> => {
+      const env = { ...process.env, GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date }
+      const result = await execGitIn(env)(dir, [
+        '-c',
+        'user.email=t@example.com',
+        '-c',
+        'user.name=T',
+        ...args,
+      ])
+      if (result.code !== 0) {
+        throw new GitError(args, result.stderr, result.code)
+      }
+      return result.stdout.toString('utf8').trim()
+    }
+    try {
+      await inRepo('2026-01-01T00:00:00Z', 'init', '-q', '-b', 'main')
+      await inRepo('2026-01-01T00:00:00Z', 'commit', '-q', '--allow-empty', '-m', 'base')
+      const base = await inRepo('2026-01-01T00:00:00Z', 'rev-parse', 'HEAD')
+      // The first answer, then its revision on a child whose clock ran behind.
+      await inRepo(
+        '2026-01-05T00:00:00Z',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'a',
+        '-m',
+        'Settled-decision: a.ts:1 first'
+      )
+      const first = await inRepo('2026-01-05T00:00:00Z', 'rev-parse', 'HEAD')
+      await inRepo(
+        '2026-01-02T00:00:00Z',
+        'commit',
+        '-q',
+        '--allow-empty',
+        '-m',
+        'b',
+        '-m',
+        'Settled-decision: a.ts:1 revised'
+      )
+      const revised = await inRepo('2026-01-02T00:00:00Z', 'rev-parse', 'HEAD')
+      await inRepo('2026-01-06T00:00:00Z', 'checkout', '-q', '-b', 'side', first)
+      await inRepo('2026-01-06T00:00:00Z', 'commit', '-q', '--allow-empty', '-m', 'side')
+      await inRepo('2026-01-07T00:00:00Z', 'merge', '-q', '--no-ff', '-m', 'merge', revised)
+      const keyed = await createGit(dir, execGitAsRepoConfig).commitKeyedLines(
+        base,
+        'HEAD',
+        'Settled-decision'
+      )
+      expect(keyed.map(commit => commit.sha)).toEqual([first, revised])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('snapshots the working tree, untracked files included, without touching the real index', async () => {
     const dir = await makeTempDir('pr-review-snap-')
     try {

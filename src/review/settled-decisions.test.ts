@@ -1,6 +1,6 @@
 import type { FileEntry } from '../contract/review-artifact.js'
 import { SETTLEMENT_REASON_MAX } from '../contract/review-artifact.js'
-import { toFileEntry } from '../git/diff-collector.js'
+import { toFileEntry, toPatchMap } from '../git/diff-collector.js'
 import type { CommitKeyedLines } from '../git/git.js'
 import { createFakeGit } from '../testing/fakes.js'
 import { BASE_SHA, HEAD_SHA, SYNTHETIC_FILES } from '../testing/synthetic.js'
@@ -105,6 +105,7 @@ describe('readSettledDecisions', () => {
       mergeBaseSha: BASE_SHA,
       headSha: HEAD_SHA,
       files: opts.files ?? FILES,
+      patches: toPatchMap(SYNTHETIC_FILES),
       authorEmail: opts.email === undefined ? 'author@example.com' : opts.email,
     })
     return { git, decisions }
@@ -177,6 +178,18 @@ describe('readSettledDecisions', () => {
     expect(git.calls.filter(call => call[0] === 'show')).toEqual([
       ['show', `${EARLIER}^:src/gone.ts`],
       ['show', `${BASE_SHA}:src/gone.ts`],
+    ])
+  })
+
+  it('keeps an old-side decision only on a line the diff deletes, not on a context row', async () => {
+    const atBase = "import { a } from './a'\nexport function run() {\n  return a()\n}\n"
+    const { decisions } = read(
+      [commit(EARLIER, ['src/app.ts:3:old the bare call goes', 'src/app.ts:2:old run is not deleted'])],
+      { blobs: { [`${EARLIER}^:src/app.ts`]: atBase, [`${BASE_SHA}:src/app.ts`]: atBase } }
+    )
+    expect((await decisions).map(decision => [decision.text, decision.line])).toEqual([
+      ['the bare call goes', 3],
+      ['run is not deleted', null],
     ])
   })
 

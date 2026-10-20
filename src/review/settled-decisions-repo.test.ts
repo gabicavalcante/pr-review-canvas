@@ -45,8 +45,8 @@ describe('settled decisions against a real repository', () => {
   // In order: the author's decision, followed by a blank line and an attribution as the loop writes
   // it; another person's commit with a decision of their own; lines added above the decided one;
   // the same line decided again; a deleted line decided as numbered in its parent; the decided line
-  // edited.
-  const heads = { decided: '', other: '', shifted: '', revised: '', deleted: '', edited: '' }
+  // edited; the deleted line restored, with the line under it changed.
+  const heads = { decided: '', other: '', shifted: '', revised: '', deleted: '', edited: '', restored: '' }
   let harness: TestContext
 
   beforeAll(async () => {
@@ -94,6 +94,8 @@ describe('settled decisions against a real repository', () => {
       `// header\n// more\n${APP.replace('b\n', 'B\n').replace('h\n', 'H\n').replace('E!', 'E?')}`
     )
     heads.edited = await commit(dir, ['fix(app): soften E'])
+    await write(dir, 'src/old.ts', 'zero\none\ntwo\nTHREE\n')
+    heads.restored = await commit(dir, ['revert(old): bring two back'])
   })
   afterAll(async () => rm(dir, { recursive: true, force: true }))
   beforeEach(async () => {
@@ -186,6 +188,14 @@ describe('settled decisions against a real repository', () => {
         .filter(decision => decision.side === 'old')
         .map(decision => [decision.path, decision.line])
     ).toEqual([['src/old.ts', 2]])
+  })
+
+  it("keeps a deleted line's decision as context once a later commit restores the line", async () => {
+    const { context, artifact } = await published(heads.restored)
+    expect(
+      context.decisions.filter(decision => decision.side === 'old').map(decision => decision.line)
+    ).toEqual([null])
+    expect(artifact.points.filter(point => point.decisionCommit !== undefined)).toEqual([])
   })
 
   it('keeps a decision whose line changed after the commit as context, and adds no point for it', async () => {

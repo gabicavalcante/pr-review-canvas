@@ -24,7 +24,7 @@ export interface SideText {
 export const MAX_LINE_EDITS = 2000
 
 /** The diff row (marker and text) that shows each line of `side`, keyed by line number. */
-function rowsOnSide(patch: string, side: Side): Map<number, string> {
+export function rowsOnSide(patch: string, side: Side): Map<number, string> {
   const rows = new Map<number, string>()
   for (const hunk of splitHunks(patch)) {
     let line = side === 'new' ? hunk.newStart : hunk.oldStart

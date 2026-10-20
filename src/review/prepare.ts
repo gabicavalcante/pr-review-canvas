@@ -322,6 +322,7 @@ export async function prepare(
       mergeBaseSha: pr.mergeBaseSha,
       headSha: pr.headSha,
       files: derived.files,
+      patches: derived.patches,
       authorEmail: (await mayResolve(ctx, target, pr)) ? await ctx.git.authorEmail() : null,
     }),
     preparedAt: ctx.now().toISOString(),

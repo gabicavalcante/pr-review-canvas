@@ -46,8 +46,9 @@
   so the canvas does not ask it again. The question is optional. The point costs the generator
   none of its own.
 - `prepare` reads the decisions of the author's own commits, and on a pull request only when its
-  author prepares the canvas. A decision is carried to its line while later commits only move it,
-  and kept as context the generator does not reopen once its line changes. The line counts
+  author prepares the canvas. A decision is carried to its line while the line reads the same at
+  the head, and kept as context the generator does not reopen once it does not, or once a deleted
+  line it is about comes back. The line counts
   anywhere in the message, so a blank line before `Co-Authored-By` loses nothing.
 - A reason the author wrote on the canvas stands over the commit's until a later commit changes
   the answer; a later decision on the same line replaces an earlier one.
