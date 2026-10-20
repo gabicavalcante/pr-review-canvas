@@ -3,7 +3,14 @@
 // agents writing into one thread.
 import type { AgentRunner } from '../acpx/acpx.js'
 import { latestModel } from '../acpx/models.js'
-import type { ChatContext, ChatEvent, ChatThreadsResponse, ChatTurn } from '../contract/chat.js'
+import {
+  type ChatContext,
+  type ChatEvent,
+  type ChatThreadsResponse,
+  type ChatTurn,
+  chatContextLabel,
+  threadOfPlace,
+} from '../contract/chat.js'
 import type { FileEntry, Repo, ReviewArtifact } from '../contract/review-artifact.js'
 import type { Settings, SettingsOverrides } from '../contract/settings.js'
 import { parseReviewFolder, type ReviewKey, reviewFolder } from '../contract/review-key.js'
@@ -138,7 +145,17 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     }
   }
 
-  const newThread = async (key: ReviewKey, agent: string): Promise<ChatThread> => {
+  /**
+   * Makes a thread. `opens` makes it the thread the pane opens next: new thread is the reader
+   * opening one. A question's thread is not, since the reader may be reading another thread by the
+   * time it is made; the pane records the thread it shows.
+   */
+  const newThread = async (
+    key: ReviewKey,
+    agent: string,
+    made: { opens: boolean; anchored?: { anchor: ChatContext; title: string } }
+  ): Promise<ChatThread> => {
+    const { anchored } = made
     const at = deps.now().toISOString()
     let created: ChatThread | null = null
     await deps.state.update(key, state => {
@@ -146,12 +163,20 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         name: threadName(deps.repo, key, agent, nextThreadIndex(state.chat.threads)),
         agent,
         rev: 0,
-        title: NEW_THREAD_TITLE,
+        title: anchored?.title ?? NEW_THREAD_TITLE,
         createdAt: at,
         seededHeadSha: '',
+        ...(anchored === undefined ? {} : { anchor: anchored.anchor }),
       }
       created = thread
-      return { ...state, chat: { threads: [...state.chat.threads, thread], activeThread: thread.name } }
+      return {
+        ...state,
+        chat: {
+          ...state.chat,
+          threads: [...state.chat.threads, thread],
+          ...(made.opens ? { activeThread: thread.name } : {}),
+        },
+      }
     })
     if (created === null) {
       throw new Error('the thread was not created')
@@ -159,26 +184,46 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     return created
   }
 
-  /** The thread a message goes to: the one asked for, the active one, or a fresh one. */
-  const resolveThread = async (key: ReviewKey, agent: string, wanted?: string): Promise<ChatThread> => {
+  /**
+   * The thread a message goes to: the one it names, while it is this agent's; else, when the
+   * reader keeps a thread per place, the thread of the place it is about; else a new thread, named
+   * after that place when it has one. A thread of another agent is not continued: its session
+   * belongs to that agent.
+   */
+  const resolveThread = async (
+    key: ReviewKey,
+    settings: Settings,
+    wanted: string | undefined,
+    context: ChatContext,
+    artifact: ReviewArtifact
+  ): Promise<ChatThread> => {
+    const agent = settings.chatAgent
     const state = await deps.state.read(key)
-    const byName = wanted === undefined ? undefined : state.chat.threads.find(t => t.name === wanted)
-    const active =
-      byName ??
-      (state.chat.activeThread === undefined
-        ? undefined
-        : state.chat.threads.find(t => t.name === state.chat.activeThread))
-    // Changing the agent starts a new thread: the old session belongs to the old agent.
-    if (active === undefined || active.agent !== agent) {
-      return newThread(key, agent)
+    // A question about the whole PR that names no thread comes from new thread, so it starts one.
+    const place = settings.chatThreadPerPlace && context.kind !== 'pr' ? context : undefined
+    const thread =
+      state.chat.threads.find(t => t.name === wanted && t.agent === agent) ??
+      (place === undefined ? undefined : threadOfPlace(state.chat.threads, agent, place))
+    if (thread === undefined) {
+      return newThread(key, agent, {
+        opens: false,
+        ...(place === undefined
+          ? {}
+          : {
+              anchored: {
+                anchor: place,
+                title: threadTitle(
+                  chatContextLabel(
+                    place,
+                    id => artifact.layers.find(layer => layer.id === id)?.title,
+                    fingerprint => artifact.points.find(point => point.fingerprint === fingerprint)?.title
+                  )
+                ),
+              },
+            }),
+      })
     }
-    if (state.chat.activeThread !== active.name) {
-      await deps.state.update(key, current => ({
-        ...current,
-        chat: { ...current.chat, activeThread: active.name },
-      }))
-    }
-    return active
+    return thread
   }
 
   /**
@@ -211,8 +256,9 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
                 seededHeadSha,
                 seededCwd,
                 seededReaderResolves,
-                // The first turn of a thread gives it its title.
-                title: t.rev === 0 ? threadTitle(userText) : t.title,
+                // The first turn of a general thread gives it its title; an anchored one is named
+                // after its place.
+                title: t.rev === 0 && t.anchor === undefined ? threadTitle(userText) : t.title,
               }
             : t
         ),
@@ -289,7 +335,6 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     slot: RunningTurn
   ): AsyncIterable<ChatEvent> {
     const settings = await effectiveSettings()
-    const thread = await resolveThread(target.key, settings.chatAgent, input.thread)
     const at = deps.now().toISOString()
     const contextBlock = await renderChatContext(input.context, {
       artifact: target.artifact,
@@ -299,6 +344,9 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     })
     const code = yield* prepareCode(target, settings, slot)
     const { cwd } = code
+    // Resolved once nothing above can refuse the question: a question that names no thread makes
+    // one, and a refused one would leave it empty, under no name the pane ever heard.
+    const thread = await resolveThread(target.key, settings, input.thread, input.context, target.artifact)
     // Saved on the answer, so the warning is still there when the thread is opened again.
     const fallback: Pick<ChatTurn, 'fallback'> =
       code.kind === 'fallback' ? { fallback: { message: code.message, branch: code.branch } } : {}
@@ -465,6 +513,8 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
           agent: t.agent,
           title: t.title,
           createdAt: t.createdAt,
+          turns: t.rev,
+          ...(t.anchor === undefined ? {} : { anchor: t.anchor }),
         })),
         activeThread: state.chat.activeThread ?? null,
         agent: settings.chatAgent,
@@ -472,7 +522,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     },
     async createThread(key) {
       const settings = await effectiveSettings()
-      return newThread(key, settings.chatAgent)
+      return newThread(key, settings.chatAgent, { opens: true })
     },
     async selectThread(key, name) {
       const state = await deps.state.read(key)
