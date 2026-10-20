@@ -16,10 +16,13 @@ import {
   ChatBusyError,
   type ChatManager,
   type ChatTarget,
+  changesSessionName,
   createChatManager,
 } from './chat-manager.js'
 import { CheckoutBusyError, checkoutsFor, createReviewCheckouts, type ReviewCheckouts } from './checkouts.js'
 import { createTranscriptStore, THREAD_TITLE_MAX, type TranscriptStore } from './threads.js'
+import { TurnSandboxError } from './turn-sandbox.js'
+import type { PrepareWriteTurn } from './write-turn.js'
 
 const artifact = syntheticArtifact()
 const files = SYNTHETIC_FILES.map(toFileEntry)
@@ -55,6 +58,7 @@ function build(
     overrides?: { chatAgent?: 'claude' | 'codex'; chatModel?: string }
     checkoutGit?: FakeCheckoutGit
     turns?: RunningTurns
+    prepareWriteTurn?: PrepareWriteTurn
   } = {}
 ) {
   runner = opts.runner ?? createFakeRunner()
@@ -84,6 +88,7 @@ function build(
     currentBranch: async () => 'main',
     now: () => new Date('2026-09-11T10:00:00.000Z'),
     turns: opts.turns,
+    prepareWriteTurn: opts.prepareWriteTurn,
   })
 }
 
@@ -988,5 +993,78 @@ describe('the review checkout a turn reads', () => {
     expect(runner.ensured).toEqual([T1, T1])
     expect(runner.runs[1]?.prompt).toContain('SEED for')
     expect(runner.runs[1]?.cwd).toBe(checkoutDir())
+  })
+})
+
+describe('a turn that may change code', () => {
+  const BOX = { box: ['--ro-bind', '/', '/', '--'], env: { PR_REVIEW_BRANCH: 'refs/heads/feat' } }
+  const offered = { offered: true as const, branchRef: 'refs/heads/feat' }
+  const requests: Parameters<PrepareWriteTurn>[0][] = []
+  const boxing: PrepareWriteTurn = async request => {
+    requests.push(request)
+    return BOX
+  }
+
+  const askChanging = async (changesCode: ChatTarget['changesCode'], message = 'fix it'): Promise<void> => {
+    await collect(manager.send({ ...target(), changesCode }, { message, context: POINT }))
+  }
+
+  beforeEach(() => {
+    requests.splice(0)
+  })
+
+  it('runs in the reader’s checkout, in a session of its own, boxed, with the rules for changing code', async () => {
+    build({ prepareWriteTurn: boxing })
+    await askChanging(offered)
+    const run = runner.runs[0]
+    expect(run).toMatchObject({ cwd: '/repo', session: changesSessionName(T1), writes: BOX })
+    expect(run?.prompt).toContain('## Changing the code')
+    expect(run?.prompt).toContain('Settled-decision: <path>:<line>')
+    expect(runner.ensured).toEqual([changesSessionName(T1)])
+    expect(requests).toEqual([{ key: 42, agent: 'claude', branchRef: 'refs/heads/feat' }])
+    expect(checkoutGit.calls).toEqual([])
+  })
+
+  it('runs read-only when the reader let it change code but a condition fails, and tells the agent why', async () => {
+    build({ prepareWriteTurn: boxing })
+    await askChanging({ offered: false, reason: 'tracked files have uncommitted changes' })
+    const run = runner.runs[0]
+    expect(run?.writes).toBeUndefined()
+    expect(run?.session).toBe(T1)
+    expect(run?.prompt).toContain('you cannot this turn: tracked files have uncommitted changes')
+    expect(run?.prompt).not.toContain('## Changing the code')
+    expect(requests).toEqual([])
+  })
+
+  it('runs read-only, saying why, when the box cannot be prepared', async () => {
+    build({
+      prepareWriteTurn: async () => {
+        throw new TurnSandboxError('the checkout’s path is too long')
+      },
+    })
+    await askChanging(offered)
+    expect(runner.runs[0]?.writes).toBeUndefined()
+    expect(runner.runs[0]?.prompt).toContain('you cannot this turn: the checkout’s path is too long')
+  })
+
+  it('tells a session that starts over what the thread said before, going in and out of the mode', async () => {
+    build({ prepareWriteTurn: boxing })
+    await ask(POINT, 'is the sum intended?')
+    await askChanging(offered, 'then make it a product')
+    await ask(POINT, 'what changed?')
+    expect(runner.ensured).toEqual([T1, changesSessionName(T1), T1])
+    const changing = runner.runs[1]?.prompt ?? ''
+    expect(changing).toContain('## Earlier in this thread')
+    expect(changing).toContain('**Reader:** is the sum intended?')
+    expect(changing).toContain('**You:** Yes. The behavior is covered')
+    expect(runner.runs[2]?.prompt).toContain('**Reader:** then make it a product')
+  })
+
+  it('keeps one session while the turns go on changing code', async () => {
+    build({ prepareWriteTurn: boxing })
+    await askChanging(offered)
+    await askChanging(offered, 'and the test')
+    expect(runner.ensured).toEqual([changesSessionName(T1)])
+    expect(runner.runs[1]?.prompt).not.toContain('## Earlier in this thread')
   })
 })

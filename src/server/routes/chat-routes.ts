@@ -289,6 +289,10 @@ export function chatRoutes(ctx: AppContext, loader: PrLoader): Hono {
         // The same reader the page offers resolve to: an outdated canvas is read with its own
         // commit, so its points are not resolved here. The probe answers from its cache.
         readerResolves: readerResolves(key, (await ctx.capabilities.get()).login, pr, current),
+        // Checked again each turn: the checkout can move or gain edits between turns.
+        changesCode: (await ctx.state.read(key)).changesCode
+          ? await changesCodeStatus(ctx, loader, key)
+          : null,
       },
       { message: input.message, context: input.context, thread: input.thread }
     )

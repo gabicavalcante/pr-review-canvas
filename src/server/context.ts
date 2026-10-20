@@ -5,6 +5,7 @@ import { type AgentRunner, createAgentRunner } from '../acpx/acpx.js'
 import { type AgentDirectory, createAgentDirectory } from '../acpx/agents.js'
 import { createPreflightProbe, type PreflightProbe } from '../acpx/preflight.js'
 import { type SandboxSupport, sandboxSupport } from '../acpx/sandbox.js'
+import { createWriteTurnPreparer } from '../chat/write-turn.js'
 import { type ChatManager, createChatManager, type RunningTurns } from '../chat/chat-manager.js'
 import {
   type CheckoutGit,
@@ -257,6 +258,12 @@ export function createChatSet(
       now,
       turns: clone.chatTurns,
       worktree: config.worktree,
+      prepareWriteTurn: createWriteTurnPreparer({
+        checkout: config.repoRoot,
+        dataDir: config.dataDir,
+        reviewDir: key => stores.prs.prDir(key),
+        guardHooksDir: path.join(config.dataDir, 'git-guard'),
+      }),
     }),
   }
 }

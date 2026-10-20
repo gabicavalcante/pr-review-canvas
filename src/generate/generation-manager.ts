@@ -194,6 +194,7 @@ function targetOf(key: ReviewKey, base: string | undefined): PrepareTargetInput 
 export function codeNote(code: CodeSource, headSha: string): string {
   switch (code.kind) {
     case 'checkout':
+    case 'changes':
       return `Your working directory is a checkout of ${code.sha}, the head: read any file there, changed or untouched, as it is at the head.`
     case 'working-tree':
       return 'Your working directory is the work under review: read any file there as it is now.'

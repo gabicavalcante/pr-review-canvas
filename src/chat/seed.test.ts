@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest'
 import type { ReviewArtifact } from '../contract/review-artifact.js'
 import { syntheticArtifact } from '../testing/synthetic.js'
 import {
+  codeLocationMarkdown,
+  EARLIER_TURNS_MAX,
+  earlierTurnsMarkdown,
   layersMarkdown,
   loadSeedTemplate,
   pointsMarkdown,
@@ -134,5 +137,44 @@ describe('the seed sections', () => {
       throw new Error('fixture changed')
     }
     expect(layersMarkdown({ ...artifact, layers: [{ ...one, files: [] }] })).toBe('- **Run path**')
+  })
+})
+
+describe('a turn that may change code', () => {
+  it('tells the agent it works in the reader’s checkout at the canvas’s commit, and may change it', () => {
+    const text = codeLocationMarkdown({
+      ...PATHS,
+      code: { kind: 'changes', cwd: '/repo', sha: 'abc1234def' },
+    })
+    expect(text).toContain("`/repo`, is the reader's own checkout")
+    expect(text).toContain('`abc1234`')
+    expect(text).toContain('**Changing the code**')
+  })
+})
+
+describe('earlierTurnsMarkdown', () => {
+  it('is empty for a thread that said nothing yet', () => {
+    expect(earlierTurnsMarkdown([{ role: 'assistant', text: '  ' }])).toBe('')
+  })
+
+  it('names who said each turn, in order', () => {
+    const text = earlierTurnsMarkdown([
+      { role: 'user', text: 'is it covered?' },
+      { role: 'assistant', text: 'Yes, by a.test.ts.' },
+    ])
+    expect(text).toContain('## Earlier in this thread')
+    expect(text.indexOf('**Reader:** is it covered?')).toBeLessThan(
+      text.indexOf('**You:** Yes, by a.test.ts.')
+    )
+  })
+
+  it('keeps the newest turns when the whole conversation is too long', () => {
+    const long = 'x'.repeat(EARLIER_TURNS_MAX)
+    const text = earlierTurnsMarkdown([
+      { role: 'user', text: `old ${long}` },
+      { role: 'user', text: 'newest question' },
+    ])
+    expect(text).toContain('newest question')
+    expect(text).not.toContain('old x')
   })
 })

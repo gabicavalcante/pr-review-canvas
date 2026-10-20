@@ -8,11 +8,13 @@ import { pointRef } from '../../static/js/proposed-comment.js'
 
 /**
  * The agent's working directory for this turn: a review checkout at the reviewed commit, the
- * reader's working tree when that is the work under review, or the reader's checkout because
- * checkouts are turned off or this one failed (`fallback`, with why).
+ * reader's working tree when that is the work under review, the reader's checkout because
+ * checkouts are turned off or this one failed (`fallback`, with why), or the reader's checkout on
+ * the branch under review for a turn that may change code (`changes`).
  */
 export type CodeSource =
   | { kind: 'checkout'; cwd: string; sha: string }
+  | { kind: 'changes'; cwd: string; sha: string }
   | { kind: 'working-tree'; cwd: string }
   | { kind: 'reader-checkout'; cwd: string }
   | { kind: 'fallback'; cwd: string; message: string; branch: string | null }
@@ -96,6 +98,15 @@ export function codeLocationMarkdown(paths: SeedPaths): string {
         "that checkout's lockfile, so when this pull request changes its dependencies, what is installed",
         'there may not be what the pull request uses. Say so when it matters to an answer.',
       ].join('\n')
+    case 'changes':
+      return [
+        `Your working directory, \`${paths.code.cwd}\`, is the reader's own checkout, on the branch under`,
+        `review at the canvas's commit \`${paths.code.sha.slice(0, 7)}\`, with its dependencies installed.`,
+        'You may change code here (see **Changing the code**). The other side of the diff is',
+        'materialized:',
+        '',
+        ...sides,
+      ].join('\n')
     case 'working-tree':
       return [
         `Your working directory, \`${paths.repoRoot}\`, is the reader's own checkout, and its working`,
@@ -151,4 +162,65 @@ export function renderSeed(
     CODE_LOCATION: codeLocationMarkdown(paths),
   }
   return template.replace(/\{\{([A-Z_]+)\}\}/g, (whole, token: string) => values[token] ?? whole)
+}
+
+/**
+ * What a turn that may change code adds to the seed. It lifts the read-only rule for this review
+ * only; the box around the agent and the git guard hold, whatever it says.
+ */
+export const CHANGES_CODE_SEED = [
+  '## Changing the code',
+  '',
+  'This section replaces the rule above that you only read: the reader let you change code on this',
+  'review. When they ask for a change, or agree to one you proposed, make it, run the tests that',
+  'cover it, and say what you ran. Then commit it on the current branch as an ordinary commit,',
+  'staging only the files you changed, by their paths. The subject says what the code does',
+  'differently now; the body says why. When the change settles an attention point, end the body',
+  'with one line per decision, in this form, for the canvas to show the point resolved:',
+  '',
+  '    Settled-decision: <path>:<line> <the question the point asks>? <the decision and its reason>',
+  '',
+  "`<line>` is the line in your commit's version of the file. End your answer with the commit's",
+  'short sha.',
+  '',
+  'A question gets an answer, not an edit. Never amend, reset, rebase, switch branches, stash, or',
+  'push: git refuses them here, and the change goes on top of the commit the canvas shows. You can',
+  'write only inside the repository.',
+].join('\n')
+
+/** What a turn says when the reader let AI Chat change code but a condition fails now. */
+export function changesCodeOffMarkdown(reason: string): string {
+  return `The reader let you change code on this review, but you cannot this turn: ${reason}. Only read, and tell the reader what to do first.`
+}
+
+/** The longest earlier conversation a new session is given, so a long thread does not crowd the question. */
+export const EARLIER_TURNS_MAX = 12_000
+
+/**
+ * The thread's earlier turns, for a session that starts without them: the thread moved to another
+ * session, such as when the reader let AI Chat change code. The newest turns are kept when the
+ * whole conversation is too long.
+ */
+export function earlierTurnsMarkdown(turns: readonly { role: 'user' | 'assistant'; text: string }[]): string {
+  const said = turns.filter(turn => turn.text.trim() !== '')
+  if (said.length === 0) {
+    return ''
+  }
+  const lines: string[] = []
+  let size = 0
+  for (const turn of [...said].reverse()) {
+    const line = `**${turn.role === 'user' ? 'Reader' : 'You'}:** ${turn.text.trim()}`
+    if (size + line.length > EARLIER_TURNS_MAX && lines.length > 0) {
+      break
+    }
+    lines.unshift(line)
+    size += line.length
+  }
+  return [
+    '## Earlier in this thread',
+    '',
+    'You answered in this thread before, in a session you no longer have:',
+    '',
+    ...lines,
+  ].join('\n\n')
 }

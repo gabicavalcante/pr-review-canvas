@@ -1,9 +1,10 @@
 // One turn at a time per pull request: build the prompt, run the agent, stream what it says,
 // and keep the transcript. The lock is what makes `CHAT_BUSY` a real answer rather than two
 // agents writing into one thread.
-import type { AgentRunner } from '../acpx/acpx.js'
+import type { AgentRunner, WriteTurn } from '../acpx/acpx.js'
 import { latestModel } from '../acpx/models.js'
 import {
+  type ChangesCodeStatus,
   type ChatContext,
   type ChatEvent,
   type ChatThreadsResponse,
@@ -19,7 +20,14 @@ import type { SettingsStore } from '../store/settings-store.js'
 import type { StateStore } from '../store/state-store.js'
 import { type CheckoutLease, readCodeAt, type ReviewCheckouts } from './checkouts.js'
 import { type ContextSources, renderChatContext } from './context.js'
-import { type CodeSource, renderSeed, type SeedPaths } from './seed.js'
+import {
+  CHANGES_CODE_SEED,
+  changesCodeOffMarkdown,
+  type CodeSource,
+  earlierTurnsMarkdown,
+  renderSeed,
+  type SeedPaths,
+} from './seed.js'
 import {
   NEW_THREAD_TITLE,
   nextThreadIndex,
@@ -27,6 +35,8 @@ import {
   threadName,
   threadTitle,
 } from './threads.js'
+import { TurnSandboxError } from './turn-sandbox.js'
+import type { PrepareWriteTurn } from './write-turn.js'
 
 export class ChatBusyError extends Error {
   constructor() {
@@ -58,6 +68,13 @@ export interface ChatManagerDeps {
   turns?: RunningTurns | undefined
   /** The linked worktree the manager's checkout is, null for the main checkout: it names which local reviews are its own. */
   worktree?: string | null | undefined
+  /** Makes the box and the git guard of a turn that changes code; without it no turn does. */
+  prepareWriteTurn?: PrepareWriteTurn | undefined
+}
+
+/** The session a thread's turns that may change code run in: a session of their own, only ever started inside the box. */
+export function changesSessionName(thread: string): string {
+  return `${thread}-changes`
 }
 
 /** The turns running over one data dir, by review folder (`reviewFolder`). */
@@ -75,6 +92,11 @@ export interface ChatTarget {
   readLines: ContextSources['readLines']
   /** Whether the reader may resolve the points of this canvas, so the agent may propose it. */
   readerResolves: boolean
+  /**
+   * Whether this turn may change code (see `src/chat/write-mode.ts`): offered, or why not now.
+   * Absent or null when the reader has it off for this review.
+   */
+  changesCode?: ChangesCodeStatus | null | undefined
 }
 
 export interface ChatSendInput {
@@ -237,6 +259,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     assistant: ChatTurn,
     seededHeadSha: string,
     seededCwd: string,
+    seededSession: string,
     seededReaderResolves: boolean,
     reached: boolean
   ): Promise<void> => {
@@ -255,6 +278,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
                 rev: t.rev + 1,
                 seededHeadSha,
                 seededCwd,
+                seededSession,
                 seededReaderResolves,
                 // The first turn of a general thread gives it its title; an anchored one is named
                 // after its place.
@@ -329,6 +353,43 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     }
   }
 
+  /**
+   * How this turn may change code: the box and guard it runs with, or why it may not this turn.
+   * Null when the reader has it off. A box that cannot be prepared makes a read-only turn that says
+   * why, rather than a failed one.
+   */
+  const changesFor = async (
+    target: ChatTarget,
+    settings: Settings
+  ): Promise<{ writes: WriteTurn } | { offReason: string } | null> => {
+    const status = target.changesCode ?? null
+    if (status === null) {
+      return null
+    }
+    if (!status.offered) {
+      return { offReason: status.reason }
+    }
+    if (deps.prepareWriteTurn === undefined) {
+      return { offReason: 'this server cannot start a turn that changes code' }
+    }
+    try {
+      return {
+        writes: await deps.prepareWriteTurn({
+          key: target.key,
+          agent: settings.chatAgent,
+          branchRef: status.branchRef,
+        }),
+      }
+    } catch (err) {
+      return {
+        offReason:
+          err instanceof TurnSandboxError
+            ? err.message
+            : `the box could not be prepared (${err instanceof Error ? err.message : String(err)})`,
+      }
+    }
+  }
+
   async function* runTurn(
     target: ChatTarget,
     input: ChatSendInput,
@@ -342,16 +403,27 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
       patches: target.patches,
       readLines: target.readLines,
     })
-    const code = yield* prepareCode(target, settings, slot)
+    const changes = await changesFor(target, settings)
+    const writes = changes !== null && 'writes' in changes ? changes.writes : undefined
+    // A turn that changes code works in the reader's checkout, where its commit lands on the branch.
+    const code: CodeSource =
+      writes === undefined
+        ? yield* prepareCode(target, settings, slot)
+        : { kind: 'changes', cwd: deps.repoRoot, sha: target.headSha }
     const { cwd } = code
     // Resolved once nothing above can refuse the question: a question that names no thread makes
     // one, and a refused one would leave it empty, under no name the pane ever heard.
     const thread = await resolveThread(target.key, settings, input.thread, input.context, target.artifact)
+    const session = writes === undefined ? thread.name : changesSessionName(thread.name)
     // Saved on the answer, so the warning is still there when the thread is opened again.
     const fallback: Pick<ChatTurn, 'fallback'> =
       code.kind === 'fallback' ? { fallback: { message: code.message, branch: code.branch } } : {}
-    // acpx scopes a session by its folder, so a thread whose session ran elsewhere starts over.
-    const sameSession = thread.seededHeadSha !== '' && (thread.seededCwd ?? deps.repoRoot) === cwd
+    // acpx scopes a session by its folder, so a thread whose session ran elsewhere starts over, as
+    // one that moves between its read-only session and the one that changes code does.
+    const sameSession =
+      thread.seededHeadSha !== '' &&
+      (thread.seededCwd ?? deps.repoRoot) === cwd &&
+      (thread.seededSession ?? thread.name) === session
     const seeded =
       !sameSession ||
       thread.seededHeadSha !== target.headSha ||
@@ -359,16 +431,24 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
     const seed = seeded
       ? `${renderSeed(await deps.loadSeedTemplate(), target.artifact, seedPaths(deps, target, code), {
           readerResolves: target.readerResolves,
-        })}\n\n`
+        })}\n\n${writes === undefined ? '' : `${CHANGES_CODE_SEED}\n\n`}`
       : ''
-    const prompt = `${seed}${contextBlock}\n\n## Question\n\n${input.message}\n`
+    // A session that starts over is told what was said before, which the reader still sees.
+    const earlier =
+      !sameSession && thread.rev > 0
+        ? earlierTurnsMarkdown(await deps.transcripts.read(target.key, thread.name))
+        : ''
+    const off =
+      changes !== null && 'offReason' in changes ? `\n\n${changesCodeOffMarkdown(changes.offReason)}` : ''
+    const prompt = `${seed}${earlier === '' ? '' : `${earlier}\n\n`}${contextBlock}${off}\n\n## Question\n\n${input.message}\n`
 
     if (!sameSession) {
       await deps.runner.ensureSession({
         agent: settings.chatAgent,
-        session: thread.name,
+        session,
         cwd,
         timeoutSec: settings.chatTimeoutSec,
+        writes,
       })
     }
     await deps.transcripts.append(target.key, thread.name, {
@@ -378,7 +458,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
       context: input.context,
     })
 
-    const model = await modelForTurn(deps.runner, settings, thread.name, cwd)
+    const model = await modelForTurn(deps.runner, settings, session, cwd)
 
     // A stop that arrived while the turn was setting up means no agent is started at all. The
     // transcript is written before the events, so a reader who leaves now still finds it there.
@@ -390,6 +470,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         { role: 'assistant', text: '', at: deps.now().toISOString(), incomplete: 'cancelled', ...fallback },
         target.headSha,
         cwd,
+        session,
         target.readerResolves,
         // The seed never went anywhere, so the thread stays where it was.
         false
@@ -401,12 +482,13 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
 
     const run = deps.runner.run({
       agent: settings.chatAgent,
-      session: thread.name,
+      session,
       prompt,
       cwd,
       timeoutSec: settings.chatTimeoutSec,
       model,
       maxTurns: settings.maxTurns ?? undefined,
+      writes,
       // The runner scrubs the line before it gets here; this only writes it down.
       onRawLine: line => {
         void deps.transcripts.appendEvent(target.key, thread.name, line).catch(() => undefined)
@@ -493,6 +575,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         },
         target.headSha,
         cwd,
+        session,
         target.readerResolves,
         // An error before the agent said anything means the turn never reached it.
         answer !== '' || incomplete === undefined || incomplete === 'cancelled'

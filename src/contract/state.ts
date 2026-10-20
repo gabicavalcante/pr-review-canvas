@@ -15,6 +15,11 @@ export const ChatThreadSchema = z.object({
    */
   seededCwd: z.string().optional(),
   /**
+   * The acpx session the thread last ran in: its own name, or another for turns that may change
+   * code, which run in a session of their own. Threads from before have none, which is their name.
+   */
+  seededSession: z.string().optional(),
+  /**
    * Whether the seed told the agent the reader may resolve attention points. An outdated canvas
    * keeps its commit but takes that right away, so a change sends the seed again. Threads from
    * before it have none and are seeded once more.
