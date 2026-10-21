@@ -56,17 +56,21 @@ describe('checkTurn', () => {
     expect(report.commits).toEqual((await git('rev-list', '--reverse', 'HEAD~2..HEAD')).split('\n'))
   })
 
-  it('reports a tracked file changed outside a commit, as a refused reset leaves it, with how to restore it', async () => {
-    const report = await turn(async () => {
-      await writeFile(path.join(repo, 'a.txt'), 'one\n')
-      await git('add', 'a.txt')
-    })
+  it('reports a tracked file changed outside a commit, with how to restore it', async () => {
+    const report = await turn(() => writeFile(path.join(repo, 'a.txt'), 'one\n'))
     expect(report.findings).toEqual([
       {
         message: 'tracked files changed outside a commit: a.txt',
         fix: 'if these changes are not yours: git restore --staged --worktree --source=HEAD -- a.txt',
       },
     ])
+  })
+
+  it('names a renamed file by its new path, and a path with spaces whole', async () => {
+    const report = await turn(async () => {
+      await git('mv', 'a.txt', 'b c.txt')
+    })
+    expect(report.findings[0]?.message).toBe('tracked files changed outside a commit: b c.txt')
   })
 
   it('leaves an untracked file alone', async () => {

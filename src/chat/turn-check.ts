@@ -38,12 +38,25 @@ async function exists(file: string): Promise<boolean> {
   )
 }
 
+/**
+ * The path one line of `git status --porcelain=v2` names, the new one for a rename. The fields
+ * before it are as many as the line's kind has: `1` a change, `2` a rename with its score, `u` a
+ * conflict. Version 2 writes `.` for no change, so the line keeps its fields when git's output is
+ * trimmed, where version 1's leading space was lost along with the path's first letter.
+ */
+function statusPath(line: string): string {
+  const fields = line.split(' ')
+  const kind = fields[0]
+  const rest = fields.slice(kind === '2' ? 9 : kind === 'u' ? 10 : 8).join(' ')
+  return kind === '2' ? (rest.split('\t')[0] ?? rest) : rest
+}
+
 export async function snapshotCheckout(git: CheckoutGitExec): Promise<CheckoutSnapshot> {
   const [head, branchRef, refLines, status, gitDir] = await Promise.all([
     git(['rev-parse', 'HEAD']).catch(() => null),
     git(['symbolic-ref', '-q', 'HEAD']).catch(() => null),
     git(['for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads', 'refs/tags', 'refs/stash']),
-    git(['status', '--porcelain', '--untracked-files=no']),
+    git(['status', '--porcelain=v2', '--untracked-files=no']),
     git(['rev-parse', '--absolute-git-dir']),
   ])
   const refs = Object.fromEntries(
@@ -52,11 +65,10 @@ export async function snapshotCheckout(git: CheckoutGitExec): Promise<CheckoutSn
       .filter(line => line !== '')
       .map(line => line.split(' ') as [string, string])
   )
-  // `XY path`, or `XY old -> new` for a rename: the path is what follows the two status letters.
   const pending = status
     .split('\n')
     .filter(line => line !== '')
-    .map(line => line.slice(3).split(' -> ').at(-1) ?? line.slice(3))
+    .map(statusPath)
   let operation: CheckoutSnapshot['operation'] = null
   for (const candidate of OPERATIONS) {
     if (await exists(path.join(gitDir, candidate.file))) {
