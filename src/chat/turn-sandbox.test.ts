@@ -14,10 +14,19 @@ import {
   turnSandbox,
 } from './turn-sandbox.js'
 
+const runsLater = [
+  '/work/my_repo/.git/config',
+  '/work/my_repo/.git/config.worktree',
+  '/work/my_repo/.git/hooks',
+  '/home/u/.acpx/config.json',
+]
+
 const input = (overrides: Partial<TurnSandboxInput> = {}): TurnSandboxInput => ({
   agent: 'claude',
   checkout: '/work/my_repo',
   gitCommonDir: '/work/my_repo/.git',
+  gitDir: '/work/my_repo/.git',
+  hooksDir: '/work/my_repo/.git/hooks',
   dataDir: '/work/my_repo/.pr-review',
   codexHome: '/work/my_repo/.pr-review/repos/o__r/agent-homes/codex/branch',
   home: '/home/u',
@@ -55,8 +64,32 @@ describe('turnSandbox', () => {
         '/home/u/.npm',
         '/home/u/.claude/projects/-work-my-repo',
       ],
-      readOnly: ['/work/my_repo/.pr-review', '/home/u/.claude/projects/-work-my-repo/memory'],
+      readOnly: ['/work/my_repo/.pr-review', ...runsLater, '/home/u/.claude/projects/-work-my-repo/memory'],
     })
+  })
+
+  it('keeps a linked worktree’s pointers to its git directory read-only, and its hooks wherever core.hooksPath puts them', () => {
+    const spec = turnSandbox(
+      input({
+        checkout: '/work/side',
+        gitDir: '/work/my_repo/.git/worktrees/side',
+        hooksDir: '/work/side/.githooks',
+      })
+    )
+    expect(spec.writable).toContain('/work/my_repo/.git')
+    expect(spec.readOnly).toEqual(
+      expect.arrayContaining([
+        '/work/my_repo/.git/config',
+        '/work/my_repo/.git/worktrees/side/config.worktree',
+        '/work/side/.githooks',
+        '/work/side/.git',
+        '/work/my_repo/.git/worktrees/side/commondir',
+      ])
+    )
+  })
+
+  it('leaves the checkout’s .git writable when it is the git directory itself', () => {
+    expect(turnSandbox(input()).readOnly).not.toContain('/work/my_repo/.git')
   })
 
   it('takes npm’s cache from npm_config_cache when it is set', () => {
@@ -74,7 +107,7 @@ describe('turnSandbox', () => {
         '/home/u/.npm',
         codexHome,
       ],
-      readOnly: ['/work/my_repo/.pr-review', `${codexHome}/config.toml`],
+      readOnly: ['/work/my_repo/.pr-review', ...runsLater, `${codexHome}/config.toml`],
       binds: [{ source: '/codex/auth.json', target: `${codexHome}/auth.json`, writable: true }],
       env: { CODEX_HOME: codexHome },
     })
@@ -125,9 +158,31 @@ describe('prepareTurnSandbox', () => {
     return dir
   }
 
+  const gitPaths = async (): Promise<Pick<TurnSandboxInput, 'gitCommonDir' | 'gitDir' | 'hooksDir'>> => {
+    const gitDir = path.join(await scratch(), '.git')
+    return { gitCommonDir: gitDir, gitDir, hooksDir: path.join(gitDir, 'hooks') }
+  }
+
+  it('creates the missing hooks folder, worktree configuration and acpx configuration it binds read-only', async () => {
+    const home = await scratch()
+    const git = await gitPaths()
+    await prepareTurnSandbox(input({ home, ...git }))
+    expect((await stat(git.hooksDir)).isDirectory()).toBe(true)
+    expect(await readFile(path.join(git.gitDir, 'config.worktree'), 'utf8')).toBe('')
+    expect(JSON.parse(await readFile(path.join(home, '.acpx', 'config.json'), 'utf8'))).toEqual({})
+  })
+
+  it('leaves an acpx configuration the reader already has as it is', async () => {
+    const home = await scratch()
+    await mkdir(path.join(home, '.acpx'))
+    await writeFile(path.join(home, '.acpx', 'config.json'), '{"defaultAgent":"codex"}')
+    await prepareTurnSandbox(input({ home, ...(await gitPaths()) }))
+    expect(await readFile(path.join(home, '.acpx', 'config.json'), 'utf8')).toBe('{"defaultAgent":"codex"}')
+  })
+
   it('creates Claude’s project and memory folders', async () => {
     const home = await scratch()
-    await prepareTurnSandbox(input({ home }))
+    await prepareTurnSandbox(input({ home, ...(await gitPaths()) }))
     expect((await stat(path.join(claudeProjectDir('/work/my_repo', home, {}), 'memory'))).isDirectory()).toBe(
       true
     )
@@ -139,7 +194,7 @@ describe('prepareTurnSandbox', () => {
     await writeFile(path.join(home, '.codex', 'config.toml'), 'model = "gpt-5"\n')
     await writeFile(path.join(home, '.codex', 'auth.json'), '{"token":"t"}')
     const codexHome = path.join(home, 'data', 'codex')
-    await prepareTurnSandbox(input({ agent: 'codex', home, codexHome }))
+    await prepareTurnSandbox(input({ agent: 'codex', home, codexHome, ...(await gitPaths()) }))
     expect(await readFile(path.join(codexHome, 'config.toml'), 'utf8')).toContain('model = "gpt-5"')
     expect(await readFile(path.join(codexHome, 'auth.json'), 'utf8')).toBe('')
   })
@@ -147,7 +202,9 @@ describe('prepareTurnSandbox', () => {
   it('refuses Codex when the reader’s login is not in auth.json', async () => {
     const home = await scratch()
     await expect(
-      prepareTurnSandbox(input({ agent: 'codex', home, codexHome: path.join(home, 'c') }))
+      prepareTurnSandbox(
+        input({ agent: 'codex', home, codexHome: path.join(home, 'c'), ...(await gitPaths()) })
+      )
     ).rejects.toThrow(TurnSandboxError)
   })
 })

@@ -41,6 +41,9 @@ describe('createWriteTurnPreparer', () => {
     expect(bound('--bind', checkout)).toBe(true)
     expect(bound('--bind', path.join(checkout, '.git'))).toBe(true)
     expect(bound('--ro-bind', dataDir)).toBe(true)
+    expect(bound('--ro-bind', path.join(checkout, '.git', 'config'))).toBe(true)
+    expect(bound('--ro-bind', path.join(checkout, '.git', 'hooks'))).toBe(true)
+    expect(bound('--ro-bind', path.join(home, '.acpx', 'config.json'))).toBe(true)
     expect(turn.box.at(-1)).toBe('--')
     expect(turn.env).toMatchObject({
       GIT_CONFIG_KEY_0: `includeIf.gitdir:${path.join(checkout, '.git')}.path`,

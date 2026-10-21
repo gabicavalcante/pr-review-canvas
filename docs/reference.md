@@ -1260,8 +1260,11 @@ to your branch.
   `~/.claude/projects/`, with its `memory/` read-only; for Codex, a Codex home of the review's own
   in the data dir, with your `auth.json` bound in and your `config.toml` copied with Codex's own
   sandbox opened to the git directory, so it can commit and its memories stay there. The data dir is
-  read-only too. A write anywhere else fails with `Read-only file system`, whether a file tool, a
-  shell command, or a script makes it.
+  read-only too, and so is what git and acpx run commands from later, outside the sandbox: the
+  repository's hooks (wherever `core.hooksPath` puts them), its `config` and `config.worktree`, a
+  linked worktree's `.git` file and `commondir`, and `~/.acpx/config.json`. Missing ones are
+  created first, empty, so the sandbox can hold them. A write anywhere else fails with
+  `Read-only file system`, whether a file tool, a shell command, or a script makes it.
 - **The git guard.** A `reference-transaction` hook lets the turn move only its branch, and only
   forward: an amend, reset, rebase, branch switch, new branch, tag or stash is refused. It is set
   through `GIT_CONFIG_*` for the turn alone and runs your repository's own hooks after it, so your

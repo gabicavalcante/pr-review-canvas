@@ -1,7 +1,8 @@
 /**
  * What a turn that changes code may write, per agent, as the box of `../acpx/sandbox.ts` takes it.
  * The repository and its git directory, acpx's own state, and the agent's sessions are writable;
- * the agent's memory and settings, and pr-review's data dir, stay read-only. The paths come from
+ * the agent's memory and settings, pr-review's data dir, and whatever git or acpx later runs commands
+ * from outside the box stay read-only. The paths come from
  * running each agent inside the box (the spike log of the RFC
  * `2026-10-20-author-chat-changes-code-on-branch-canvas`).
  */
@@ -30,6 +31,10 @@ export interface TurnSandboxInput {
   checkout: string
   /** `git rev-parse --git-common-dir` of the checkout: a linked worktree's objects and refs live there. */
   gitCommonDir: string
+  /** `git rev-parse --absolute-git-dir`: the common dir, or a linked worktree's own folder in it. */
+  gitDir: string
+  /** `git rev-parse --git-path hooks`, which follows `core.hooksPath`. */
+  hooksDir: string
   /** pr-review's data dir, which may sit inside the checkout and stays read-only. */
   dataDir: string
   /** Where this review keeps a Codex home of its own (see `prepareTurnSandbox`). */
@@ -65,18 +70,43 @@ function commonWritable(input: TurnSandboxInput): string[] {
   ]
 }
 
+function acpxConfig(home: string): string {
+  return path.join(home, '.acpx', 'config.json')
+}
+
+/**
+ * What git and acpx read commands from when they run later outside the box, by the reader, the
+ * server, or a turn that only reads: git's hooks and configuration (`core.fsmonitor`, an alias), a
+ * linked worktree's pointers to its git directory, which could point git at a configuration the
+ * turn wrote, and acpx's configuration, which names the command each agent starts. A commit needs
+ * none of them written. Each has to exist for the box to bind it, so `prepareTurnSandbox` creates
+ * the missing ones: skipping one would leave it to be created inside the writable folder it sits in.
+ */
+function runsLater(input: TurnSandboxInput): string[] {
+  const paths = [
+    path.join(input.gitCommonDir, 'config'),
+    path.join(input.gitDir, 'config.worktree'),
+    input.hooksDir,
+    acpxConfig(input.home),
+  ]
+  if (path.resolve(input.gitDir) !== path.resolve(input.gitCommonDir)) {
+    paths.push(path.join(input.checkout, '.git'), path.join(input.gitDir, 'commondir'))
+  }
+  return paths
+}
+
 export function turnSandbox(input: TurnSandboxInput): SandboxSpec {
   const common = commonWritable(input)
   if (input.agent === 'claude') {
     const project = claudeProjectDir(input.checkout, input.home, input.env)
     return {
       writable: [...common, project],
-      readOnly: [input.dataDir, path.join(project, 'memory')],
+      readOnly: [input.dataDir, ...runsLater(input), path.join(project, 'memory')],
     }
   }
   return {
     writable: [...common, input.codexHome],
-    readOnly: [input.dataDir, path.join(input.codexHome, 'config.toml')],
+    readOnly: [input.dataDir, ...runsLater(input), path.join(input.codexHome, 'config.toml')],
     binds: [
       {
         // A refreshed login has to reach the reader's own file, or their session keeps a token the
@@ -122,12 +152,27 @@ export function codexTurnConfig(readerConfig: string, gitCommonDir: string): str
   ].join('\n')
 }
 
+/** Writes `content` to a file that does not exist yet, and leaves one that does as it is. */
+async function createFile(file: string, content: string): Promise<void> {
+  await mkdir(path.dirname(file), { recursive: true, mode: 0o700 })
+  await writeFile(file, content, { flag: 'wx' }).catch((err: unknown) => {
+    if (!(typeof err === 'object' && err !== null && 'code' in err && err.code === 'EEXIST')) {
+      throw err
+    }
+  })
+}
+
 /**
- * Creates what the box binds and the agent expects to find: Claude's project and memory folders,
- * or the review's Codex home with its generated configuration and a file `auth.json` is bound over.
+ * Creates what the box binds and the agent expects to find: the read-only paths of `runsLater`,
+ * then Claude's project and memory folders, or the review's Codex home with its generated
+ * configuration and a file `auth.json` is bound over.
  */
 export async function prepareTurnSandbox(input: TurnSandboxInput): Promise<void> {
   await mkdir(acpxSocketDir(input.home), { recursive: true, mode: 0o700 })
+  await mkdir(input.hooksDir, { recursive: true })
+  // Git reads an empty configuration file as no settings, and acpx an empty object as no config.
+  await createFile(path.join(input.gitDir, 'config.worktree'), '')
+  await createFile(acpxConfig(input.home), '{}\n')
   if (input.agent === 'claude') {
     await mkdir(path.join(claudeProjectDir(input.checkout, input.home, input.env), 'memory'), {
       recursive: true,
