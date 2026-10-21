@@ -9,7 +9,7 @@ import { hostLabel } from './host.js'
 import { lineLink } from './links.js'
 import { pendingCommentHtml, pendingForPoint, pendingRange } from './pending.js'
 import { layerAnchorId, pointAnchorId } from './keys.js'
-import { LEVELS, levelIconHtml, pointLevelText } from './point-level.js'
+import { LEVELS, levelIconHtml, pointKindText, pointLevelText } from './point-level.js'
 import { renderMarkdown } from './markdown.js'
 import {
   audiencePillHtml,
@@ -136,7 +136,7 @@ export function setMentionCanvas(on) {
  */
 export function pointToMarkdown(p) {
   const source = mentionCanvas ? ' · from the pr-review canvas' : ''
-  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${p.kind} · ${pointLevelText(p)}${source}_`
+  return `**${p.title}**\n\n${p.body}\n\n_${pointLocation(p)} · ${pointKindText(p)} · ${pointLevelText(p)}${source}_`
 }
 
 /**
@@ -372,7 +372,7 @@ function pointPartsHtml(p, ctx, opts) {
       `data-point="${esc(p.id)}" data-fingerprint="${esc(p.fingerprint)}" data-status="${status}" ` +
       `data-sig="${esc(pointSignature(p, status, ctx))}"`,
     handled: status === 'open' ? '' : status === 'resolved' ? ' is-handled is-resolved' : ' is-handled',
-    title: `<span class="p-title">${esc(p.title)}</span>${impactPillHtml(p)}<span class="pill kind">${esc(p.kind)}</span>${audiencePillHtml(p)}${parts.pill}${loc}${toggle}`,
+    title: `<span class="p-title">${esc(p.title)}</span>${impactPillHtml(p)}<span class="pill kind">${esc(pointKindText(p))}</span>${audiencePillHtml(p)}${parts.pill}${loc}${toggle}`,
     rest:
       parts.summary +
       `<div class="prose">${renderMarkdown(p.body, { paths: ctx.paths })}</div>` +

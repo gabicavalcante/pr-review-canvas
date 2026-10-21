@@ -57,7 +57,7 @@ describe('points', () => {
     expect(li?.id).toBe('point-p-1')
     expect(li?.querySelector('.lv.decide')?.getAttribute('aria-label')).toBe('decide')
     expect(li?.querySelector('.pill.impact.high')?.textContent).toBe('high')
-    expect(li?.querySelector('.pill.kind')?.textContent).toBe('decision')
+    expect(li?.querySelector('.pill.kind')?.textContent).toBe('design choice')
     expect(li?.querySelector('a.loc')?.getAttribute('href')).toBe('#line:src/app.ts:4')
     expect(li?.querySelector('.prose p')?.textContent).toContain('Look at the operator')
     expect([...(li?.querySelectorAll('button.cmd') ?? [])].map(b => b.textContent)).toEqual([
@@ -122,14 +122,14 @@ describe('where a point stands', () => {
     expect(pointToMarkdown(first)).toBe(
       '**Sum instead of product**\n\n' +
         'Look at the operator because the spec is ambiguous; if the spec says sum, this is fine.\n\n' +
-        '_src/app.ts:4 · decision · decide (high impact) · from the pr-review canvas_'
+        '_src/app.ts:4 · design choice · decide (high impact) · from the pr-review canvas_'
     )
   })
 
   it('leaves the canvas out of the comment when mentionCanvas is off', () => {
     setMentionCanvas(false)
     try {
-      expect(pointToMarkdown(first)).toMatch(/_src\/app\.ts:4 · decision · decide \(high impact\)_$/)
+      expect(pointToMarkdown(first)).toMatch(/_src\/app\.ts:4 · design choice · decide \(high impact\)_$/)
       expect(pointToMarkdown(first).toLowerCase()).not.toContain('canvas')
     } finally {
       setMentionCanvas(true)

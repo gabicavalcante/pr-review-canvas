@@ -37,6 +37,11 @@
   them.
 - A generation that leaves a decide point without an impact, or gives one to another point, is
   sent back to the agent to fix (`POINT_IMPACT`).
+- A `decision` point's tag reads **design choice**, on its card, in a copied or posted comment, and
+  in what AI Chat is told. It marks a choice the change makes at any level, so an fyi one no longer
+  reads as something to decide. Canvases still store `decision`, so resolutions and threads hold.
+- A generation that writes a **question** point at fyi level is sent back to the agent to fix
+  (`POINT_LEVEL`): a question asks the reader to decide or check. Stored canvases still open.
 
 ### Settled decisions
 
