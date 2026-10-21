@@ -144,7 +144,9 @@ test('a reviewer loads the author’s resolved points off the page, and the laye
 test('a reviewer whose queued point the author resolves keeps the draft, and is told so where it shows', async ({
   page,
   chatServer,
-}) => {
+}, testInfo) => {
+  // Narrower screens float the pane, minimized, over the canvas; the wide one docks its tabs.
+  test.skip(testInfo.project.name !== 'desktop')
   const artifact = syntheticArtifact()
   const server = await chatServer({
     setup: async t => {
