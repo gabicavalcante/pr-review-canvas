@@ -360,8 +360,14 @@ export function impactPillHtml(p) {
  */
 function pointPartsHtml(p, ctx, opts) {
   const status = pointStatus(p, ctx.state)
+  // A settled decision's point is open only when the author reopened it: its body still gives the
+  // commit's answer, which no longer settles it.
+  const reopened =
+    p.decisionCommit === undefined
+      ? ''
+      : '<p class="p-summary muted">The author reopened this on the canvas; the commit’s answer below no longer settles it.</p>'
   const parts =
-    status === 'open' ? { pill: '', summary: '', outcome: '' } : statusPartsHtml(p, status, ctx, opts)
+    status === 'open' ? { pill: '', summary: reopened, outcome: '' } : statusPartsHtml(p, status, ctx, opts)
   const toggle =
     status === 'open'
       ? ''

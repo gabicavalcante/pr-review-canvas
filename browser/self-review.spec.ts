@@ -139,3 +139,61 @@ test('a reviewer loads the author’s resolved points off the page, and the laye
   await expect(card.locator('.p-summary')).toHaveText('Resolved by the author: The spec says sum.')
   await expect(card.locator('[data-act="point-unsettle"]')).toHaveCount(0)
 })
+
+test('the author reopens a settled decision, which then gives the commit’s answer as context', async ({
+  page,
+  chatServer,
+}) => {
+  const base = syntheticArtifact()
+  const commit = 'c'.repeat(40)
+  const decision = {
+    ...base.points[0]!,
+    id: 'p-4',
+    fingerprint: 'fp-4',
+    kind: 'decision' as const,
+    level: 'fyi' as const,
+    title: 'Should run() multiply?',
+    body: 'Commit `ccccccc` answered this on 2026-10-13: No: the spec says sum.',
+    audience: 'author' as const,
+    decisionCommit: commit,
+  }
+  const { impact: _impact, ...point } = decision
+  const artifact = {
+    ...base,
+    points: [...base.points, point],
+    settled: { 'fp-4': { reason: 'No: the spec says sum.', at: '2026-10-13T10:00:00.000Z', commit } },
+  }
+  const server = await chatServer({
+    setup: async t => {
+      t.ctx.fixtureArtifact = null
+      await t.ctx.canvases.write(artifact.pr.headSha, artifact, {
+        formatVersion: 1,
+        tool: { name: 'pr-review', version: '0.0.0-test' },
+        repo: artifact.pr.repo,
+        prNumber: 42,
+        headSha: artifact.pr.headSha,
+        mergeBaseSha: artifact.pr.mergeBaseSha,
+        baseRef: 'main',
+        headRef: 'feat/b',
+        generatedAt: artifact.generatedAt,
+        generator: artifact.generator,
+      })
+    },
+  })
+  await page.goto(server.url)
+  await page.locator('[data-act="toggle-resolved"]').click()
+  const card = page.locator('section.layer li.finding[data-fingerprint="fp-4"]')
+  await card.locator('[data-act="point-expand"]').click()
+  await card.locator('[data-act="point-unsettle"]').click()
+  await expect(card).toHaveAttribute('data-status', 'open')
+  await expect(card.locator('.p-summary')).toHaveText(
+    'The author reopened this on the canvas; the commit’s answer below no longer settles it.'
+  )
+  await expect(card.locator('.prose').first()).toHaveText(
+    'Commit ccccccc answered this on 2026-10-13: No: the spec says sum.'
+  )
+  const stored = await server.ctx.canvases.readArtifact(artifact.pr.headSha)
+  expect(stored?.reopened).toEqual({ 'fp-4': { commit, at: expect.any(String) } })
+  await page.reload()
+  await expect(card).toHaveAttribute('data-status', 'open')
+})

@@ -861,8 +861,11 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   part longer than the reason limit is cut. Only a `?` followed by a space, outside backticks,
   ends the question, so one inside a URL or quoted code such as `` `x ?? 0` `` does not, but a
   reason with a `?` mid-sentence and no question in front is split there: start such a line with
-  its question.
-- The line counts wherever it sits in the message, at the start of a line, in any letter case. It
+  its question. A line that ends with its question gives no answer, so it settles nothing: the
+  canvas gets no point for it, and the generator is told the question was raised and left open,
+  until a later line answers it.
+- The line counts wherever it sits in the message, at the start of a line or indented, in any
+  letter case. It
   need not be in the block git reads as trailers, so a blank line before `Co-Authored-By` loses
   nothing.
 - `prepare` reads the decisions of `merge-base..head` from the commits whose author email is the
@@ -871,22 +874,28 @@ Co-Authored-By: Claude <noreply@anthropic.com>
   when that person is the pull request's author, the same rule as **resolve**; a canvas anyone
   else generates resolves no decision.
 - A new-side line is carried from its commit to the head, and an old-side line from the commit's
-  parent to the merge base, while it reads the same at both ends: a commit that changes the line
-  and a later one that changes it back leave the decision on it. An old-side decision also needs
+  parent to the merge base (under the file's old name when the pull request renamed it, in the
+  parent too when the same commit did), while it reads the same at both ends: a commit that
+  changes the line and a later one that changes it back leave the decision on it. An old-side decision also needs
   the diff to still delete its line, so a later commit that restores the line ends it. When the
   line no longer reads the same, is no longer deleted, or is outside the diff, the decision is
   context: the generator does not raise its question again unless the code contradicts the answer,
   and the canvas gets no point for it. A rebase rewrites the versions the numbers refer to while the lines keep their
   text, so after one a decision can land on another line, or be lost; regenerate with care, or
   write the decision again.
-- Two decisions on the same line: the later commit's stands, which is how a decision is revised.
-  Later means later in the history, parents before children, whatever the commit dates say.
-  There is no line that withdraws one. To ask its question again, change the line it is about, so
-  the decision becomes context, or rewrite the commit; reopening its point on the canvas lasts only
-  until the canvas is generated again, because the commit still says it.
+- Two decisions on the same line that ask the same question, or that both ask none: the later one
+  stands, which is how a decision is revised. Later means later in the history, parents before
+  children, whatever the commit dates say. Two questions about one line are two decisions, each
+  its own point with its own answer. There is no line that withdraws one. To ask its question
+  again, **reopen** its point on the canvas: every later canvas keeps it open, until a later
+  commit answers the same question on the same line again, which resolves it with that answer.
+  Changing the line it is about also makes the decision context.
 - Publish adds each decision in the diff to the canvas as a `decision` point for the author,
   titled with its question (or with the decision when the line asks none), on its line, and
-  resolved with its reason as of its commit. These points are not the generator's to write and do
+  resolved with its reason as of its commit. The point's text names the commit and gives its
+  answer, so a copy of the point and what AI Chat is told about it carry the answer too. A
+  reopened one says the author reopened it on the canvas, with the commit's answer below as
+  context. These points are not the generator's to write and do
   not count toward its attention points. A canvas holds at most 36 of them; past that, the oldest
   are context. A reason the author wrote on the canvas for such a point stands over the commit's
   when the canvas is generated again, while its `Settled-decision` line reads the same; a later

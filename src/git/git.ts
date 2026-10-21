@@ -248,8 +248,9 @@ export function createGit(cwd: string, exec: GitExec = execGit): Git {
         '--format=%H%x1f%ae%x1f%aI%x1f%B%x1d',
         `${from}..${to}`,
       ])
-      // The key is one of this tool's own names, letters and dashes, so it needs no escaping.
-      const keyed = new RegExp(`^${key}:(.*)$`, 'i')
+      // The key is one of this tool's own names, letters and dashes, so it needs no escaping. A line
+      // indented, as under a list item, counts too.
+      const keyed = new RegExp(`^\\s*${key}:(.*)$`, 'i')
       return out
         .split('\x1d')
         .map(record => record.replace(/^\n/, ''))

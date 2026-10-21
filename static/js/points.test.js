@@ -191,6 +191,16 @@ describe('where a point stands', () => {
     }
   })
 
+  it("says a settled decision's point is open because the author reopened it", () => {
+    const decision = { ...first, decisionCommit: 'c'.repeat(40) }
+    document.body.innerHTML = `<ol>${pointCardHtml(decision, ctx)}</ol>`
+    expect(document.querySelector('.p-summary')?.textContent).toBe(
+      'The author reopened this on the canvas; the commit’s answer below no longer settles it.'
+    )
+    document.body.innerHTML = `<ol>${pointCardHtml(first, ctx)}</ol>`
+    expect(document.querySelector('.p-summary')).toBeNull()
+  })
+
   it('links a posted point to its comment, and says it was sent when the comment is unknown', () => {
     const state = {
       ...BASE,

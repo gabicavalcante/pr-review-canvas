@@ -56,7 +56,16 @@
   line it is about comes back. The line counts
   anywhere in the message, so a blank line before `Co-Authored-By` loses nothing.
 - A reason the author wrote on the canvas stands over the commit's until a later commit changes
-  the answer; a later decision on the same line replaces an earlier one.
+  the answer; a later decision on the same line and question replaces an earlier one. Two
+  questions about one line, in one commit or two, are two resolved points, each with its answer.
+- **reopen** on a decision's point lasts: every later canvas keeps it open until a later commit
+  answers its question on that line again. While it is open, the point says the author reopened
+  it, with the commit's answer as context.
+- A decision's point gives its commit's answer in its text, so **copy** and **ask** carry it.
+- A line that asks its question and gives no answer, such as `src/app.ts:9 Is this the answer?`,
+  resolves nothing: the generator is told the question is open.
+- An indented `Settled-decision` line counts. A decision on a line deleted in a commit that also
+  renames its file is found under the old name.
 - The review loop skill writes a decision line for each question its gate asks, and its Claude and
   Codex copies are the same again.
 
