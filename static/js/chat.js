@@ -186,6 +186,8 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
  *   onProposed?: (what: ProposedAct, comment: ProposedComment, el: HTMLElement) => void,
  *   onResolution?: (what: 'save' | 'edit', resolution: ProposedResolution, el: HTMLElement) => void,
  *   onChanges?: (report: import('./contract-types.js').ChangesReport) => void,
+ *   canvasUpdatesItself?: () => boolean,
+ *   onUpdateCanvas?: () => void,
  * }} ChatOptions
  */
 
@@ -220,7 +222,14 @@ function withDefaults(overrides) {
 /**
  * What a turn carries besides its text. `context` is the label of what a message was about; a
  * message about the whole PR has none, so only a narrower target is named.
- * @typedef {{ incomplete?: string, fallback?: ChatTurn['fallback'], context?: string }} TurnOpts
+ * `changes` is what a turn that could change code did; `offerUpdate` puts the command that updates the
+ * canvas under its commits, when the page does not update it by itself.
+ * @typedef {{
+ *   incomplete?: string,
+ *   fallback?: ChatTurn['fallback'],
+ *   context?: string,
+ *   changes?: import('./contract-types.js').ChangesReport,
+ * }} TurnOpts
  */
 
 /**
@@ -248,8 +257,33 @@ function turnInnerHtml(role, bodyHtml, opts = {}) {
       ? ''
       : `<p class="turn-ctx">about <span class="ctx-chip">${esc(opts.context)}</span></p>`) +
     (opts.fallback === undefined ? '' : checkoutWarningHtml(opts.fallback)) +
-    `<div class="prose">${bodyHtml}</div>${note}`
+    `<div class="prose">${bodyHtml}</div>${note}` +
+    (opts.changes === undefined ? '' : changesReportHtml(opts.changes, { offerUpdate: false }))
   )
+}
+
+/**
+ * What a turn that could change code did to the reader's checkout: its commits, and anything else it
+ * left, each with the command that puts it back. Nothing was undone for the reader.
+ * @param {import('./contract-types.js').ChangesReport} report
+ * @param {{ offerUpdate: boolean }} opts `offerUpdate` adds **update canvas to continue** under the
+ *   commits, for a page that does not update the canvas by itself
+ */
+export function changesReportHtml(report, opts) {
+  const commits =
+    report.commits.length === 0
+      ? '<p class="muted small">No commit.</p>'
+      : `<p class="small">Committed ${report.commits.map(sha => `<span class="mono">${esc(sha.slice(0, 7))}</span>`).join(', ')}.</p>`
+  const findings =
+    report.findings.length === 0
+      ? ''
+      : '<p class="chat-warning small" role="status">The turn left something in your checkout besides its commits. Nothing was undone:</p>' +
+        `<ul class="small">${report.findings.map(finding => `<li>${esc(finding.message)}: <code>${esc(finding.fix)}</code></li>`).join('')}</ul>`
+  const update =
+    opts.offerUpdate && report.commits.length > 0 && report.findings.length === 0
+      ? '<p><button class="cmd" type="button" data-act="changes-update-canvas">update canvas to continue</button></p>'
+      : ''
+  return `<div class="chat-changes">${commits}${findings}${update}</div>`
 }
 
 /**
@@ -1086,6 +1120,7 @@ export function wireChat(options) {
                 {
                   ...(turn.incomplete === undefined ? {} : { incomplete: turn.incomplete }),
                   ...(turn.fallback === undefined ? {} : { fallback: turn.fallback }),
+                  ...(turn.changes === undefined ? {} : { changes: turn.changes }),
                   ...(turn.role === 'user' ? turnContext(turn.context) : {}),
                 }
               )
@@ -1329,7 +1364,12 @@ export function wireChat(options) {
             const commits = field('commits')
             const findings = field('findings')
             if (event.event === 'changes' && Array.isArray(commits) && Array.isArray(findings)) {
-              options.onChanges?.({ commits, findings })
+              const report = { commits, findings }
+              answer.turn.insertAdjacentHTML(
+                'beforeend',
+                changesReportHtml(report, { offerUpdate: options.canvasUpdatesItself?.() === false })
+              )
+              options.onChanges?.(report)
             }
           },
         }
@@ -1531,6 +1571,12 @@ export function wireChat(options) {
       return
     }
     const act = el.getAttribute('data-act')
+    if (act === 'changes-update-canvas' && el instanceof HTMLButtonElement) {
+      // Once: the update runs in the server and its notice follows it.
+      el.disabled = true
+      options.onUpdateCanvas?.()
+      return
+    }
     const entry = proposed.get(el.getAttribute('data-proposed') ?? '')
     if (entry === undefined) {
       return

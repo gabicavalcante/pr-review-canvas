@@ -11,6 +11,7 @@ import { cssEscape } from './anchors.js'
 import { setChatEnabled } from './ask.js'
 import {
   answerHtml,
+  changesReportHtml,
   CHAT_MINIMIZED_KEY,
   CHAT_WIDTH_DEFAULT,
   CHAT_WIDTH_KEY,
@@ -3102,4 +3103,106 @@ it('renders sparse tool updates and an agent error without a message', async () 
   expect(el(root, '.chat-tool-calls li').textContent).toBe('Read code · completed')
   expect(root.textContent).toContain('the agent failed')
   chat.stop()
+})
+
+describe('what a turn that could change code did', () => {
+  const finding = {
+    message: 'tracked files changed outside a commit: calc.py',
+    fix: 'git restore -- calc.py',
+  }
+
+  it('names the commits by their short sha', () => {
+    document.body.innerHTML = changesReportHtml(
+      { commits: ['7d3297b7565890', 'abcdef1234'], findings: [] },
+      { offerUpdate: false }
+    )
+    expect(document.body.textContent).toBe('Committed 7d3297b, abcdef1.')
+  })
+
+  it('lists what else the turn left, each with the command that puts it back, and says nothing was undone', () => {
+    document.body.innerHTML = changesReportHtml({ commits: [], findings: [finding] }, { offerUpdate: true })
+    expect(document.querySelector('.chat-warning')?.textContent).toContain('Nothing was undone')
+    expect(document.querySelector('li')?.textContent).toBe(
+      'tracked files changed outside a commit: calc.py: git restore -- calc.py'
+    )
+    expect(document.querySelector('[data-act="changes-update-canvas"]')).toBeNull()
+  })
+
+  it('offers to update the canvas only under commits that left nothing else', () => {
+    /**
+     * @param {import('./contract-types.js').ChangesReport} report
+     * @param {boolean} offerUpdate
+     */
+    const offered = (report, offerUpdate) => {
+      document.body.innerHTML = changesReportHtml(report, { offerUpdate })
+      return document.querySelector('[data-act="changes-update-canvas"]') !== null
+    }
+    expect(offered({ commits: ['c1'], findings: [] }, true)).toBe(true)
+    expect(offered({ commits: ['c1'], findings: [] }, false)).toBe(false)
+    expect(offered({ commits: ['c1'], findings: [finding] }, true)).toBe(false)
+    expect(offered({ commits: [], findings: [] }, true)).toBe(false)
+  })
+
+  /**
+   * Asks one question whose turn reports `report`, on a page that updates the canvas by itself or not.
+   * @param {import('./contract-types.js').ChangesReport} report
+   * @param {boolean} updatesItself
+   */
+  const changing = async (report, updatesItself) => {
+    /** @type {string[]} */
+    const updates = []
+    const { root } = mount(
+      {
+        streamChat: async (_pr, _input, opts) => {
+          opts.onEvent({ event: 'turn', data: { thread: 't1', agent: 'claude', seeded: true } })
+          opts.onEvent({ event: 'chunk', data: { text: 'Done.' } })
+          opts.onEvent({ event: 'changes', data: report })
+          opts.onEvent({ event: 'done', data: { stopReason: 'end_turn' } })
+        },
+      },
+      { canvasUpdatesItself: () => updatesItself, onUpdateCanvas: () => updates.push('update') }
+    )
+    const box = el(root, '#msg')
+    if (!(box instanceof HTMLTextAreaElement)) throw new Error('no box')
+    box.value = 'fix it'
+    el(root, '#chat-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flush()
+    return { root, updates }
+  }
+
+  it('shows the report under the answer, with the update command when the page will not update by itself', async () => {
+    const { root, updates } = await changing({ commits: ['7d3297b'], findings: [] }, false)
+    expect(el(root, '.turn.a .chat-changes').textContent).toContain('Committed 7d3297b.')
+    const button = el(root, '[data-act="changes-update-canvas"]')
+    button.click()
+    button.click()
+    expect(updates).toEqual(['update'])
+    expect(button.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('leaves the command out when the page updates the canvas by itself', async () => {
+    const { root } = await changing({ commits: ['7d3297b'], findings: [] }, true)
+    expect(root.querySelector('[data-act="changes-update-canvas"]')).toBeNull()
+  })
+
+  it('shows the report again when the thread is opened, without the command', async () => {
+    const thread = 'pr-review-acme-widgets-42-claude-t1'
+    const { root } = mount({
+      fetchThreads: async () => ({
+        threads: [{ name: thread, agent: 'claude', title: 't1', createdAt: '', turns: 1 }],
+        activeThread: thread,
+        agent: 'claude',
+      }),
+      fetchThreadHistory: async (_pr, name) => ({
+        name,
+        turns: [
+          { role: 'user', text: 'fix it', at: '' },
+          { role: 'assistant', text: 'Done.', at: '', changes: { commits: ['7d3297b'], findings: [] } },
+        ],
+      }),
+    })
+    await flush()
+    expect(el(root, '.turn.a .chat-changes').textContent).toContain('Committed 7d3297b.')
+    expect(root.querySelector('[data-act="changes-update-canvas"]')).toBeNull()
+  })
 })

@@ -287,6 +287,14 @@ describe('a local review page coming back into view', () => {
     expect(autoUpdate).not.toHaveBeenCalled()
   })
 
+  it('updates with the setting off when the reader asks for it, as from AI Chat', async () => {
+    const next = bundle({ head: NEXT_HEAD })
+    serveBundle(() => next)
+    const { el, autoUpdate } = reviewPage({ enabled: false })
+    await el.reread({ update: true })
+    expect(autoUpdate.mock.calls).toEqual([[next]])
+  })
+
   it('leaves the screen alone when nothing moved or the work could not be read', async () => {
     serveBundle(() => bundle())
     const { el, render, autoUpdate } = reviewPage()

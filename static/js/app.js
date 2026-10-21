@@ -428,6 +428,8 @@ export class PrAppElement extends HTMLElement {
               void this.reread()
             }
           },
+          canvasUpdatesItself: () => this.autoUpdate,
+          onUpdateCanvas: () => void this.reread({ update: true }),
         })
         this.quickQuestions = wireQuickQuestions(this, {
           onPick: (context, question) => {
@@ -597,9 +599,11 @@ export class PrAppElement extends HTMLElement {
   /**
    * The reader came back to a local review. The work is read again, and the screen drawn again
    * only when what it shows moved; a canvas the reader was reading stays on screen under the
-   * outdated bar. A branch review whose canvas is now of an earlier commit is then updated.
+   * outdated bar. A branch review whose canvas is now of an earlier commit is then updated, when
+   * the reader's setting lets the page do it or the reader asked for it (`update`).
+   * @param {{ update?: boolean }} [opts]
    */
-  async reread() {
+  async reread(opts = {}) {
     const boot = this.bootstrap
     const shown = this.shown
     if (!boot || !shown) {
@@ -625,7 +629,11 @@ export class PrAppElement extends HTMLElement {
     const running = job !== null && isRunning(job)
     if (
       generation === null ||
-      !shouldAutoUpdate(next, { enabled: this.autoUpdate, running, lastHead: this.autoUpdatedHead })
+      !shouldAutoUpdate(next, {
+        enabled: this.autoUpdate || opts.update === true,
+        running,
+        lastHead: this.autoUpdatedHead,
+      })
     ) {
       return
     }
