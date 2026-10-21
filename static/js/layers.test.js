@@ -166,11 +166,8 @@ describe('rail', () => {
       )
     expect(group()).toEqual(['[Run path]', '#step-p-1', '[Other changes]', '#step-p-2', '#step-p-3'])
     expect(document.querySelector('a[href="#step-p-1"] .lv.decide')).not.toBeNull()
-    // A layer's heading leads to the layer, with its dot and number from the Layers group.
-    const heading = document.querySelector('.rail-points .pt-layer a')
-    expect(heading?.getAttribute('href')).toBe('#layer-run-path')
-    expect(heading?.querySelector('.n')?.textContent).toBe('1')
-    expect(heading?.querySelector('.dot')?.getAttribute('style')).toBe('--dc:var(--s1)')
+    // A layer's heading names it, and leads nowhere itself.
+    expect(document.querySelector('.rail-points .pt-layer a')).toBeNull()
     const dismissed = { ...state, dismissed: { 'fp-2': { at: 'x' } } }
     expect(refreshRail(document, artifact, dismissed)).toBe(true)
     expect(group()).toEqual(['[Run path]', '#step-p-1', '[Other changes]', '#step-p-2', '#step-p-3'])
