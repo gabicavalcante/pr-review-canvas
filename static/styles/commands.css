@@ -64,6 +64,13 @@
   transform: translate(-2px, -2px);
   box-shadow: 7px 7px 0 var(--shadow);
 }
+/* A filled command that is off drops its fill and lift, so it does not read as ready. */
+.cmd:is(.fill, .big):disabled {
+  background: none;
+  color: var(--fg-dim);
+  box-shadow: none;
+  transform: none;
+}
 /* How the last copy went, for a moment after the click. */
 .cmd[data-copied='copied'] {
   color: var(--ok);

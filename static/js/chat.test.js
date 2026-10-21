@@ -1025,7 +1025,7 @@ describe('a thread per place', () => {
     await flush()
     const marks = () => el(root, '#chat-thread-marks').textContent ?? ''
     expect(marks()).toContain(
-      '[data-ask-point="fp-1"] > .ask-label::after { content: "" / "new answer"; background: var(--accent); }'
+      '[data-ask-point="fp-1"] > .ask-label::after { content: "" / "new answer"; --ask-dot: var(--accent); }'
     )
     expect(el(root, '#thread-switch .threads-new').hidden).toBe(false)
     const entry = el(root, '[data-thread-open="pr-review-a-b-42-claude-t1"] .thread-new')

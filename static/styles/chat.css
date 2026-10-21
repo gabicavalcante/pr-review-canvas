@@ -235,14 +235,15 @@
 /* An ask command whose place has a thread carries a dot after its label, which chat.js turns on;
    the dot takes the accent while an answer the reader has not seen waits there. It hangs off the
    label, since a skin may draw the command's brackets or icon in the command's own
-   pseudo-elements: within brackets it reads `[ ask ● ]`. Like the icons, it is an SVG mask on a
-   fixed box, so neither the font nor a scaled screen changes its size or roundness. */
+   pseudo-elements: within brackets it reads `[ ask ● ]`, with room before the bracket. Like the
+   icons, it is an SVG mask on a fixed box, so neither the font nor a scaled screen changes its size
+   or roundness. chat.js sets `--ask-dot` for a new answer, so a skin can recolor the plain dot. */
 .ask-label::after {
   display: inline-block;
   width: 8px;
   height: 8px;
-  margin-left: 6px;
-  background: var(--fg-dim);
+  margin-inline: 6px 3px;
+  background: var(--ask-dot, var(--fg-dim));
   mask: var(--i-dot) center / contain no-repeat;
   vertical-align: middle;
 }
@@ -368,6 +369,9 @@ textarea {
 .chat-composer .cmd.fill {
   padding: 4px 10px;
   box-shadow: 2px 2px 0 var(--shadow);
+}
+.chat-composer .cmd.fill:disabled {
+  box-shadow: none;
 }
 
 /* ---- The side pane's tabs: AI Chat and the review being written ---- */

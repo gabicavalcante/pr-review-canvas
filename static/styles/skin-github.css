@@ -180,6 +180,12 @@
     transform: none;
     box-shadow: none;
   }
+  /* Off, a primary button is a plain one in the muted text, as GitHub draws a disabled button. */
+  .cmd:is(.fill, .big):disabled {
+    border-color: var(--line);
+    background: var(--btn-bg);
+    color: var(--fg-dim);
+  }
   .chat-composer .cmd.fill {
     box-shadow: none;
   }
@@ -409,11 +415,25 @@
   :is(.file-h, .layer-ctl) .cmd[data-act='ask'] {
     position: relative;
   }
+  .ask-label::after {
+    margin-right: 0;
+  }
+  /* On the robot's corner, the dot takes the text color and a ring of the button's background, so
+     it stands apart from the icon; a new answer turns it the accent. */
   :is(.file-h, .layer-ctl) .cmd[data-act='ask'] .ask-label::after {
     position: absolute;
-    top: 3px;
-    right: 3px;
+    top: 1px;
+    right: 1px;
+    width: 8px;
+    height: 8px;
     margin: 0;
+    border-radius: 50%;
+    background: var(--ask-dot, var(--fg));
+    box-shadow: 0 0 0 2px var(--btn-bg);
+    mask: none;
+  }
+  :is(.file-h, .layer-ctl) .cmd[data-act='ask']:hover .ask-label::after {
+    box-shadow: 0 0 0 2px var(--btn-bg-hover);
   }
   :is(.layer-end .cmd, [data-act='point-settle'], [data-act='settle-save']) {
     --icon: var(--i-check);

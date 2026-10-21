@@ -1117,7 +1117,7 @@ export function wireChat(options) {
         }
         return [
           unseen.has(t.name)
-            ? `${selector} > .ask-label::after { content: "" / "new answer"; background: var(--accent); }`
+            ? `${selector} > .ask-label::after { content: "" / "new answer"; --ask-dot: var(--accent); }`
             : `${selector} > .ask-label::after { content: "" / "thread"; }`,
         ]
       })
