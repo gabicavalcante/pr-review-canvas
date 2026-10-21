@@ -2,6 +2,7 @@ import { TEXT_CAPS } from '../src/contract/review-artifact.js'
 import { toPatchMap } from '../src/git/diff-collector.js'
 import { artifactToModelOutput, normalize } from '../src/review/normalize.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../src/testing/synthetic.js'
+import { SETTLED_POLL_MS } from '../static/js/api.js'
 import { expect, test } from './fixtures.js'
 
 test('the author settles a reviewer point with a reason, reads it after a reload, and reopens it', async ({
@@ -138,6 +139,48 @@ test('a reviewer loads the author’s resolved points off the page, and the laye
   await expect(heading).toBeVisible()
   await expect(card.locator('.p-summary')).toHaveText('Resolved by the author: The spec says sum.')
   await expect(card.locator('[data-act="point-unsettle"]')).toHaveCount(0)
+})
+
+test('a reviewer whose queued point the author resolves keeps the draft, and is told so where it shows', async ({
+  page,
+  chatServer,
+}) => {
+  const artifact = syntheticArtifact()
+  const server = await chatServer({
+    setup: async t => {
+      t.ctx.fixtureArtifact = artifact
+    },
+  })
+  await page.clock.install()
+  await page.goto(server.url)
+  const card = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
+  await card.locator('[data-act="point-queue"]').click()
+  await expect(card).toHaveAttribute('data-status', 'queued')
+  // The author resolves the point; the reviewer's page reads it on its next poll.
+  server.ctx.fixtureArtifact = {
+    ...artifact,
+    settled: { 'fp-1': { reason: 'The spec says sum.', at: '2026-09-10T12:00:00.000Z' } },
+  }
+  await page.clock.runFor(SETTLED_POLL_MS)
+  await expect(page.locator('.toast')).toContainText(
+    'the author resolved a point; your review keeps your draft on it'
+  )
+  await expect(card).toBeHidden()
+  await expect(page.locator('.point-statuses')).toContainText(
+    '1 resolved by the author (1 with your draft in the review)'
+  )
+  const note = 'The author resolved this point. Your draft stays in your review until you send or delete it.'
+  await expect(page.locator('tr.pending-row .pending-resolved')).toHaveText(note)
+  await expect(page.locator('.pending-bar')).toContainText('1 pending comment')
+  await page
+    .locator('aside.chat')
+    .getByRole('tab', { name: /Your review/ })
+    .click()
+  await expect(page.locator('#review-panel .pending-resolved')).toHaveText(note)
+  await page.locator('[data-act="toggle-resolved"]').click()
+  await expect(card.locator('.p-summary')).toHaveText(
+    'Resolved by the author: The spec says sum. · your draft still waits in your review'
+  )
 })
 
 test('the author reopens a settled decision, which then gives the commit’s answer as context', async ({

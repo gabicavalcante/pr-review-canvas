@@ -758,7 +758,9 @@ Acting on it changes its status:
 - **dismissed**: you took it off your own list. Other readers still see it open.
 
 When more than one applies, the point shows the first one in this order: resolved, posted, in your
-review, dismissed.
+review, dismissed. A resolved point keeps the drafts you added before the author resolved it: its
+line says your draft still waits, the expanded point lists it, and the draft itself says the author
+resolved the point. Send or delete it as you choose.
 
 A point you acted on stays in its layer and on its line in the diff. It collapses to its title, its
 status, and one line: the start of the reason, the comment link, or a note that the draft waits.
@@ -769,7 +771,8 @@ deleting the draft. The point collapses again when its status changes. A reload 
 
 The counts in the rail, the layer headings, and the overview squares include only open points. The
 overview line **Attention points: 2 open · 1 in your review · 1 resolved by the author · …** counts
-each status. Resolved points start off the page for every reader, the author too: **show the N
+each status, and adds **(N with your draft in the review)** after the resolved ones that still hold
+a draft. Resolved points start off the page for every reader, the author too: **show the N
 resolved** brings them back, collapsed in place, until you click it again. A layer whose points are
 all resolved drops its **Attention points** heading while they are hidden. A link to a resolved
 point shows that one point, and a point you just resolved stays shown until the next load. The
@@ -805,8 +808,9 @@ A resolution is written into the canvas itself:
   reason posted as a comment does not mark the point posted, so a reopened point is open again.
 - The canvas comment is shared again at once, with the new counts. A reviewer's page reads it back
   when it opens and every two minutes after while its tab is in view, hides the newly resolved
-  points, updates the Conversation card, and says so. Each read fetches the pull request's comments,
-  and downloads the canvas only when they changed. When the author shared a newer canvas for the
+  points, updates the Conversation card, and says so. When one of them holds a draft in the
+  reviewer's pending review, the message says the review keeps it. Each read fetches the pull
+  request's comments, and downloads the canvas only when they changed. When the author shared a newer canvas for the
   same commit, the page says to **refresh** and stops reading. The author's Conversation card updates
   immediately and stays current after reload.
   When sharing fails, the resolution stays in your local canvas and the message says why.

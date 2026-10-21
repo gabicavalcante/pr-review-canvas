@@ -15,6 +15,9 @@
 - A reviewer's page reads the author's resolutions back from the canvas comment when it opens and
   every two minutes after while its tab is in view, hides the newly resolved points, and says so.
   Before, a reviewer who had already loaded the canvas saw them only after **refresh**.
+- A draft the reviewer added to the review stays when the author resolves its point. The message
+  says the review keeps it, the draft says the author resolved its point, and the overview line
+  counts the resolved points that still hold one.
 
 ### Prompt templates
 

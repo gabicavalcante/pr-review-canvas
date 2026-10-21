@@ -305,13 +305,23 @@ function statusPartsHtml(p, status, ctx, opts) {
     case 'resolved': {
       const reason = settlementOf(p)?.reason ?? ''
       const first = reason.split('\n')[0] ?? ''
+      // A draft the reviewer queued before the author resolved the point stays theirs to send or drop.
+      const drafts = pendingForPoint(ctx.state, p.fingerprint).length
+      const waiting =
+        drafts === 0
+          ? ''
+          : `${drafts === 1 ? 'your draft still waits' : `${drafts} drafts still wait`} in your review`
+      // A settled decision that states no question is titled by its reason; the line would repeat it.
+      const said = [first === p.title ? '' : `Resolved by the author: ${esc(first)}`, waiting]
+        .filter(part => part !== '')
+        .join(' · ')
       return {
         pill,
-        // A settled decision that states no question is titled by its reason; the line would repeat it.
-        summary: first === p.title ? '' : line(`Resolved by the author: ${esc(first)}`),
+        summary: said === '' ? '' : line(said.charAt(0).toUpperCase() + said.slice(1)),
         outcome:
           '<div class="p-outcome"><h4 class="lbl">Author’s reason</h4>' +
-          `<div class="prose settled-reason">${renderMarkdown(reason, { paths: ctx.paths })}</div></div>`,
+          `<div class="prose settled-reason">${renderMarkdown(reason, { paths: ctx.paths })}</div></div>` +
+          (opts.card ? draftsHtml(p, ctx) : ''),
       }
     }
     case 'dismissed':
@@ -434,11 +444,17 @@ export function pointStatusesHtml(points, state, switches = {}) {
     counts[pointStatus(p, state)] += 1
   }
   const handled = points.length - counts.open - counts.resolved
+  // A resolved point counts as resolved, so the drafts that still wait on one are named apart.
+  const drafted = points.filter(
+    p => pointStatus(p, state) === 'resolved' && pendingForPoint(state, p.fingerprint).length > 0
+  ).length
   const parts = [`<b>${counts.open} open</b>`]
   for (const status of /** @type {const} */ (['queued', 'posted', 'resolved', 'dismissed'])) {
     if (counts[status] > 0) {
       parts.push(
-        `${counts[status]} ${status === 'resolved' ? 'resolved by the author' : STATUS_LABELS[status]}`
+        status === 'resolved'
+          ? `${counts.resolved} resolved by the author${drafted === 0 ? '' : ` (${drafted} with your draft in the review)`}`
+          : `${counts[status]} ${STATUS_LABELS[status]}`
       )
     }
   }

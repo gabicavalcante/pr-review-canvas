@@ -15,6 +15,7 @@ import {
 } from './api.js'
 import { setChatEnabled } from './ask.js'
 import { setMentionCanvas } from './points.js'
+import { pendingForPoint } from './pending.js'
 import { applyPointColors } from './point-colors.js'
 import { wireBarDismissal } from './bar-dismissal.js'
 import { readChatMinimized, readChatWidth, renderChatShell, wireChat } from './chat.js'
@@ -434,9 +435,14 @@ export class PrAppElement extends HTMLElement {
           }
           const added = session.takeSettled(answer)
           if (added.length > 0) {
+            // A resolved point leaves the page, but a draft about it stays in the review: say so.
+            const drafted = added.filter(fp => pendingForPoint(session.state, fp).length > 0).length
+            const about =
+              added.length === 1 ? 'draft on it' : `draft${drafted === 1 ? '' : 's'} on ${drafted} of them`
+            const kept = drafted === 0 ? '' : `; your review keeps your ${about}`
             toast(
               this,
-              `the author resolved ${added.length === 1 ? 'a point' : `${added.length} points`}; show the resolved ones from the overview`
+              `the author resolved ${added.length === 1 ? 'a point' : `${added.length} points`}${kept}; show the resolved ones from the overview`
             )
           }
         })

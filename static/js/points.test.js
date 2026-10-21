@@ -191,6 +191,26 @@ describe('where a point stands', () => {
     }
   })
 
+  it('keeps the draft of a point the author resolved, says so, and counts it in the overview', () => {
+    setSettled({ [first.fingerprint]: { reason: 'Known.', at: '2026-09-10T12:00:00.000Z' } })
+    const state = { ...BASE, pending: [draftFor(first)] }
+    try {
+      document.body.innerHTML = pointStatusesHtml(points, state)
+      expect(document.querySelector('.point-statuses')?.textContent).toBe(
+        'Attention points: 2 open · 1 resolved by the author (1 with your draft in the review) show the 1 resolved'
+      )
+      document.body.innerHTML = `<ol>${pointCardHtml(first, { ...ctx, state })}</ol>`
+      expect(document.querySelector('.p-summary')?.textContent).toBe(
+        'Resolved by the author: Known. · your draft still waits in your review'
+      )
+      expect(document.querySelector('.p-outcome .pending-cmt .pending-resolved')?.textContent).toBe(
+        'The author resolved this point. Your draft stays in your review until you send or delete it.'
+      )
+    } finally {
+      setSettled({})
+    }
+  })
+
   it("says a settled decision's point is open because the author reopened it", () => {
     const decision = { ...first, decisionCommit: 'c'.repeat(40) }
     document.body.innerHTML = `<ol>${pointCardHtml(decision, ctx)}</ol>`
