@@ -84,6 +84,8 @@ describe('renderPointSteps', () => {
     expect(file?.id).toBe('step-p-1-file')
     expect(file?.getAttribute('data-path')).toBe('src/app.ts')
     expect(file?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
+    // Its chevron says so, as the toggle reads it.
+    expect(file?.querySelector('.file-h > .chev')?.getAttribute('aria-expanded')).toBe('true')
     const hunks = file?.querySelector('.diff-host')?.getAttribute('data-hunks')?.split(',')
     expect(hunks).toHaveLength(1)
   })
