@@ -25,6 +25,27 @@ export interface WriteTurnRequest {
 
 export type PrepareWriteTurn = (request: WriteTurnRequest) => Promise<WriteTurn>
 
+/** Ten minutes, the longest Claude Code lets a shell command run in the foreground. */
+const SHELL_TIMEOUT_MS = 600_000
+
+/**
+ * How long Claude Code runs a shell command before it moves it to the background: ten minutes, in
+ * place of its two. A commit runs the project's hooks, often its whole test suite, and a command
+ * moved to the background is stopped when the turn ends, with the commit unmade. A longer time the
+ * reader set is kept. Codex reads neither variable.
+ * @param env the reader's environment
+ */
+export function shellTimeoutEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  const atLeast = (name: string): string => {
+    const set = Number.parseInt(env[name] ?? '', 10)
+    return String(Number.isFinite(set) && set > SHELL_TIMEOUT_MS ? set : SHELL_TIMEOUT_MS)
+  }
+  return {
+    BASH_DEFAULT_TIMEOUT_MS: atLeast('BASH_DEFAULT_TIMEOUT_MS'),
+    BASH_MAX_TIMEOUT_MS: atLeast('BASH_MAX_TIMEOUT_MS'),
+  }
+}
+
 export interface WriteTurnPreparerOptions {
   /** The reader's checkout, which the turn changes. */
   checkout: string
@@ -66,6 +87,9 @@ export function createWriteTurnPreparer(opts: WriteTurnPreparerOptions): Prepare
       branchRef: request.branchRef,
       originalHooksDir,
     })
-    return { box: bwrapArgs(turnSandbox(input)), env: { ...gitConfigEnv(env, guard.pairs), ...guard.env } }
+    return {
+      box: bwrapArgs(turnSandbox(input)),
+      env: { ...shellTimeoutEnv(env), ...gitConfigEnv(env, guard.pairs), ...guard.env },
+    }
   }
 }

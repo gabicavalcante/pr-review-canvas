@@ -1269,7 +1269,9 @@ These are checked again on every turn. With the mode on but a condition failing,
 reads, and the agent tells you what to do first.
 
 A turn that may change code runs in your checkout instead of the review checkout, in an acpx session
-of its own per thread, with every tool approved. What holds it in:
+of its own per thread, with every tool approved. Two layers hold it in: the sandbox says it may
+change only this repository, and the git guard says that in this repository it may only add commits
+to your branch.
 
 - **The sandbox.** acpx and the agent run under bubblewrap with the whole filesystem read-only,
   except your checkout and its git directory, acpx's own state (`~/.acpx`, its socket folder under
@@ -1289,9 +1291,16 @@ of its own per thread, with every tool approved. What holds it in:
   repository. From your clone, a push to a `file://` URL is rewritten too, and the guard's
   `pre-push` refuses a push to a remote given as a path.
 
+A command still running when the turn ends is stopped, so a commit whose hooks run your tests must
+finish within it. For Claude, these turns raise the time a shell command runs before Claude Code
+moves it to the background from two minutes to ten (`BASH_DEFAULT_TIMEOUT_MS` and
+`BASH_MAX_TIMEOUT_MS`, or longer ones you set); the agent is also told to wait for such commands.
+
 After each such turn the answer lists the commits it made and anything else it left in your
 checkout, each with the command that puts it back: HEAD off the branch, the branch moved back, a ref
-added or removed, an operation left in progress, or a tracked file changed outside a commit. Nothing
+added or removed, an operation left in progress, or a tracked file changed outside a commit. Files
+staged and not committed are named as such: a commit stopped while its hooks ran leaves them, and so
+does a refused reset, so check them with `git diff --cached` before you commit them. Nothing
 is undone for you, since a changed file may be your own edit made in a terminal meanwhile.
 
 A commit moves the branch past the canvas, so the next turn may change code only once the canvas is

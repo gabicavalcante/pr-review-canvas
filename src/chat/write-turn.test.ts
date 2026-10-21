@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createWriteTurnPreparer } from './write-turn.js'
+import { createWriteTurnPreparer, shellTimeoutEnv } from './write-turn.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -47,7 +47,20 @@ describe('createWriteTurnPreparer', () => {
       GIT_CONFIG_VALUE_0: path.join(guardHooksDir, 'config'),
       PR_REVIEW_BRANCH: 'refs/heads/feat',
       PR_REVIEW_ORIG_HOOKS: path.join(checkout, '.git', 'hooks'),
+      BASH_DEFAULT_TIMEOUT_MS: '600000',
+      BASH_MAX_TIMEOUT_MS: '600000',
     })
     await access(path.join(guardHooksDir, 'reference-transaction'))
+  })
+})
+
+describe('shellTimeoutEnv', () => {
+  it('lets a shell command run ten minutes, or longer when the reader set longer', () => {
+    expect(shellTimeoutEnv({})).toEqual({ BASH_DEFAULT_TIMEOUT_MS: '600000', BASH_MAX_TIMEOUT_MS: '600000' })
+    expect(shellTimeoutEnv({ BASH_DEFAULT_TIMEOUT_MS: '60000', BASH_MAX_TIMEOUT_MS: '900000' })).toEqual({
+      BASH_DEFAULT_TIMEOUT_MS: '600000',
+      BASH_MAX_TIMEOUT_MS: '900000',
+    })
+    expect(shellTimeoutEnv({ BASH_DEFAULT_TIMEOUT_MS: 'soon' })['BASH_DEFAULT_TIMEOUT_MS']).toBe('600000')
   })
 })
