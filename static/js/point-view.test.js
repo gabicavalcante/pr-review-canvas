@@ -1,0 +1,78 @@
+// @ts-check
+// @vitest-environment happy-dom
+import { describe, expect, it } from 'vitest'
+import { toFileEntry } from '../../src/git/diff-collector.js'
+import { emptyState } from '../../src/contract/state.js'
+import { SYNTHETIC_FILES, syntheticArtifact } from '../../src/testing/synthetic.js'
+import { POINT_STEPS_ID, renderPointSteps, stepAnchorId } from './point-view.js'
+
+const artifact = syntheticArtifact()
+const files = SYNTHETIC_FILES.map(toFileEntry)
+const state = emptyState('2026-10-21T10:00:00.000Z')
+
+/** @param {string} html */
+function draw(html) {
+  document.body.innerHTML = html
+  return document.body
+}
+
+/** @param {string} selector */
+function all(selector) {
+  return Array.from(document.querySelectorAll(selector))
+}
+
+describe('renderPointSteps', () => {
+  it('draws a stop per open point, layer by layer, in a container the page keeps hidden', () => {
+    const root = draw(renderPointSteps(artifact, files, state))
+    const container = root.querySelector(`#${POINT_STEPS_ID}`)
+    expect(container?.hasAttribute('hidden')).toBe(true)
+    expect(all('section.point-step').map(section => section.id)).toEqual(['step-p-1', 'step-p-2', 'step-p-3'])
+    expect(all('.step-n').map(el => el.textContent)).toEqual(['Point 1 of 3', 'Point 2 of 3', 'Point 3 of 3'])
+  })
+
+  it('names the layer each point belongs to, as a link to it', () => {
+    draw(renderPointSteps(artifact, files, state))
+    const link = document.querySelector('#step-p-1 .step-h a')
+    expect(link?.textContent).toBe('Layer 1 · Run path')
+    expect(link?.getAttribute('href')).toBe('#layer-run-path')
+  })
+
+  it('draws the point’s card under an id of its own, so the layer’s card keeps the point’s anchor', () => {
+    draw(renderPointSteps(artifact, files, state))
+    const card = document.querySelector('#step-p-1 li.finding')
+    expect(card?.id).toBe('step-p-1-card')
+    expect(card?.getAttribute('data-fingerprint')).toBe('fp-1')
+  })
+
+  it('draws the point’s file open, with only the chunk that holds its lines', () => {
+    draw(renderPointSteps(artifact, files, state))
+    const file = document.querySelector('#step-p-1 article.file')
+    expect(file?.id).toBe('step-p-1-file')
+    expect(file?.getAttribute('data-path')).toBe('src/app.ts')
+    expect(file?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
+    const hunks = file?.querySelector('.diff-host')?.getAttribute('data-hunks')?.split(',')
+    expect(hunks).toHaveLength(1)
+  })
+
+  it('leads from each stop to the one before and after, and from the last to the layers', () => {
+    draw(renderPointSteps(artifact, files, state))
+    const links = (/** @type {string} */ id) =>
+      all(`#${id} .step-nav a`).map(a => [a.textContent, a.getAttribute('href')])
+    expect(links(stepAnchorId({ id: 'p-1' }))).toEqual([
+      ['← overview', '#overview'],
+      ['next point →', '#step-p-2'],
+    ])
+    expect(links('step-p-3')).toEqual([
+      ['← previous point', '#step-p-2'],
+      ['the rest of the diff, by layer →', '#layer-run-path'],
+    ])
+  })
+
+  it('leaves out a point the reader acted on, and draws nothing when none is open', () => {
+    const dismissed = { ...state, dismissed: { 'fp-2': { at: 'x' } } }
+    draw(renderPointSteps(artifact, files, dismissed))
+    expect(all('section.point-step').map(section => section.id)).toEqual(['step-p-1', 'step-p-3'])
+    const allDone = { ...state, dismissed: { 'fp-1': { at: 'x' }, 'fp-2': { at: 'x' }, 'fp-3': { at: 'x' } } }
+    expect(renderPointSteps(artifact, files, allDone)).toBe('')
+  })
+})

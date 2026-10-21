@@ -475,19 +475,24 @@ export function wireCardReveal(root) {
 }
 
 /**
+ * `id` names a card drawn outside its layer, such as in the one-point view, which leaves the file's
+ * anchors to the layers; `open` draws its body at once rather than under its title.
  * @param {LayerFile} lf
  * @param {FileEntry | undefined} entry
  * @param {Layer} layer
  * @param {{ hunkIndex: Map<string, { layer: Layer, index: number }>, paths: ReadonlySet<string>, firstCardFor: Set<string>, state?: PrState }} ctx
+ * @param {{ id?: string, open?: boolean }} [opts]
  * @returns {string}
  */
-export function renderFileCard(lf, entry, layer, ctx) {
+export function renderFileCard(lf, entry, layer, ctx, opts = {}) {
   const key = entry?.key ?? sanitizeKey(lf.path)
   const cardReviewedId = reviewedId(layer.key, lf.path)
   const cardReviewed = ctx.state?.reviewed[cardReviewedId] === true
-  const isFirst = !ctx.firstCardFor.has(key)
-  ctx.firstCardFor.add(key)
-  const id = isFirst ? fileAnchorId(key) : `${fileAnchorId(key)}-${layer.key}`
+  const isFirst = opts.id === undefined && !ctx.firstCardFor.has(key)
+  if (opts.id === undefined) {
+    ctx.firstCardFor.add(key)
+  }
+  const id = opts.id ?? (isFirst ? fileAnchorId(key) : `${fileAnchorId(key)}-${layer.key}`)
   const pills = entry
     ? `<span class="pill add">+${entry.additions}</span><span class="pill del">&minus;${entry.deletions}</span>`
     : ''
@@ -507,7 +512,7 @@ export function renderFileCard(lf, entry, layer, ctx) {
     `<div class="file-h">${chevronHtml('Collapse file', false, { act: 'toggle-card' })}<h3 id="${esc(id)}-h" class="path" data-act="toggle-card">${path}${testTag}</h3>${status}${pills}` +
     `<label class="chk"><input type="checkbox" data-reviewed-id="${esc(cardReviewedId)}"${cardReviewed ? ' checked' : ''}> reviewed</label>` +
     `<span class="tbtns">${askButtonHtml({ kind: 'file', path: lf.path }, { title: 'Ask AI Chat about this file' })}</span></div>` +
-    `<div class="file-body" hidden>${note}<div class="diff-host" data-key="${esc(key)}" data-hunks="${esc(lf.hunks.join(','))}"><div class="loading">Loading diff…</div></div>${elsewhere}</div></article></pr-file>`
+    `<div class="file-body"${opts.open === true ? '' : ' hidden'}>${note}<div class="diff-host" data-key="${esc(key)}" data-hunks="${esc(lf.hunks.join(','))}"><div class="loading">Loading diff…</div></div>${elsewhere}</div></article></pr-file>`
   )
 }
 

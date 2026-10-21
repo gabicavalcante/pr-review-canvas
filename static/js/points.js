@@ -394,14 +394,16 @@ function pointPartsHtml(p, ctx, opts) {
 }
 
 /**
- * One attention point card, shown in the layer that owns the point.
+ * One attention point card, shown in the layer that owns the point. `id` names a card shown
+ * somewhere else too, such as the one-point view, so the layer's keeps the point's anchor.
  * @param {Point} p
  * @param {PointContext} ctx
+ * @param {{ id?: string }} [opts]
  */
-export function pointCardHtml(p, ctx) {
+export function pointCardHtml(p, ctx, opts = {}) {
   const { attrs, handled, title, rest } = pointPartsHtml(p, ctx, { card: true })
   return (
-    `<li class="finding${handled}" id="${esc(pointAnchorId(p.id))}" ${attrs}>${levelHtml(p)}<div>` +
+    `<li class="finding${handled}" id="${esc(opts.id ?? pointAnchorId(p.id))}" ${attrs}>${levelHtml(p)}<div>` +
     `<div class="f-title">${title}</div>${rest}</div></li>`
   )
 }
