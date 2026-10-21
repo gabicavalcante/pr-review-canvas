@@ -61,10 +61,14 @@
   a file, or a layer. The first ask about a place starts a thread titled after it, and asking about
   the place again comes back to that thread. Each thread is its own agent session, so a
   conversation about one point no longer mixes with another's.
-- The chat pane shows one thread at a time, with its place on top and **go to code** to lead back
-  to it. The new **Threads** tab lists them by kind of place, with the questions in each, and
-  **new thread** starts one about the whole PR; an ask about the whole PR comes back to the latest
-  of those. It replaces the thread list in the pane's head.
+- The chat pane shows one thread at a time, its place named on top with a tag for its kind. The
+  context line above the message box stays, with **go to code** to lead back to the place and
+  **clear** to take what the box holds to the latest thread about the whole PR. **new thread**, on
+  the pane's head and in the new **Threads** tab, starts one about the whole PR. The tab lists the
+  threads by kind of place, with the questions in each, and replaces the thread list in the pane's
+  head.
+- An ask that leaves the thread the reader was reading for a new one offers **back to** that thread
+  until its first question.
 - The ask command of a place with a thread carries a dot. The dot fills, and the **Threads** tab
   shows one too, when an answer arrived there while the reader was not reading it: in another
   thread, with the pane minimized, or on another tab. The **AI Chat** tab and its launcher count

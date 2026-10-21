@@ -116,6 +116,7 @@ describe('renderChatShell', () => {
     expect(html).toContain('id="side-tab-threads"')
     expect(html).toContain('id="thread-index"')
     expect(html).toContain('id="new-thread"')
+    expect(html).toContain('id="chat-new-thread"')
     expect(html).not.toContain('id="thread-close"')
     expect(html).toContain('id="chat-ctx"')
     expect(html).toContain('id="chat-log"')
@@ -370,7 +371,7 @@ describe('sending a message', () => {
     el(root, '#chat-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await flush()
     // The head already says what the thread is about.
-    expect(el(root, '#thread-title').textContent).toBe('layer · Run path')
+    expect(el(root, '#thread-title').textContent).toBe('Run path')
     expect(root.querySelector('.turn.u .turn-ctx')).toBeNull()
   })
 
@@ -692,7 +693,8 @@ describe('a thread per place', () => {
     await flush()
     chat.ask(LAYER)
     await flush()
-    expect(el(root, '#thread-title').textContent).toBe('layer · Run path')
+    expect(el(root, '#thread-kind').textContent).toBe('layer')
+    expect(el(root, '#thread-title').textContent).toBe('Run path')
     expect(el(root, '#chat-log').textContent).toContain('A new thread about layer · Run path')
     expect(el(root, '#thread-goto').hidden).toBe(false)
     // Only the thread open at the start was loaded: a draft has no turns to fetch.
@@ -743,6 +745,51 @@ describe('a thread per place', () => {
     expect(el(root, '#thread-title').textContent).toBe('overall')
     expect(loaded).toEqual(['pr-review-a-b-42-claude-t1', 'pr-review-a-b-42-claude-t2'])
     expect(el(root, '#thread-goto').hidden).toBe(true)
+  })
+
+  it('clear leaves a place’s thread for the whole PR’s, with what the box holds', async () => {
+    const { root, chat } = mount({ fetchThreads: async () => PLACED })
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    expect(el(root, '#thread-kind').textContent).toBe('point')
+    expect(el(root, '#chat-clear').hidden).toBe(false)
+    const box = el(root, '#msg')
+    if (!(box instanceof HTMLTextAreaElement)) throw new Error('no box')
+    box.value = 'and overall?'
+    el(root, '#chat-clear').click()
+    await flush()
+    expect(el(root, '#thread-title').textContent).toBe('overall')
+    expect(el(root, '#thread-kind').hidden).toBe(true)
+    expect(chat.context).toEqual({ kind: 'pr' })
+    expect(el(root, '#chat-clear').hidden).toBe(true)
+    expect(box.value).toBe('and overall?')
+  })
+
+  it('starts a thread about the whole PR from the AI Chat tab’s own new thread', async () => {
+    const { root, chat } = mount({ fetchThreads: async () => PLACED })
+    await flush()
+    chat.ask(POINT)
+    await flush()
+    el(root, '#chat-new-thread').click()
+    expect(el(root, '#thread-title').textContent).toBe('New thread')
+    expect(el(root, '#chat-log').textContent).toContain('A new thread about the whole PR.')
+  })
+
+  it('leads a draft back to the thread the ask left, until its first question', async () => {
+    const { root, chat } = mount({ fetchThreads: async () => PLACED, streamChat: async () => undefined })
+    await flush()
+    chat.ask(LAYER)
+    await flush()
+    const back = el(root, '#chat-log [data-thread-open]')
+    expect(back.textContent).toBe('back to “overall”')
+    back.click()
+    await flush()
+    expect(el(root, '#thread-title').textContent).toBe('overall')
+    chat.ask(LAYER)
+    await flush()
+    await sendMessage(root, 'why this order?')
+    expect(root.querySelector('#chat-log [data-thread-open]')).toBe(null)
   })
 
   it('opens a draft about the whole PR when there is no thread about it yet', async () => {
@@ -1270,7 +1317,7 @@ describe('a place’s thread, in its corners', () => {
     streams[1]?.fail(new Error('a canvas generation holds the review checkout'))
     await flush()
     expect(root.querySelector('.toast')?.textContent).toBe(
-      'Your question in “Sum instead of product” was not sent: a canvas generation holds the review checkout'
+      'Your question in “point · Sum instead of product” was not sent: a canvas generation holds the review checkout'
     )
     expect(el(root, '#chat-thread-marks').textContent).not.toContain('new answer')
     expect(el(root, '#side-tab-threads .threads-new').hidden).toBe(true)
@@ -1440,13 +1487,15 @@ describe('a place’s thread, in its corners', () => {
     expect(el(root, '#chat-log').textContent).not.toContain('is the sum intended?')
     chat.askQuestion(LAYER, 'What could break?')
     await flush()
-    expect(el(root, '#thread-title').textContent).toBe('layer · Run path')
+    expect(el(root, '#thread-title').textContent).toBe('Run path')
     expect(sent).toHaveLength(1)
-    expect(el(root, '#chat-log').textContent).toContain('Waiting for the answer in “Sum instead of product”.')
+    expect(el(root, '#chat-log').textContent).toContain(
+      'Waiting for the answer in “point · Sum instead of product”.'
+    )
     const box = el(root, '#msg')
     expect(box.hasAttribute('disabled')).toBe(true)
     expect(box.getAttribute('placeholder')).toBe(
-      'A question already waits for the answer in “Sum instead of product”.'
+      'A question already waits for the answer in “point · Sum instead of product”.'
     )
     ends[0]?.()
     await flush()
@@ -1554,7 +1603,8 @@ describe('with a thread per place off', () => {
     chat.ask(POINT)
     chat.followSettings({ ...DEFAULT_SETTINGS, chatThreadPerPlace: true })
     await flush()
-    expect(el(root, '#chat-ctx-line').hidden).toBe(true)
+    // The context line stays: it says what the next question is about in both modes.
+    expect(el(root, '#chat-ctx-line').hidden).toBe(false)
     expect(el(root, '#chat-thread-marks').textContent).toContain('data-ask-point="fp-1"')
     // The open thread is about the whole PR again, so the next question is too.
     await sendMessage(root, 'overall?')

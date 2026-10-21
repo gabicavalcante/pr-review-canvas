@@ -31,7 +31,7 @@ test('each ask opens the thread of its place, and the Threads tab lists them', a
   await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
 
   await askAbout(page, layerAsk, 'Anything risky here?')
-  await expect(page.locator('#thread-title')).toHaveText('layer · Run path')
+  await expect(page.locator('#thread-title')).toHaveText('Run path')
   await expect(page.locator('#chat-log')).not.toContainText('Is the sum intended?')
 
   const threadsTab = page.locator('#side-tab-threads')
@@ -81,7 +81,7 @@ test('with a thread per place off, every ask goes to the open thread until the r
   await page.locator('dialog').getByRole('tab', { name: 'AI Chat' }).click()
   await page.locator('#set-thread-per-place').check()
   await page.locator('[data-act="settings-save"]').click()
-  await expect(page.locator('#chat-ctx-line')).toBeHidden()
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
 
   await pointAsk.click()
   await page.getByText('ask something else…', { exact: true }).first().click()
@@ -155,7 +155,9 @@ test('another thread opens while an answer comes in, and a question asked there 
   await expect(page.locator('#thread-title')).toHaveText('New thread')
   await page.locator('#msg').fill('And overall?')
   await page.keyboard.press('Enter')
-  await expect(page.locator('#chat-log')).toContainText('Waiting for the answer in “Sum instead of product”.')
+  await expect(page.locator('#chat-log')).toContainText(
+    'Waiting for the answer in “point · Sum instead of product”.'
+  )
 
   release()
   // The waiting question went once the first answer ended, and its answer arrives here.

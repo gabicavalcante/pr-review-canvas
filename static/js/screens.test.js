@@ -637,7 +637,7 @@ describe('chat shell', () => {
     expect(aside?.querySelector('.transcript .empty')?.textContent).toMatch(/^Ask AI Chat about/)
     expect(aside?.querySelector('#thread-title')?.textContent).toBe('New thread')
     expect(aside?.querySelector('#side-tab-threads')?.textContent).toBe('Threads')
-    expect(aside?.querySelector('.ctx-line')?.textContent).toBe('Context: whole PR clear')
+    expect(aside?.querySelector('.ctx-line')?.textContent).toBe('Context: whole PR go to code clear')
     expect(aside?.querySelector('textarea')?.hasAttribute('disabled')).toBe(false)
     expect(aside?.querySelector('.chat-composer .cmd.fill')?.textContent).toBe('send')
     expect(aside?.querySelectorAll('button:disabled').length).toBe(0)
