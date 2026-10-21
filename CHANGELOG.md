@@ -91,6 +91,20 @@
 - On a wide screen AI Chat starts minimized until you open it once, so a canvas you do not chat
   on keeps its full width. After that it opens the way you last left it.
 
+### AI Chat changes code
+
+- On a branch review, **let it change code** in the chat pane lets AI Chat edit, test and commit on
+  your branch when you ask for a change. It is off by default, applies to every thread of the
+  review, and is offered only when the canvas is current, the checkout is on a branch at its commit
+  with no uncommitted change to a tracked file, and bubblewrap can run (Linux and WSL2). The line
+  says why when it cannot. `GET` and `PUT /api/prs/branch/chat/changes-code` read and set it.
+- Such a turn runs in your checkout under bubblewrap, with the filesystem read-only except the
+  repository, acpx's state and the agent's sessions; the agent's memory and settings, and the data
+  dir, stay read-only. A git hook lets it move only its branch, forward, and pushes are refused.
+- The answer lists the commits the turn made and anything else it left in your checkout, with the
+  command that puts it back; nothing is undone for you. After a commit the page updates the canvas
+  as it does after any commit, or offers **update canvas to continue** with `autoUpdateCanvas` off.
+
 ### AI Chat threads
 
 - **Ask** opens the thread of the place it was asked from: an attention point, a selection of lines,

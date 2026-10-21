@@ -1230,6 +1230,59 @@ Cleanup never touches canvases or review state. The **Checkouts** tab of the set
 lists the current checkouts and edits these settings. Set `checkoutEnabled: false` to read your
 own checkout, as before review checkouts existed.
 
+### Changing code from AI Chat
+
+On a branch review, AI Chat can change code for you: edit, run the tests, and commit on your branch.
+It is off by default, and the line above the message box turns it on (**let it change code**) and
+off (**stop changing code**). It applies to every thread of the review. The line says why when it
+cannot be turned on now:
+
+- The review is the branch review: a pull request's canvas is what reviewers read, and the
+  uncommitted review is work in progress the agent's edits would mix into.
+- Its canvas is current, and your checkout is on a branch at the canvas's commit.
+- No tracked file has an uncommitted change, so a commit carries the agent's change and none of
+  yours. Untracked files do not count.
+- The machine can start the sandbox: Linux or WSL2 with
+  [bubblewrap](https://github.com/containers/bubblewrap) installed (`bwrap`). macOS and Windows are
+  not supported yet.
+
+These are checked again on every turn. With the mode on but a condition failing, the turn only
+reads, and the agent tells you what to do first.
+
+A turn that may change code runs in your checkout instead of the review checkout, in an acpx session
+of its own per thread, with every tool approved. What holds it in:
+
+- **The sandbox.** acpx and the agent run under bubblewrap with the whole filesystem read-only,
+  except your checkout and its git directory, acpx's own state (`~/.acpx`, its socket folder under
+  `/tmp`, `~/.npm`), and the agent's sessions. For Claude that is the project's folder under
+  `~/.claude/projects/`, with its `memory/` read-only; for Codex, a Codex home of the review's own
+  in the data dir, with your `auth.json` bound in and your `config.toml` copied with Codex's own
+  sandbox opened to the git directory, so it can commit and its memories stay there. The data dir is
+  read-only too. A write anywhere else fails with `Read-only file system`, whether a file tool, a
+  shell command, or a script makes it.
+- **The git guard.** A `reference-transaction` hook lets the turn move only its branch, and only
+  forward: an amend, reset, rebase, branch switch, new branch, tag or stash is refused. It is set
+  through `GIT_CONFIG_*` for the turn alone and runs your repository's own hooks after it, so your
+  `pre-commit` still runs and nothing is written to the repository.
+- **Pushes.** Every push URL is rewritten to one that does not exist, and the guard's `pre-push`
+  refuses a push to a remote given as a path.
+
+After each such turn the answer lists the commits it made and anything else it left in your
+checkout, each with the command that puts it back: HEAD off the branch, the branch moved back, a ref
+added or removed, an operation left in progress, or a tracked file changed outside a commit. Nothing
+is undone for you, since a changed file may be your own edit made in a terminal meanwhile.
+
+A commit moves the branch past the canvas, so the next turn may change code only once the canvas is
+updated. When the turn committed and left nothing else, the page updates the canvas by itself as it
+does after any commit (`autoUpdateCanvas`); with that setting off, the answer offers **update canvas
+to continue**. When the agent settles an attention point, its commit ends with a `Settled-decision`
+line (see [settled decisions](#settled-decisions)), so the updated canvas shows the point resolved.
+
+The guard catches mistakes; it is not a boundary inside your checkout. `git -c core.hooksPath=`
+skips it, `git clean` moves no ref, and a refused `git reset --hard` has already rewritten the files
+when the hook refuses the ref: the answer then lists them with `git restore`. The sandbox keeps all
+of it inside your checkout. A change starts only from your own message.
+
 ## Generating from the review app
 
 When `acpx` and the chat agent are installed, the review app can generate a canvas itself, so you
@@ -1354,9 +1407,11 @@ attachments and submit the comments or reviews you choose to
 post. Rendered Markdown can load images from HTTPS hosts. Generation and chat send review
 context to the selected coding agent and its configured provider.
 
-Chat is instructed to read code without changing it, but the tool does not provide a filesystem
-sandbox for the agent. Its access also depends on the agent's own permissions. Disable chat with
-`chat.enabled: false` if those permissions are unsuitable for the project.
+Chat is instructed to read code without changing it, and outside the mode that lets it change code
+the tool does not provide a filesystem sandbox for the agent; its access also depends on the agent's
+own permissions. A turn that may change code runs in bubblewrap with every tool approved (see
+[changing code from AI Chat](#changing-code-from-ai-chat)). Disable chat with `chat.enabled: false`
+if those permissions are unsuitable for the project.
 
 ## Troubleshooting
 
@@ -1387,6 +1442,7 @@ sandbox for the agent. Its access also depends on the agent's own permissions. D
 | `COMMENT_FORBIDDEN`                     | Check the GitHub or GitLab account's repository access and token permissions                                                                                                                            |
 | `COMMENT_LINE_NOT_IN_DIFF`              | Choose a line shown in the current diff                                                                                                                                                                 |
 | `NOT_AUTHOR`                            | Only the pull request's author resolves points; sign in with that account, or dismiss the point instead                                                                                                 |
+| `CHANGES_CODE_UNAVAILABLE`              | Do what the reason says (update the canvas, commit or stash, install `bwrap`), then turn it on again                                                                                                    |
 | `SIGNOFF_INCOMPLETE`                    | Mark every layer except Other reviewed for this head                                                                                                                                                    |
 | `FORBIDDEN_HOST` / `CROSS_ORIGIN`       | Open the local server using `localhost` or `127.0.0.1` and submit actions from that page                                                                                                                |
 | `SERVER_NOT_RUNNING`                    | Start the server with `pr-review serve` in any terminal, then run `pr-review open` again                                                                                                                |
