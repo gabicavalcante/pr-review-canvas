@@ -4,8 +4,12 @@
  * switch, a new branch, tag or stash) before git applies it. git 2.53 runs no such hook declared in
  * configuration, so `core.hooksPath` points at a folder of pr-review's whose every hook runs the
  * repository's own afterwards. It is set through `GIT_CONFIG_*` in the turn's environment, so
- * nothing is written to the repository, and git run anywhere else is untouched. A push is refused
- * twice over: push URLs are rewritten to none that works, and the pre-push hook refuses.
+ * nothing is written to the repository. The environment reaches every git the turn runs, such as a
+ * test's `git init` in a temporary folder, so the hooks come in through an `includeIf` on the
+ * reader's git directory: a repository of the turn's own keeps its HEAD and its own hooks. A push is
+ * refused twice over: push URLs are rewritten to none that works, and the pre-push hook refuses. A
+ * push to the network is rewritten from any repository; a push to a local path or a `file://` URL
+ * only from the reader's, so a test may still push to a bare repository it made.
  *
  * It guards against the agent's mistakes, not against an agent set on getting around it: one
  * `git -c core.hooksPath=` skips it. The check after the turn reports what got past.
@@ -92,27 +96,42 @@ function shim(hook: (typeof CLIENT_HOOKS)[number]): string {
  * Every push URL a remote can have rewritten to one no transport serves, so a push fails before it
  * connects while fetches keep their URLs. A remote given as a plain path is not rewritten; the
  * pre-push hook refuses that one. Each needs its own way around: `-c` here, `--no-verify` there.
+ * The network's prefixes are rewritten in every repository, `file://` only in the reader's.
  */
-const PUSH_URL_PREFIXES = ['https://', 'http://', 'git@', 'ssh://', 'git://', 'file://']
-export const PUSH_GUARD_PAIRS: readonly [string, string][] = PUSH_URL_PREFIXES.map(prefix => [
-  'url.pr-review-push-blocked:///.pushInsteadOf',
+const BLOCKED_PUSH_URL = 'url.pr-review-push-blocked:///.pushInsteadOf'
+const NETWORK_PUSH_PREFIXES = ['https://', 'http://', 'git@', 'ssh://', 'git://']
+export const PUSH_GUARD_PAIRS: readonly [string, string][] = NETWORK_PUSH_PREFIXES.map(prefix => [
+  BLOCKED_PUSH_URL,
   prefix,
 ])
 
-/** Writes the guard and a shim per client hook into `dir`. Writing again leaves the same files. */
+/** The configuration file the reader's repository includes: the guard's hooks, and `file://` pushes. */
+export const GUARD_CONFIG_FILE = 'config'
+
+/** git reads a quoted value with the escapes JSON writes for the backslashes and quotes of a path. */
+function guardConfig(dir: string): string {
+  const quoted = JSON.stringify(dir)
+  return `[core]\n\thooksPath = ${quoted}\n[url "pr-review-push-blocked:///"]\n\tpushInsteadOf = file://\n`
+}
+
+/**
+ * Writes the guard, a shim per client hook, and the configuration that points the reader's
+ * repository at them into `dir`. Writing again leaves the same files.
+ */
 export async function writeGuardHooks(dir: string): Promise<void> {
   await mkdir(dir, { recursive: true })
   const files: [string, string][] = [
     ['pr-review-guard', GUARD_SCRIPT],
     ...CLIENT_HOOKS.map((hook): [string, string] => [hook, shim(hook)]),
   ]
-  await Promise.all(
-    files.map(async ([name, content]) => {
+  await Promise.all([
+    ...files.map(async ([name, content]) => {
       const file = path.join(dir, name)
       await writeFile(file, content)
       await chmod(file, 0o755)
-    })
-  )
+    }),
+    writeFile(path.join(dir, GUARD_CONFIG_FILE), guardConfig(dir)),
+  ])
 }
 
 /**
@@ -135,6 +154,8 @@ export function gitConfigEnv(
 export interface GitGuard {
   /** The guard's hooks folder, from `writeGuardHooks`. */
   hooksDir: string
+  /** The reader's git directory, shared by the clone's worktrees, made absolute. */
+  gitCommonDir: string
   /** The branch the turn started on, as `refs/heads/<name>`. */
   branchRef: string
   /** The repository's own hooks folder: `git rev-parse --git-path hooks`, made absolute. */
@@ -150,10 +171,19 @@ export async function repositoryHooksDir(checkout: string): Promise<string> {
   return path.resolve(checkout, stdout.trim())
 }
 
-/** The git configuration pair that turns the guard on, and the variables its hooks read. */
+/**
+ * The git configuration pairs that turn the guard on, and the variables its hooks read. The guard's
+ * configuration is included for the reader's git directory and for every worktree's under it, the
+ * first pattern matching the directory itself and the second what is inside it.
+ */
 export function gitGuardConfig(guard: GitGuard): { pairs: [string, string][]; env: Record<string, string> } {
+  const config = path.join(guard.hooksDir, GUARD_CONFIG_FILE)
   return {
-    pairs: [['core.hooksPath', guard.hooksDir], ...PUSH_GUARD_PAIRS],
+    pairs: [
+      [`includeIf.gitdir:${guard.gitCommonDir}.path`, config],
+      [`includeIf.gitdir:${guard.gitCommonDir}/.path`, config],
+      ...PUSH_GUARD_PAIRS,
+    ],
     env: { PR_REVIEW_BRANCH: guard.branchRef, PR_REVIEW_ORIG_HOOKS: guard.originalHooksDir },
   }
 }
