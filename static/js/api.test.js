@@ -7,6 +7,7 @@ import {
   fetchAgents,
   fetchBundle,
   fetchCapabilities,
+  fetchChangesCode,
   fetchJson,
   fetchPatches,
   fetchReviewBody,
@@ -19,6 +20,7 @@ import {
   postComment,
   postReview,
   probeAgent,
+  putChangesCode,
   putDismissed,
   putReviewed,
   putThreadHidden,
@@ -379,6 +381,17 @@ describe('the AI Chat routes', () => {
       'GET /api/settings/agents',
       'POST /api/settings/agents/claude/probe',
     ])
+  })
+
+  it('reads and sets whether AI Chat may change code on a review', async () => {
+    const f = fakeFetch(200, {})
+    await fetchChangesCode('branch', { fetchImpl: f.impl })
+    await putChangesCode('branch', true, { fetchImpl: f.impl })
+    expect(f.calls.map(c => `${c.init?.method ?? 'GET'} ${c.url}`)).toEqual([
+      'GET /api/prs/branch/chat/changes-code',
+      'PUT /api/prs/branch/chat/changes-code',
+    ])
+    expect(f.calls[1]?.init?.body).toBe(JSON.stringify({ on: true }))
   })
 
   it('escapes a thread name and an agent id in the URL', async () => {

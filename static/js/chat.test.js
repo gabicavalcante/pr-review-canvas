@@ -11,6 +11,7 @@ import { cssEscape } from './anchors.js'
 import { setChatEnabled } from './ask.js'
 import {
   answerHtml,
+  changesLineHtml,
   changesReportHtml,
   CHAT_MINIMIZED_KEY,
   CHAT_WIDTH_DEFAULT,
@@ -3204,5 +3205,87 @@ describe('what a turn that could change code did', () => {
     await flush()
     expect(el(root, '.turn.a .chat-changes').textContent).toContain('Committed 7d3297b.')
     expect(root.querySelector('[data-act="changes-update-canvas"]')).toBeNull()
+  })
+})
+
+describe('whether AI Chat may change code on the review', () => {
+  const offered = { offered: /** @type {const} */ (true), branchRef: 'refs/heads/feat' }
+  const refused = { offered: /** @type {const} */ (false), reason: 'tracked files have uncommitted changes' }
+
+  it.each([
+    ['off, and offered', { on: false, status: offered }, 'AI Chat only reads. let it change code'],
+    [
+      'off, and not offered',
+      { on: false, status: refused },
+      'AI Chat only reads: tracked files have uncommitted changes.',
+    ],
+    [
+      'on',
+      { on: true, status: offered },
+      'changes code Asked for a change, AI Chat edits and commits on feat. stop changing code',
+    ],
+    [
+      'on, but not now',
+      { on: true, status: refused },
+      'AI Chat may change code here, but not now: tracked files have uncommitted changes. stop changing code',
+    ],
+  ])('says so when %s', (_name, changes, text) => {
+    document.body.innerHTML = changesLineHtml(changes)
+    expect(document.body.textContent).toBe(text)
+  })
+
+  it('shows nothing on a pull request, whose chat only reads', async () => {
+    let asked = 0
+    const { root } = mount({
+      fetchChangesCode: async () => {
+        asked += 1
+        return { on: false, status: offered }
+      },
+    })
+    await flush()
+    expect(el(root, '#chat-changes-line').hidden).toBe(true)
+    expect(asked).toBe(0)
+  })
+
+  it('turns it on and off from the line on a branch review', async () => {
+    /** @type {boolean[]} */
+    const puts = []
+    const { root } = mount(
+      {
+        fetchChangesCode: async () => ({ on: false, status: offered }),
+        putChangesCode: async (_pr, on) => {
+          puts.push(on)
+          return { on, status: offered }
+        },
+      },
+      { prNumber: 'branch' }
+    )
+    await flush()
+    const line = el(root, '#chat-changes-line')
+    expect(line.hidden).toBe(false)
+    el(root, '#chat-changes-toggle').click()
+    await flush()
+    expect(line.textContent).toContain('changes code')
+    el(root, '#chat-changes-toggle').click()
+    await flush()
+    expect(puts).toEqual([true, false])
+    expect(line.textContent).toContain('AI Chat only reads.')
+  })
+
+  it('says why the server refused to turn it on, and keeps the line as it was', async () => {
+    const { root } = mount(
+      {
+        fetchChangesCode: async () => ({ on: false, status: offered }),
+        putChangesCode: async () => {
+          throw new Error('the checkout is at another commit than the canvas; update the canvas first')
+        },
+      },
+      { prNumber: 'branch' }
+    )
+    await flush()
+    el(root, '#chat-changes-toggle').click()
+    await flush()
+    expect(el(root, '.cmd-err').textContent).toContain('another commit than the canvas')
+    expect(el(root, '#chat-changes-line').textContent).toContain('AI Chat only reads.')
   })
 })

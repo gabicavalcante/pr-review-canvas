@@ -601,6 +601,32 @@ export function selectThread(prNumber, name, opts = {}) {
 }
 
 /**
+ * Whether AI Chat may change code on this review, and why not when it may not.
+ * @param {ReviewKey} prNumber
+ * @param {{ fetchImpl?: typeof fetch }} [opts]
+ * @returns {Promise<import('./contract-types.js').ChangesCodeResponse>}
+ */
+export function fetchChangesCode(prNumber, opts = {}) {
+  return fetchJson(`/api/prs/${prNumber}/chat/changes-code`, { fetchImpl: opts.fetchImpl })
+}
+
+/**
+ * Lets AI Chat change code on this review, or stops it. Turning it on is refused, with the
+ * reason, when a condition fails.
+ * @param {ReviewKey} prNumber
+ * @param {boolean} on
+ * @param {{ fetchImpl?: typeof fetch }} [opts]
+ * @returns {Promise<import('./contract-types.js').ChangesCodeResponse>}
+ */
+export function putChangesCode(prNumber, on, opts = {}) {
+  return fetchJson(`/api/prs/${prNumber}/chat/changes-code`, {
+    method: 'PUT',
+    body: { on },
+    fetchImpl: opts.fetchImpl,
+  })
+}
+
+/**
  * @param {ReviewKey} prNumber
  * @param {{ fetchImpl?: typeof fetch }} [opts]
  * @returns {Promise<{ cancelled: boolean }>}

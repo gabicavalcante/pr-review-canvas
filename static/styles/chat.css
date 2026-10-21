@@ -233,6 +233,14 @@ textarea:disabled {
   border-left: 3px solid var(--warn);
   background: var(--warn-bg);
 }
+.changes-line {
+  margin: 0;
+  color: var(--fg-muted);
+}
+.pill.changes-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 .chat-changes {
   margin-top: 8px;
   padding-top: 6px;

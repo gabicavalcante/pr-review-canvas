@@ -7,7 +7,15 @@
 /** @typedef {import('./proposed-comment.js').ProposedComment} ProposedComment */
 /** @typedef {import('./proposed-comment.js').ProposedResolution} ProposedResolution */
 /** @typedef {import('./review-session.js').ReviewSession} ReviewSession */
-import { cancelChat, fetchThreadHistory, fetchThreads, selectThread, streamChat } from './api.js'
+import {
+  cancelChat,
+  fetchChangesCode,
+  fetchThreadHistory,
+  fetchThreads,
+  putChangesCode,
+  selectThread,
+  streamChat,
+} from './api.js'
 import {
   chatContextAttrs,
   chatContextLabel,
@@ -87,6 +95,8 @@ export function renderChatShell(opts) {
     // thread. The bubble sits on the composer too, so it clears it at any height.
     '<form class="chat-composer" id="chat-form">' +
     '<button class="cmd unseen" type="button" id="chat-unseen" hidden aria-live="polite"></button>' +
+    // Whether AI Chat may change code, on a branch review only: it is the review's, not a thread's.
+    '<p class="changes-line small" id="chat-changes-line" hidden></p>' +
     '<p class="ctx-line" id="chat-ctx-line" hidden>Context: <span class="ctx-chip" id="chat-ctx">whole PR</span>' +
     ' <button class="cmd" type="button" id="chat-clear" hidden>clear</button></p>' +
     '<label class="sr" for="msg">Message</label>' +
@@ -204,6 +214,8 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
  *   selectThread: typeof selectThread,
  *   cancelChat: typeof cancelChat,
  *   streamChat: typeof streamChat,
+ *   fetchChangesCode: typeof fetchChangesCode,
+ *   putChangesCode: typeof putChangesCode,
  * }} ChatApi
  */
 
@@ -215,6 +227,8 @@ function withDefaults(overrides) {
     selectThread,
     cancelChat,
     streamChat,
+    fetchChangesCode,
+    putChangesCode,
     ...overrides,
   }
 }
@@ -284,6 +298,37 @@ export function changesReportHtml(report, opts) {
       ? '<p><button class="cmd" type="button" data-act="changes-update-canvas">update canvas to continue</button></p>'
       : ''
   return `<div class="chat-changes">${commits}${findings}${update}</div>`
+}
+
+/**
+ * The line that says whether AI Chat may change code on this review, with the command that turns
+ * it on or off. A mode the reader turned on but that cannot run now says why, and so does one that
+ * cannot be turned on.
+ * @param {import('./contract-types.js').ChangesCodeResponse} changes
+ */
+export function changesLineHtml(changes) {
+  const { on, status } = changes
+  if (on && status.offered) {
+    const branch = status.branchRef.replace(/^refs\/heads\//, '')
+    return (
+      '<span class="pill changes-on">changes code</span> ' +
+      `Asked for a change, AI Chat edits and commits on <span class="mono">${esc(branch)}</span>. ` +
+      '<button class="cmd" type="button" id="chat-changes-toggle">stop changing code</button>'
+    )
+  }
+  if (on && !status.offered) {
+    return (
+      `AI Chat may change code here, but not now: ${esc(status.reason)}. ` +
+      '<button class="cmd" type="button" id="chat-changes-toggle">stop changing code</button>'
+    )
+  }
+  if (status.offered) {
+    return (
+      'AI Chat only reads. ' +
+      '<button class="cmd" type="button" id="chat-changes-toggle">let it change code</button>'
+    )
+  }
+  return `<span class="muted">AI Chat only reads: ${esc(status.reason)}.</span>`
 }
 
 /**
@@ -593,6 +638,21 @@ export function wireChat(options) {
   const contextLine = mustFind(root, '#chat-ctx-line', HTMLElement)
   const clearButton = mustFind(root, '#chat-clear', HTMLElement)
   const bubble = mustFind(root, '#chat-unseen', HTMLElement)
+  const changesLine = mustFind(root, '#chat-changes-line', HTMLElement)
+  /** @type {import('./contract-types.js').ChangesCodeResponse | null} */
+  let changes = null
+  /** @param {import('./contract-types.js').ChangesCodeResponse} next */
+  const drawChanges = next => {
+    changes = next
+    changesLine.innerHTML = changesLineHtml(next)
+    changesLine.hidden = false
+  }
+  /** Reads the mode again: a commit, an edit, or a new canvas changes whether a turn may change code. */
+  const refreshChanges = async () => {
+    if (prNumber === 'branch') {
+      drawChanges(await api.fetchChangesCode(prNumber))
+    }
+  }
   const sendButton = mustFind(root, '#chat-send', HTMLButtonElement)
   const stopButton = mustFind(root, '#chat-stop', HTMLElement)
   const reviewPanel = qs(`#${REVIEW_PANEL_ID}`, pane)
@@ -1403,6 +1463,7 @@ export function wireChat(options) {
           unseen.set(current.thread, (unseen.get(current.thread) ?? 0) + 1)
         }
         void refreshThreads().catch(() => undefined)
+        void refreshChanges().catch(() => undefined)
         stopActivity()
         toolDetails.open = false
         const toolSummary = toolDetails.querySelector('summary')
@@ -1537,6 +1598,11 @@ export function wireChat(options) {
     }
     if (el.id === 'chat-clear') {
       setContext(WHOLE_PR)
+      return
+    }
+    if (el.id === 'chat-changes-toggle') {
+      const on = changes?.on !== true
+      void runCommand(el, async () => drawChanges(await api.putChangesCode(prNumber, on)))
       return
     }
     if (el.id === 'chat-stop') {
@@ -1720,6 +1786,7 @@ export function wireChat(options) {
   box.addEventListener('keydown', /** @type {EventListener} */ (onKeyDown))
   drawContext()
   void restoreThread().catch(() => undefined)
+  void refreshChanges().catch(() => undefined)
 
   return {
     get context() {
