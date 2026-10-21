@@ -160,6 +160,22 @@ export function initOneLayer(root, opts) {
     signal: listeners.signal,
   })
 
+  /**
+   * In the one-point view a stop takes the place of the one before, under a page that stays where
+   * it is: the header and the rail do not scroll away. True when it moved to the section `fragment`
+   * names, which the URL then records.
+   * @param {string} fragment
+   */
+  const swapInPlace = fragment => {
+    const target = elementForHash(root, fragment)
+    if (view !== 'points' || target === null || !isPageSection(target)) {
+      return false
+    }
+    revealFragment(fragment)
+    win.scrollTo({ top: 0 })
+    return true
+  }
+
   // A rail link or a "more chunks in layer 4" link is a plain fragment: what it names opens here,
   // before the browser's own scroll runs.
   root.addEventListener(
@@ -167,8 +183,15 @@ export function initOneLayer(root, opts) {
     event => {
       const link = event.target instanceof Element ? event.target.closest('a[href^="#"]') : null
       // A modified click opens the link in a new tab and leaves this page where it is.
-      if (link !== null && plainClick(/** @type {MouseEvent} */ (event))) {
-        revealFragment(link.getAttribute('href') ?? '')
+      if (link === null || !plainClick(/** @type {MouseEvent} */ (event))) {
+        return
+      }
+      const href = link.getAttribute('href') ?? ''
+      if (swapInPlace(href)) {
+        event.preventDefault()
+        win.history.pushState(null, '', href)
+      } else {
+        revealFragment(href)
       }
     },
     { signal: listeners.signal }
@@ -180,7 +203,7 @@ export function initOneLayer(root, opts) {
     'hashchange',
     () => {
       const el = elementForHash(root, win.location.hash || '#overview')
-      if (el === null) return
+      if (el === null || swapInPlace(win.location.hash || '#overview')) return
       if (sectionOf(root, el)?.hidden === true) {
         scrollIntoViewSafe(el, 'start')
       } else {

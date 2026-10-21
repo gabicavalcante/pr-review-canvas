@@ -277,6 +277,26 @@ describe('the one-point view', () => {
     expect(shownIds()).toEqual(['overview'])
   })
 
+  it('swaps the stop under a page that stays at the top, and records it in the URL', () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+    oneLayer = initOneLayer(root, { view: 'points' })
+    const link = root.querySelector('#step-p-1 .step-nav a')
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    link?.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(true)
+    expect(shownIds()).toEqual(['step-p-2'])
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 })
+    expect(window.location.hash).toBe('#step-p-2')
+  })
+
+  it('leaves the browser’s own scroll to the layer view', () => {
+    oneLayer = initOneLayer(root, { view: 'one' })
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    root.querySelector('a[href="#layer-auth"]')?.dispatchEvent(event)
+    expect(event.defaultPrevented).toBe(false)
+    expect(shownIds()).toEqual(['layer-auth'])
+  })
+
   it('opens on the point the URL names', () => {
     window.location.hash = '#step-p-2'
     oneLayer = initOneLayer(root, { view: 'points' })

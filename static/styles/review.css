@@ -665,6 +665,9 @@ img.av {
 .point-step > .files {
   padding: 0 16px 12px;
 }
+.layer-step > .test-map {
+  padding-bottom: 12px;
+}
 .step-nav {
   display: flex;
   justify-content: space-between;
