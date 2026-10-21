@@ -97,6 +97,11 @@
   ask opens the file's thread at once, with no menu, and so does the context chip of a file.
 - The context chip above the message box keeps to one line, with the whole name as its tooltip.
 
+### Reading
+
+- A file's hunks share one width: scrolled sideways past the end of a short hunk under a long one,
+  its added, removed, and hunk rows keep their colors. Before, they stopped at the card's width.
+
 ### Upgrade
 
 - A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled

@@ -1,7 +1,16 @@
 /* ---- Diff table ---- */
+/* One column as wide as the widest hunk, and at least the card: a short hunk under a long one
+   keeps its row colors across the whole width the reader scrolls through. */
 .diff-wrap {
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr);
   overflow-x: auto;
   max-width: 100%;
+}
+/* A percentage width would size the column by the card; the hunk's own width sizes it. */
+.diff-wrap > .diff {
+  width: auto;
+  min-width: 100%;
 }
 .diff {
   border-collapse: collapse;
