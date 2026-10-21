@@ -2040,6 +2040,37 @@ describe('a proposed resolution', () => {
     expect(seen).toEqual([report])
   })
 
+  it('says an answer is coming in until it is, then tells the page', async () => {
+    /** @type {() => void} */
+    let finish = () => {}
+    let answered = 0
+    const { root, chat } = mount(
+      {
+        streamChat: (_pr, _input, opts) =>
+          new Promise(resolve => {
+            opts.onEvent({ event: 'turn', data: { thread: 't1', agent: 'claude', seeded: true } })
+            finish = () => {
+              opts.onEvent({ event: 'done', data: { stopReason: 'end_turn' } })
+              resolve(undefined)
+            }
+          }),
+      },
+      { onAnswered: () => (answered += 1) }
+    )
+    expect(chat.answering).toBe(false)
+    const box = el(root, '#msg')
+    if (!(box instanceof HTMLTextAreaElement)) throw new Error('no box')
+    box.value = 'fix it'
+    el(root, '#chat-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flush()
+    expect(chat.answering).toBe(true)
+    expect(answered).toBe(0)
+    finish()
+    await flush()
+    expect(chat.answering).toBe(false)
+    expect(answered).toBe(1)
+  })
+
   it('hands the page the resolution, and follows its point as the state changes', async () => {
     setSelfReview(true, {})
     /** @type {Array<[string, import('./proposed-comment.js').ProposedResolution]>} */

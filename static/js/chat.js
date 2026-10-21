@@ -198,6 +198,7 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
  *   onChanges?: (report: import('./contract-types.js').ChangesReport) => void,
  *   canvasUpdatesItself?: () => boolean,
  *   onUpdateCanvas?: () => void,
+ *   onAnswered?: () => void,
  * }} ChatOptions
  */
 
@@ -1485,6 +1486,9 @@ export function wireChat(options) {
         if (next !== null) {
           next.user.querySelector('.chat-waiting')?.remove()
           void runTurn(next, next.user, next.shown)
+        } else {
+          // The last answer is in: the page may draw itself again, which it held off meanwhile.
+          options.onAnswered?.()
         }
       }
     }
@@ -1791,6 +1795,10 @@ export function wireChat(options) {
   return {
     get context() {
       return context
+    },
+    /** Whether an answer is coming in, which a redraw of the page would cut off. */
+    get answering() {
+      return inFlight !== null
     },
     setContext,
     focusInput() {
