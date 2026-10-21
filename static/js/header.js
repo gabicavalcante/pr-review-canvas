@@ -116,7 +116,7 @@ export function renderHeader(bundle, opts) {
   const forgeLink =
     pr.url === ''
       ? ''
-      : `<a class="cmd" href="${esc(pr.url)}" target="_blank" rel="noopener noreferrer">${esc(currentHost().kind)}</a>`
+      : `<a class="cmd forge-link" href="${esc(pr.url)}" target="_blank" rel="noopener noreferrer" title="Open on ${esc(hostLabel())}">${esc(currentHost().kind)}</a>`
   const refreshTitle = local
     ? 'Snapshot the working tree again and redraw'
     : `Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}`

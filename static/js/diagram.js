@@ -78,7 +78,7 @@ export function diagramPlaceholderHtml(source, links = {}) {
   return (
     `<div class="diagram" data-mermaid="${esc(source)}"${map}>` +
     `<div class="diagram-h">${chevronHtml('Toggle diagram')}<span class="lbl">${label}</span>` +
-    `<button class="cmd" type="button" data-copy="${esc(diagramMarkdown(source))}">copy</button></div>` +
+    `<button class="cmd" type="button" data-copy="${esc(diagramMarkdown(source))}" title="Copy">copy</button></div>` +
     '<div class="diagram-body"></div></div>'
   )
 }

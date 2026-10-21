@@ -120,6 +120,10 @@
   --i-sun: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 12a4 4 0 1 1 0-8 4 4 0 0 1 0 8Zm0-1.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Zm5.657-8.157a.75.75 0 0 1 0 1.061l-1.061 1.060a.749.749 0 0 1-1.060-1.060l1.060-1.060a.75.75 0 0 1 1.060 0Zm-9.193 9.193a.75.75 0 0 1 0 1.060l-1.060 1.061a.75.75 0 1 1-1.061-1.060l1.060-1.061a.75.75 0 0 1 1.061 0ZM8 0a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V.75A.75.75 0 0 1 8 0ZM3 8a.75.75 0 0 1-.75.75H.75a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 3 8Zm13 0a.75.75 0 0 1-.75.75h-1.5a.75.75 0 0 1 0-1.5h1.5A.75.75 0 0 1 16 8Zm-8 5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5A.75.75 0 0 1 8 13Zm3.536-1.464a.75.75 0 0 1 1.060 0l1.061 1.060a.75.75 0 0 1-1.060 1.061l-1.061-1.060a.75.75 0 0 1 0-1.061ZM2.343 2.343a.75.75 0 0 1 1.061 0l1.060 1.061a.751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018l-1.060-1.060a.75.75 0 0 1 0-1.060Z'/%3E%3C/svg%3E");
   --i-moon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M9.598 1.591a.749.749 0 0 1 .785-.175 7.001 7.001 0 1 1-8.967 8.967.75.75 0 0 1 .961-.96 5.5 5.5 0 0 0 7.046-7.046.75.75 0 0 1 .175-.786Zm1.616 1.945a7 7 0 0 1-7.678 7.678 5.499 5.499 0 1 0 7.678-7.678Z'/%3E%3C/svg%3E");
   --i-auto: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0Zm0 1.5v13a6.5 6.5 0 0 0 0-13Z'/%3E%3C/svg%3E");
+  --i-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z'/%3E%3C/svg%3E");
+  --i-external: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.75 2h3.5a.75.75 0 0 1 0 1.5h-3.5a.25.25 0 0 0-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25v-3.5a.75.75 0 0 1 1.5 0v3.5A1.75 1.75 0 0 1 12.25 14h-8.5A1.75 1.75 0 0 1 2 12.25v-8.5C2 2.784 2.784 2 3.75 2Zm6.854-1h4.146a.25.25 0 0 1 .25.25v4.146a.25.25 0 0 1-.427.177L13.03 4.03 9.28 7.78a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l3.75-3.75-1.543-1.543A.25.25 0 0 1 10.604 1Z'/%3E%3C/svg%3E");
+  --i-code: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m11.28 3.22 4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.749.749 0 0 1-1.275-.326.749.749 0 0 1 .215-.734L13.94 8l-3.72-3.72a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215Zm-6.56 0a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042L2.06 8l3.72 3.72a.749.749 0 0 1-.326 1.275.749.749 0 0 1-.734-.215L.47 8.53a.75.75 0 0 1 0-1.06Z'/%3E%3C/svg%3E");
+  --i-dash: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 7.75A.75.75 0 0 1 2.75 7h10.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 7.75Z'/%3E%3C/svg%3E");
 
   /* ---- Header ---- */
   .hdr-bar {
@@ -256,6 +260,8 @@
       .ifind [data-copy],
       .codeblock > .cmd,
       .file-h .cmd,
+      .layer-ctl [data-act='ask'],
+      [data-act='point-post'],
       #settings,
       [data-act='help'],
       #skin-toggle,
@@ -303,6 +309,70 @@
     margin-left: auto;
   }
 
+  /* Quiet icons: the pane's own controls, a chat card's send, edit and copy, a diagram's or a
+   command box's copy, and the link to the forge. The word stays as the accessible name and the
+   tooltip says it. */
+  :is(
+    #chat-minimize,
+    #chat-new-thread,
+    #new-thread,
+    #thread-goto,
+    #chat-clear,
+    .proposed .tbtns .cmd:is([data-act$='-post'], [data-act$='-edit'], [data-copy]),
+    .diagram-h [data-copy],
+    .cmdbox [data-copy],
+    .forge-link
+  ) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: var(--r);
+    color: var(--fg-muted);
+    font-size: 0;
+    vertical-align: middle;
+
+    &::before {
+      content: '';
+      width: 16px;
+      height: 16px;
+      background: currentcolor;
+      mask: var(--icon) center / contain no-repeat;
+    }
+    &:hover {
+      background: var(--btn-bg-hover);
+      color: var(--fg);
+      text-decoration: none;
+    }
+    &:disabled {
+      color: var(--fg-dim);
+      background: none;
+    }
+  }
+  #chat-minimize {
+    --icon: var(--i-dash);
+  }
+  :is(#chat-new-thread, #new-thread) {
+    --icon: var(--i-plus);
+  }
+  #thread-goto {
+    --icon: var(--i-code);
+  }
+  #chat-clear {
+    --icon: var(--i-x);
+  }
+  .proposed .tbtns [data-act$='-post'] {
+    --icon: var(--i-send);
+  }
+  .proposed .tbtns [data-act$='-edit'] {
+    --icon: var(--i-pencil);
+  }
+  .forge-link {
+    --icon: var(--i-external);
+  }
+
   /* Glyphs. */
   .cmd[data-copy] {
     --icon: var(--i-copy);
@@ -326,10 +396,10 @@
     --icon: var(--i-robot);
   }
   /* An icon alone has no label for the thread dot to follow, so the dot sits in its corner. */
-  .file-h .cmd[data-act='ask'] {
+  :is(.file-h, .layer-ctl) .cmd[data-act='ask'] {
     position: relative;
   }
-  .file-h .cmd[data-act='ask'] .ask-label::after {
+  :is(.file-h, .layer-ctl) .cmd[data-act='ask'] .ask-label::after {
     position: absolute;
     top: 3px;
     right: 3px;

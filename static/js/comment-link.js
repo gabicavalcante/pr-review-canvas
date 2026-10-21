@@ -87,7 +87,7 @@ export function sendCommandsHtml(opts) {
     return '<span class="pill pending queued">in your review</span>'
   }
   const target = `data-${opts.kind}="${esc(opts.id)}"`
-  const post = `<button class="cmd" type="button" data-act="${opts.kind}-post" ${target} data-needs-post>${postToLabel()}</button>`
+  const post = `<button class="cmd" type="button" data-act="${opts.kind}-post" ${target} data-needs-post data-tooltip="${esc(postToLabel())}" title="${esc(postToLabel())}">${postToLabel()}</button>`
   const queue = `<button class="cmd${opts.leadWithQueue === true ? ' fill' : ''}" type="button" data-act="${opts.kind}-queue" ${target}>add to review</button>`
   return opts.leadWithQueue === true ? queue + post : post + queue
 }

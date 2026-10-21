@@ -2,7 +2,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { askButtonHtml, setChatEnabled } from './ask.js'
-import { QUICK_QUESTIONS } from './chat.js'
+import { LAYER_QUESTIONS, QUICK_QUESTIONS } from './chat.js'
 import {
   ASK_SOMETHING_ELSE,
   CLOSE_DELAY_MS,
@@ -81,8 +81,15 @@ describe('wireQuickQuestions', () => {
   it('sends the question with the context of the command it opened on', () => {
     el('[data-ask-layer]').dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
     items()[0]?.click()
-    expect(picked).toEqual([[{ kind: 'layer', layerId: 'layer-1' }, QUICK_QUESTIONS[0]]])
+    expect(picked).toEqual([[{ kind: 'layer', layerId: 'layer-1' }, LAYER_QUESTIONS[0]]])
     expect(menuEl().hidden).toBe(true)
+  })
+
+  it('offers a layer its own questions, and anything narrower the general ones', () => {
+    el('[data-ask-layer]').dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    expect(items().map(i => i.textContent)).toEqual([...LAYER_QUESTIONS, ASK_SOMETHING_ELSE])
+    el('[data-ask-path]').dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    expect(items().map(i => i.textContent)).toEqual([...QUICK_QUESTIONS, ASK_SOMETHING_ELSE])
   })
 
   it('opens on the context chip too, and "ask something else" sends no question', () => {

@@ -1,9 +1,9 @@
 // @ts-check
-// The small menu that opens on an `[ ask ]` command: four questions that are worth asking about
-// almost anything, plus a way to write your own. Picking one sets the context to that target and
-// sends, so the common questions cost one click.
+// The small menu that opens on an `[ ask ]` command: questions that are worth asking about almost
+// anything of its kind, plus a way to write your own. Picking one sets the context to that target
+// and sends, so the common questions cost one click. A file's ask has no menu.
 
-import { QUICK_QUESTIONS } from './chat.js'
+import { QUICK_QUESTIONS, quickQuestionsFor } from './chat.js'
 import { chatContextFromElement } from './chat-context.js'
 import { esc, qs } from './dom.js'
 
@@ -17,15 +17,22 @@ export const MENU_GAP_PX = 4
 export const MENU_EDGE_PX = 8
 export const ASK_SOMETHING_ELSE = 'ask something else…'
 
-/** @returns {string} */
-export function quickMenuHtml() {
-  const items = [...QUICK_QUESTIONS, ASK_SOMETHING_ELSE]
+/**
+ * @param {ReadonlyArray<string>} questions
+ * @returns {string}
+ */
+function itemsHtml(questions) {
+  return [...questions, ASK_SOMETHING_ELSE]
     .map(
       (q, i) =>
         `<button class="qq-item" type="button" role="menuitem" tabindex="-1" data-qq="${i}">${esc(q)}</button>`
     )
     .join('')
-  return `<div class="qq-menu" id="${QQ_MENU_ID}" role="menu" aria-label="Quick questions" hidden>${items}</div>`
+}
+
+/** @returns {string} */
+export function quickMenuHtml() {
+  return `<div class="qq-menu" id="${QQ_MENU_ID}" role="menu" aria-label="Quick questions" hidden>${itemsHtml(QUICK_QUESTIONS)}</div>`
 }
 
 /**
@@ -78,6 +85,7 @@ export function wireQuickQuestions(root, options) {
     dismissed = null
     trigger = el
     el.setAttribute('aria-expanded', 'true')
+    menu.innerHTML = itemsHtml(quickQuestionsFor(chatContextFromElement(el)))
     menu.hidden = false
     const rect = el.getBoundingClientRect()
     // The menu is positioned against the window, so a command near an edge would push it off
@@ -173,8 +181,8 @@ export function wireQuickQuestions(root, options) {
     }
     event.preventDefault()
     const index = Number(item.getAttribute('data-qq'))
-    const question = QUICK_QUESTIONS[index] ?? null
     const context = chatContextFromElement(trigger)
+    const question = quickQuestionsFor(context)[index] ?? null
     close()
     options.onPick(context, question)
   }

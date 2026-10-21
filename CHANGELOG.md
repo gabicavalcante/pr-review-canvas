@@ -86,6 +86,17 @@
 - Threads saved by earlier versions still appear in the Threads tab, under whole PR, since they have
   no place.
 
+### Commands
+
+- The GitHub skin draws more commands as icons, each with its word as tooltip and accessible name:
+  the AI Chat pane's minimize, **new thread**, **go to code**, and **clear**; a point's and a chat
+  card's **post to github**, a chat card's **edit** and **copy**; the copy of a diagram or a
+  command box; and the link to the pull request on the forge, which opens in a new tab.
+- A layer's ask is an icon too, and its menu offers questions about the whole layer: a walkthrough,
+  what it could break, whether it follows the codebase, and whether its tests are enough. A file's
+  ask opens the file's thread at once, with no menu, and so does the context chip of a file.
+- The context chip above the message box keeps to one line, with the whole name as its tooltip.
+
 ### Upgrade
 
 - A project with its own `generation-format.md` adds the `{{RESOLVED}}` token, where the bundled

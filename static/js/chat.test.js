@@ -268,7 +268,12 @@ describe('the context chip', () => {
       expect(el(root, '#qq-menu').hidden).toBe(true)
       expect(chip.tabIndex).toBe(-1)
 
+      // A file is as wide as the whole PR for the quick questions: no menu.
       chat.setContext({ kind: 'file', path: 'src/app.ts' })
+      chip.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+      expect(el(root, '#qq-menu').hidden).toBe(true)
+
+      chat.setContext({ kind: 'layer', layerId: 'run-path' })
       chip.focus()
       expect(el(root, '#qq-menu').hidden).toBe(false)
       expect(chip.tabIndex).toBe(0)

@@ -77,9 +77,9 @@ export function renderChatShell(opts) {
     '<div class="chat-h"><h2 class="sr" id="chat-h">AI Chat</h2>' +
     '<span class="thread-kind" id="thread-kind" hidden></span>' +
     '<p class="thread-title" id="thread-title">New thread</p>' +
-    '<button class="cmd" type="button" id="chat-new-thread">new thread</button></div>' +
+    '<button class="cmd" type="button" id="chat-new-thread" title="New thread about the whole PR">new thread</button></div>' +
     `<section class="threads-panel" id="${THREADS_PANEL_ID}" role="tabpanel" aria-labelledby="side-tab-threads" hidden>` +
-    '<div class="threads-h"><button class="cmd" type="button" id="new-thread">new thread</button></div>' +
+    '<div class="threads-h"><button class="cmd" type="button" id="new-thread" title="New thread about the whole PR">new thread</button></div>' +
     '<nav class="thread-index" id="thread-index" aria-label="Threads"></nav></section>' +
     '<div class="transcript" id="chat-log" role="log" aria-label="Transcript" aria-live="polite" tabindex="0">' +
     '<p class="empty">Ask AI Chat about a layer, a file, or a selection. Answers come with a verdict first, then evidence.</p>' +
@@ -89,8 +89,8 @@ export function renderChatShell(opts) {
     '<form class="chat-composer" id="chat-form">' +
     '<button class="cmd unseen" type="button" id="chat-unseen" hidden aria-live="polite"></button>' +
     '<p class="ctx-line" id="chat-ctx-line">Context: <span class="ctx-chip" id="chat-ctx">whole PR</span>' +
-    ' <button class="cmd" type="button" id="thread-goto" hidden>go to code</button>' +
-    ' <button class="cmd" type="button" id="chat-clear" hidden>clear</button></p>' +
+    ' <button class="cmd" type="button" id="thread-goto" title="Go to the code" hidden>go to code</button>' +
+    ' <button class="cmd" type="button" id="chat-clear" title="Clear: ask about the whole PR" hidden>clear</button></p>' +
     '<label class="sr" for="msg">Message</label>' +
     '<textarea id="msg" rows="3" placeholder="Ask AI Chat about this PR…"></textarea>' +
     '<div class="tbtns"><button class="cmd fill" type="submit" id="chat-send">send</button>' +
@@ -166,6 +166,22 @@ export const QUICK_QUESTIONS = [
   'Does this follow how the codebase already does it?',
   'Is this covered by tests?',
 ]
+
+/** What the quick menu offers on a layer, which asks about a whole step of the change. */
+export const LAYER_QUESTIONS = [
+  'Walk me through this layer.',
+  'What could this layer break?',
+  'Does this follow how the codebase already does it?',
+  'Are its tests enough?',
+]
+
+/**
+ * The quick questions for what a command asks about.
+ * @param {import('./chat-context.js').ChatContext} context
+ */
+export function quickQuestionsFor(context) {
+  return context.kind === 'layer' ? LAYER_QUESTIONS : QUICK_QUESTIONS
+}
 
 /** @typedef {'post' | 'queue' | 'edit'} ProposedAct */
 
@@ -313,8 +329,8 @@ function proposedCommandsHtml(comment, id, send) {
   return (
     `<span class="tbtns" data-key="${shown}">` +
     sendCommandsHtml({ kind: 'proposed', id, ...send, leadWithQueue: true }) +
-    `<button class="cmd" type="button" data-act="proposed-edit" data-proposed="${esc(id)}" data-needs-post>edit</button>` +
-    `<button class="cmd" type="button" data-copy="${esc(comment.body)}">copy</button>` +
+    `<button class="cmd" type="button" data-act="proposed-edit" data-proposed="${esc(id)}" data-needs-post data-tooltip="Edit" title="Edit">edit</button>` +
+    `<button class="cmd" type="button" data-copy="${esc(comment.body)}" title="Copy">copy</button>` +
     '</span>'
   )
 }
@@ -400,7 +416,7 @@ function resolutionCommandsHtml(resolution, id, state) {
   const acts =
     shown === 'open'
       ? `<button class="cmd fill" type="button" data-act="resolution-save" ${target}>resolve</button>` +
-        `<button class="cmd" type="button" data-act="resolution-edit" ${target}>edit</button>`
+        `<button class="cmd" type="button" data-act="resolution-edit" ${target} title="Edit">edit</button>`
       : shown === 'resolved'
         ? '<span class="pill status resolved">resolved</span>'
         : shown === 'dismissed'
@@ -408,7 +424,7 @@ function resolutionCommandsHtml(resolution, id, state) {
           : ''
   return (
     `<span class="tbtns" data-key="${shown}">${acts}` +
-    `<button class="cmd" type="button" data-copy="${esc(resolution.reason)}">copy</button></span>`
+    `<button class="cmd" type="button" data-copy="${esc(resolution.reason)}" title="Copy">copy</button></span>`
   )
 }
 
@@ -916,9 +932,12 @@ export function wireChat(options) {
 
   const drawContext = () => {
     chip.textContent = chatContextLabel(context, layerTitle, pointTitle)
+    chip.title = chip.textContent
     clearButton.hidden = context.kind === 'pr'
-    chip.toggleAttribute('data-ask-menu', context.kind !== 'pr')
-    if (context.kind === 'pr') {
+    // A file, like the whole PR, is too wide for the quick questions.
+    const menu = context.kind !== 'pr' && context.kind !== 'file'
+    chip.toggleAttribute('data-ask-menu', menu)
+    if (!menu) {
       chip.removeAttribute('tabindex')
       chip.removeAttribute('aria-expanded')
     } else {

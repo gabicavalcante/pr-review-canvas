@@ -23,8 +23,9 @@ export function isChatEnabled() {
 /**
  * The command, or nothing at all when the pane is off: a page without a chat shows no way to ask.
  * @param {import('./chat-context.js').ChatContext} context
- * @param {{ label?: string, title?: string, enabled?: boolean }} [opts] `title` is the tooltip, for a
- *   skin that shows the command as an icon
+ * @param {{ label?: string, title?: string, enabled?: boolean, menu?: boolean }} [opts] `title` is
+ *   the tooltip, for a skin that shows the command as an icon; `menu: false` leaves out the
+ *   quick-question menu, which opens on `data-ask`
  * @returns {string}
  */
 export function askButtonHtml(context, opts = {}) {
@@ -33,5 +34,6 @@ export function askButtonHtml(context, opts = {}) {
   }
   const label = opts.label ?? 'ask'
   const title = opts.title === undefined ? '' : ` title="${esc(opts.title)}"`
-  return `<button class="cmd" type="button" data-act="ask" data-ask${chatContextAttrs(context)}${title}><span class="ask-label">${esc(label)}</span></button>`
+  const menu = opts.menu === false ? '' : ' data-ask'
+  return `<button class="cmd" type="button" data-act="ask"${menu}${chatContextAttrs(context)}${title}><span class="ask-label">${esc(label)}</span></button>`
 }
