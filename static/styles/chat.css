@@ -275,7 +275,8 @@ textarea {
   display: flex;
   flex-shrink: 0;
   align-items: stretch;
-  padding: 0 8px 0 4px;
+  /* The right edge matches the thread head's, so minimize sits over its new thread. */
+  padding: 0 14px 0 4px;
   overflow-x: auto;
   scrollbar-width: thin;
   border-bottom: 1px solid var(--ink);
