@@ -1023,6 +1023,7 @@ describe('a turn that may change code', () => {
     expect(run).toMatchObject({ cwd: '/repo', session: changesSessionName(T1), writes: BOX })
     expect(run?.prompt).toContain('## Changing the code')
     expect(run?.prompt).toContain('Settled-decision: <path>:<line>')
+    expect(run?.prompt).toContain('Run them in the\nforeground and wait for them to finish')
     expect(runner.ensured).toEqual([changesSessionName(T1)])
     expect(requests).toEqual([{ key: 42, agent: 'claude', branchRef: 'refs/heads/feat' }])
     expect(checkoutGit.calls).toEqual([])
