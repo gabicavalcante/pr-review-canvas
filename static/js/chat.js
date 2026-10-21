@@ -7,9 +7,17 @@
 /** @typedef {import('./proposed-comment.js').ProposedComment} ProposedComment */
 /** @typedef {import('./proposed-comment.js').ProposedResolution} ProposedResolution */
 /** @typedef {import('./review-session.js').ReviewSession} ReviewSession */
-import { cancelChat, fetchThreadHistory, fetchThreads, selectThread, streamChat } from './api.js'
+import {
+  cancelChat,
+  fetchThreadHistory,
+  fetchThreads,
+  markThreadUnseen,
+  selectThread,
+  streamChat,
+} from './api.js'
 import {
   chatContextAttrs,
+  chatContextFromElement,
   chatContextLabel,
   chatContextName,
   sameChatContext,
@@ -29,7 +37,7 @@ import {
 } from './chat-scroll.js'
 import { runCommand, toast } from './commands.js'
 import { isQueuedComment, postedCommentUrl, sendCommandsHtml } from './comment-link.js'
-import { esc, flash, qs, scrollIntoViewSafe } from './dom.js'
+import { esc, flash, qs, scrollIntoViewSafe, timeAgo } from './dom.js'
 import { cssEscape } from './anchors.js'
 import { getRenderContext } from './layers.js'
 import { lineLink } from './links.js'
@@ -211,6 +219,7 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
  *   fetchThreads: typeof fetchThreads,
  *   fetchThreadHistory: typeof fetchThreadHistory,
  *   selectThread: typeof selectThread,
+ *   markThreadUnseen: typeof markThreadUnseen,
  *   cancelChat: typeof cancelChat,
  *   streamChat: typeof streamChat,
  * }} ChatApi
@@ -222,6 +231,7 @@ function withDefaults(overrides) {
     fetchThreads,
     fetchThreadHistory,
     selectThread,
+    markThreadUnseen,
     cancelChat,
     streamChat,
     ...overrides,
@@ -839,9 +849,18 @@ export function wireChat(options) {
   const INDEX_GROUPS = /** @type {Array<[ChatContext['kind'], string]>} */ (Object.entries(INDEX_LABELS))
 
   const drawIndex = () => {
-    for (const dot of Array.from(root.querySelectorAll('.threads-new'))) {
-      dot.toggleAttribute('hidden', unseen.size === 0)
-      dot.setAttribute('title', 'A thread has an answer you have not seen')
+    // The thread's name counts the threads with an answer not seen yet, at the end by the list's
+    // caret: the answer can be in any thread, not only the one named.
+    const fresh = unseen.size
+    for (const note of Array.from(root.querySelectorAll('.threads-new'))) {
+      note.toggleAttribute('hidden', fresh === 0)
+      note.textContent = `${fresh} new`
+      note.setAttribute(
+        'title',
+        fresh === 1
+          ? 'A thread has an answer you have not seen'
+          : `${fresh} threads have an answer you have not seen`
+      )
     }
     // The AI Chat tab and its launcher count every answer not seen yet, up to 9.
     const count = [...unseen.values()].reduce((sum, n) => sum + n, 0)
@@ -852,7 +871,15 @@ export function wireChat(options) {
       badge.setAttribute('aria-label', counted)
       badge.setAttribute('title', counted)
     }
-    if (threads.length === 0) {
+    // A thread's first question is in no list until the server has made the thread, which takes
+    // the review checkout and the agent's session first. Until then it is listed by its place.
+    const drafts = /** @type {Array<{ place: ChatContext | undefined, status: string }>} */ ([
+      ...(live !== null && live.thread === null ? [{ place: live.place, status: 'starting…' }] : []),
+      ...(queued !== null && queued.thread === null
+        ? [{ place: queued.place, status: 'question waiting' }]
+        : []),
+    ])
+    if (threads.length === 0 && drafts.length === 0) {
       index.innerHTML =
         '<p class="empty">No threads yet. Use ask on an attention point, a selection of lines, a file or a layer, or start a thread about the whole PR.</p>'
       return
@@ -861,7 +888,16 @@ export function wireChat(options) {
     const focused = document.activeElement?.closest?.('[data-thread-open]')?.getAttribute('data-thread-open')
     index.innerHTML = INDEX_GROUPS.map(([kind, label]) => {
       const group = threads.filter(t => (t.anchor?.kind ?? 'pr') === kind)
-      if (group.length === 0) return ''
+      const unsaved = drafts
+        .filter(d => (d.place?.kind ?? 'pr') === kind)
+        .map(
+          d =>
+            `<li><button type="button" class="thread-item${activeThread === null && sameChatContext(d.place ?? WHOLE_PR, openPlace ?? WHOLE_PR) ? ' current" aria-current="true' : ''}" data-draft-open${chatContextAttrs(d.place ?? WHOLE_PR)}>` +
+            `<span class="thread-item-t">${esc(d.place === undefined ? 'New thread' : placeName(d.place))}</span>` +
+            `<span class="small muted">${esc(d.status)}</span></button></li>`
+        )
+        .join('')
+      if (group.length === 0 && unsaved === '') return ''
       const items = group
         .map(t => {
           const status =
@@ -875,13 +911,13 @@ export function wireChat(options) {
                     ? '1 question'
                     : `${t.turns} questions`
           return (
-            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current" aria-current="true' : ''}" data-thread-open="${esc(t.name)}">` +
+            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current" aria-current="true' : ''}" data-thread-open="${esc(t.name)}" title="${esc(itemTooltip(t))}">` +
             `<span class="thread-item-t">${esc(shownTitle(t))}</span>` +
             `<span class="small ${status === 'new answer' ? 'thread-new' : 'muted'}">${esc(status)}</span></button></li>`
           )
         })
         .join('')
-      return `<h3 class="thread-group">${esc(label)}</h3><ul class="thread-list">${items}</ul>`
+      return `<h3 class="thread-group">${esc(label)}</h3><ul class="thread-list">${items}${unsaved}</ul>`
     }).join('')
     applyFilter()
     if (focused !== undefined && focused !== null) {
@@ -889,17 +925,38 @@ export function wireChat(options) {
     }
   }
 
-  /** Hides the threads whose name the filter does not match, and a group left empty. */
+  /**
+   * An entry's tooltip: its whole name, cut short in the list, and when it started, which tells
+   * apart threads of the same name.
+   * @param {(typeof threads)[number]} thread
+   */
+  const itemTooltip = thread => {
+    const started = timeAgo(thread.createdAt)
+    return started === '' ? shownTitle(thread) : `${shownTitle(thread)} · started ${started}`
+  }
+
+  /**
+   * Hides the threads the filter does not match, by name or by the kind of place their group
+   * names, and a group left empty. A filter that leaves nothing says so.
+   */
   const applyFilter = () => {
     const query = filter.value.trim().toLowerCase()
     for (const list of Array.from(index.querySelectorAll('.thread-list'))) {
+      const group = (list.previousElementSibling?.textContent ?? '').toLowerCase()
       for (const li of Array.from(list.children)) {
-        const name = li.querySelector('.thread-item-t')?.textContent ?? ''
-        li.toggleAttribute('hidden', query !== '' && !name.toLowerCase().includes(query))
+        const name = (li.querySelector('.thread-item-t')?.textContent ?? '').toLowerCase()
+        li.toggleAttribute('hidden', query !== '' && !name.includes(query) && !group.includes(query))
       }
       const empty = !Array.from(list.children).some(li => !li.hasAttribute('hidden'))
       list.toggleAttribute('hidden', empty)
       list.previousElementSibling?.toggleAttribute('hidden', empty)
+    }
+    index.querySelector('.thread-nomatch')?.remove()
+    if (query !== '' && threads.length > 0 && shownItems().length === 0) {
+      index.insertAdjacentHTML(
+        'beforeend',
+        `<p class="empty thread-nomatch">No thread matches “${esc(filter.value.trim())}”.</p>`
+      )
     }
   }
 
@@ -917,6 +974,11 @@ export function wireChat(options) {
     drawIndex()
     pop.hidden = false
     switchButton.setAttribute('aria-expanded', 'true')
+    // A long list opens at the open thread.
+    const current = qs('.thread-item.current', index)
+    if (current instanceof HTMLElement && typeof current.scrollIntoView === 'function') {
+      current.scrollIntoView({ block: 'nearest' })
+    }
     filter.focus()
   }
 
@@ -962,6 +1024,46 @@ export function wireChat(options) {
     }
     const next = event.key === 'ArrowDown' ? (at + 1) % items.length : at < 0 ? items.length - 1 : at - 1
     items[next]?.focus()
+  }
+
+  /**
+   * The unsent text of each thread, by its name, or by its place for a draft, so a switch does
+   * not carry a half-written question into another thread.
+   * @type {Map<string, string>}
+   */
+  const unsent = new Map()
+  const unsentKey = () => activeThread ?? `place:${JSON.stringify(openPlace ?? WHOLE_PR)}`
+  /** Keeps what the box holds for the thread on screen; call before the pane leaves it. */
+  const keepUnsent = () => {
+    if (box.value.trim() === '') {
+      unsent.delete(unsentKey())
+    } else {
+      unsent.set(unsentKey(), box.value)
+    }
+  }
+  /** Puts back what the thread now on screen had in the box. */
+  const restoreUnsent = () => {
+    box.value = unsent.get(unsentKey()) ?? ''
+  }
+
+  /** Puts the focus in the message box, or on the thread's name while the box waits. */
+  const focusBox = () => {
+    if (box.disabled) {
+      switchButton.focus()
+    } else {
+      box.focus()
+    }
+  }
+
+  /**
+   * The focus leaving the list, by Tab or otherwise, closes it, as a press outside does.
+   * @param {FocusEvent} event
+   */
+  const onPopFocusOut = event => {
+    const to = event.relatedTarget
+    if (to instanceof Node && !pop.contains(to) && !switchButton.contains(to)) {
+      closePop()
+    }
   }
 
   /**
@@ -1288,6 +1390,7 @@ export function wireChat(options) {
       return
     }
     box.value = ''
+    unsent.delete(unsentKey())
     /** @type {Question} */
     const question = { message, context, thread: activeThread, place: openPlace }
     const { turn } = appendTurn('user', renderMarkdown(message, { paths }), turnContext(context))
@@ -1321,6 +1424,8 @@ export function wireChat(options) {
     const answer = shown ? appendTurn('assistant', '') : makeTurn('assistant', '')
     const current = { ...question, user, answer: answer.turn, shown, redraw: () => {} }
     live = current
+    // A first question's thread is listed by its place until the server names it.
+    drawIndex()
     /** Whether the agent took the turn: until then there is no answer to have missed. */
     let agentTookTurn = false
     const activity = document.createElement('p')
@@ -1464,7 +1569,7 @@ export function wireChat(options) {
         // counted on the AI Chat tab and launcher. Its own thread is off screen too while the
         // pane is minimized or shows another tab.
         if ((!current.shown || !chatOnScreen()) && current.thread !== null && agentTookTurn) {
-          unseen.set(current.thread, (unseen.get(current.thread) ?? 0) + 1)
+          setUnseen(current.thread, (unseen.get(current.thread) ?? 0) + 1)
         }
         void refreshThreads().catch(() => undefined)
         stopActivity()
@@ -1509,16 +1614,36 @@ export function wireChat(options) {
     openPlace = data.threads.find(t => t.name === activeThread)?.anchor
     context = askedIn(openPlace)
     drawContext()
+    // Answers the reader had not seen before the reload are still marked.
+    for (const t of data.threads) {
+      if (t.unseen !== undefined && t.unseen > 0) unseen.set(t.name, t.unseen)
+    }
     drawThreads(data)
+    seeOpenThread()
     if (activeThread !== null) {
       await loadHistory(activeThread)
     }
   }
 
+  /**
+   * Counts a thread's answers the reader has not seen, here and on the server, so a reload still
+   * marks them. Zero clears the mark.
+   * @param {string} name
+   * @param {number} count
+   */
+  const setUnseen = (name, count) => {
+    if (count === 0) {
+      unseen.delete(name)
+    } else {
+      unseen.set(name, count)
+    }
+    void api.markThreadUnseen(prNumber, name, count).catch(() => undefined)
+  }
+
   /** The open thread's new answers are seen once the AI Chat tab is on screen. */
   const seeOpenThread = () => {
     if (activeThread !== null && unseen.has(activeThread) && chatOnScreen()) {
-      unseen.delete(activeThread)
+      setUnseen(activeThread, 0)
       drawMarks()
       drawIndex()
     }
@@ -1529,12 +1654,14 @@ export function wireChat(options) {
    * @param {string} name
    */
   const openThread = async name => {
+    keepUnsent()
     activeThread = name
-    unseen.delete(name)
+    if (unseen.has(name)) setUnseen(name, 0)
     drawMarks()
     openPlace = currentThread()?.anchor
     context = askedIn(openPlace)
     drawContext()
+    restoreUnsent()
     showThread()
     drawIndex()
     void api.selectThread(prNumber, name).catch(() => undefined)
@@ -1552,16 +1679,25 @@ export function wireChat(options) {
    */
   const openDraft = (anchor, opts = {}) => {
     const left = currentThread()
+    // A draft whose first question is still on its way has no thread yet; the way back is its place.
+    const leftDraft =
+      left === undefined && [live, queued].some(q => q !== null && q.thread === null && isHere(q))
+        ? (openPlace ?? WHOLE_PR)
+        : undefined
+    keepUnsent()
     claimLog()
     activeThread = null
     openPlace = anchor.kind === 'pr' ? undefined : anchor
     context = anchor
     drawContext()
+    restoreUnsent()
     proposed.clear()
     const back =
-      left === undefined
-        ? ''
-        : ` <button class="cmd" type="button" data-thread-open="${esc(left.name)}">back to “${esc(runningName(left, undefined))}”</button>`
+      left !== undefined
+        ? ` <button class="cmd" type="button" data-thread-open="${esc(left.name)}">back to “${esc(runningName(left, undefined))}”</button>`
+        : leftDraft !== undefined && !sameChatContext(leftDraft, anchor)
+          ? ` <button class="cmd" type="button" data-draft-open${chatContextAttrs(leftDraft)}>back to “${esc(runningName(undefined, leftDraft.kind === 'pr' ? undefined : leftDraft))}”</button>`
+          : ''
     log.innerHTML =
       anchor.kind === 'pr'
         ? `<p class="empty">A new thread about the whole PR.${back}</p>`
@@ -1610,10 +1746,16 @@ export function wireChat(options) {
       // A thread keeps one place, so leaving a place's thread for the whole PR opens the whole
       // PR's thread. What the box holds goes along.
       if (threadPerPlace && openPlace !== undefined) {
+        const carried = box.value
+        box.value = ''
         void goToThread(WHOLE_PR)
+        // goToThread has switched by the time it returns: its awaits are only for the history.
+        if (carried.trim() !== '') box.value = carried
       } else {
         setContext(WHOLE_PR)
       }
+      // The command hides once the context is the whole PR, so the focus goes on to the box.
+      focusBox()
       return
     }
     if (el.id === 'chat-stop') {
@@ -1631,10 +1773,27 @@ export function wireChat(options) {
     if (el.id === 'new-thread' || el.id === 'chat-new-thread') {
       closePop()
       openDraft(WHOLE_PR, { fresh: true })
+      focusBox()
       return
     }
     if (el.id === 'thread-goto') {
       goToAnchor()
+      return
+    }
+    if (el.hasAttribute('data-draft-open')) {
+      // A thread whose first question is on its way: its draft, with that question. Once the
+      // server has made it, the thread itself.
+      closePop()
+      const place = chatContextFromElement(el)
+      const pending = [live, queued].some(
+        q => q !== null && q.thread === null && sameChatContext(q.place ?? WHOLE_PR, place)
+      )
+      if (pending) {
+        openDraft(place)
+      } else {
+        void goToThread(place)
+      }
+      focusBox()
       return
     }
     const picked = el.getAttribute('data-thread-open')
@@ -1645,6 +1804,8 @@ export function wireChat(options) {
       } else {
         void openThread(picked)
       }
+      // The list, or the draft's way back, is gone from under the focus: the box takes it.
+      focusBox()
       return
     }
     if (el.id === 'chat-unseen') {
@@ -1799,6 +1960,7 @@ export function wireChat(options) {
   log.addEventListener('scroll', onScroll)
   pane.addEventListener('wheel', onPaneWheel, { passive: false })
   pop.addEventListener('keydown', onPopKey)
+  pop.addEventListener('focusout', onPopFocusOut)
   filter.addEventListener('input', applyFilter)
   document.addEventListener('pointerdown', onOutside)
   box.addEventListener('keydown', /** @type {EventListener} */ (onKeyDown))
@@ -1898,8 +2060,11 @@ export function wireChat(options) {
           )
           return
         }
+        // The quick question goes, and what the reader had written in this thread stays.
+        const kept = box.value
         box.value = question
         send()
+        box.value = kept
       })()
     },
     /** Whether a question asked here waits to be sent, which a re-render would drop. */
@@ -1921,6 +2086,7 @@ export function wireChat(options) {
       log.removeEventListener('scroll', onScroll)
       marks.remove()
       pop.removeEventListener('keydown', onPopKey)
+      pop.removeEventListener('focusout', onPopFocusOut)
       filter.removeEventListener('input', applyFilter)
       document.removeEventListener('pointerdown', onOutside)
       box.removeEventListener('keydown', /** @type {EventListener} */ (onKeyDown))

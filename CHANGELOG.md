@@ -73,11 +73,17 @@
   place of the pane's old thread select. **new thread**, beside it and at the bottom of the list,
   starts one about the whole PR.
 - An ask that leaves the thread the reader was reading for a new one offers **back to** that thread
-  until its first question.
+  until its first question. A thread whose first question is still starting is listed by its place
+  until the server has made it.
+- Each thread keeps its own unsent text: a half-written question stays with the thread it was
+  written in when an ask opens another one. **clear** still takes it along to the whole PR.
+- The thread list matches the filter against each thread's name and its kind of place, says when
+  nothing matches, opens at the open thread, and gives each entry its whole name as a tooltip.
+  Picking a thread puts the focus in the message box, and tabbing out of the list closes it.
 - The ask command of a place with a thread carries a dot. The dot fills, and the thread's name on
-  top of the pane shows one too, when an answer arrived there while the reader was not reading it: in another
+  top of the pane counts the threads, as in **2 new**, when an answer arrived there while the reader was not reading it: in another
   thread, with the pane minimized, or on another tab. The **AI Chat** tab and its launcher count
-  those answers, up to 9.
+  those answers, up to 9. The marks are kept with the review, so a reload keeps them.
 - While an answer comes in, ask, the list of threads, and **new thread** still open any thread, and the
   answer keeps arriving in its own. A question asked elsewhere meanwhile is sent once it ends.
 - The open thread comes back when the page is reloaded.

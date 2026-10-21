@@ -78,6 +78,9 @@
 .thread-switch > .thread-caret {
   margin-left: auto;
 }
+.thread-switch > .threads-new:not([hidden]) + .thread-caret {
+  margin-left: 0;
+}
 .thread-switch:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 1px;
@@ -243,14 +246,18 @@
   mask: var(--i-dot) center / contain no-repeat;
   vertical-align: middle;
 }
-/* The thread head and an entry of its list say where an answer arrived that the reader has not seen. */
-.threads-new,
-.thread-new::before {
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+/* The thread head counts the threads with an answer the reader has not seen, and an entry of its
+   list marks one. */
+.threads-new {
+  flex: none;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 9px;
   background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
 }
 .threads-new[hidden] {
   display: none;
@@ -261,7 +268,12 @@
 }
 .thread-new::before {
   content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
   margin-right: 5px;
+  border-radius: 50%;
+  background: var(--accent);
   vertical-align: middle;
 }
 select,

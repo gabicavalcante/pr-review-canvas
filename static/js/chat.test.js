@@ -68,6 +68,7 @@ function mount(api = {}, extra = {}) {
       fetchThreads: async () => ({ threads: [], activeThread: null, agent: 'claude' }),
       fetchThreadHistory: async () => ({ name: 't', turns: [] }),
       selectThread: async (_pr, name) => ({ activeThread: name }),
+      markThreadUnseen: async (_pr, name, unseen) => ({ name, unseen }),
       cancelChat: async () => ({ cancelled: true }),
       streamChat: async () => undefined,
       ...api,
@@ -591,6 +592,60 @@ describe('threads', () => {
     root.remove()
   })
 
+  it('gives the box the focus after a pick, closes on Tab out, and filters by the kind of place', async () => {
+    const { root } = mount({ fetchThreads: async () => PLACED })
+    document.body.append(root)
+    await flush()
+    el(root, '#thread-switch').click()
+    // Each entry's tooltip has its whole name.
+    expect(el(root, '[data-thread-open="pr-review-a-b-42-claude-t1"]').title).toMatch(
+      /^Sum instead of product/
+    )
+    const filter = el(root, '#thread-filter')
+    if (!(filter instanceof HTMLInputElement)) throw new Error('no filter')
+    filter.value = 'attention'
+    filter.dispatchEvent(new Event('input'))
+    expect(
+      [...root.querySelectorAll('#thread-index .thread-item')].filter(i => i.closest('[hidden]') === null)
+    ).toHaveLength(1)
+    filter.value = 'nothing like it'
+    filter.dispatchEvent(new Event('input'))
+    expect(el(root, '#thread-index .thread-nomatch').textContent).toBe('No thread matches “nothing like it”.')
+    filter.value = ''
+    filter.dispatchEvent(new Event('input'))
+    el(root, '[data-thread-open="pr-review-a-b-42-claude-t1"]').click()
+    expect(document.activeElement).toBe(el(root, '#msg'))
+    // Tabbing out of the open list closes it.
+    el(root, '#thread-switch').click()
+    el(root, '#thread-pop').dispatchEvent(
+      new FocusEvent('focusout', { bubbles: true, relatedTarget: el(root, '#msg') })
+    )
+    expect(el(root, '#thread-pop').hidden).toBe(true)
+    root.remove()
+  })
+
+  it('keeps each thread’s unsent text to itself, and clear carries it along', async () => {
+    const { root, chat } = mount({ fetchThreads: async () => PLACED })
+    await flush()
+    const box = el(root, '#msg')
+    if (!(box instanceof HTMLTextAreaElement)) throw new Error('no box')
+    box.value = 'about the whole PR, half written'
+    chat.ask(POINT)
+    await flush()
+    expect(box.value).toBe('')
+    box.value = 'about the point'
+    chat.ask(LAYER)
+    await flush()
+    expect(box.value).toBe('')
+    chat.ask(POINT)
+    await flush()
+    expect(box.value).toBe('about the point')
+    el(root, '#chat-clear').click()
+    await flush()
+    expect(el(root, '#thread-title').textContent).toBe('overall')
+    expect(box.value).toBe('about the point')
+  })
+
   it('opens the first thread the filter leaves on Enter, and closes the list', async () => {
     const { root } = mount({ fetchThreads: async () => PLACED })
     document.body.append(root)
@@ -1017,6 +1072,57 @@ describe('a thread per place', () => {
     Array.from(root.querySelectorAll('.chat-new')).map(b =>
       b instanceof HTMLElement && !b.hidden ? b.textContent : null
     )
+
+  it('says on the thread head how many threads have an unseen answer, and keeps them over a reload', async () => {
+    /** @type {Array<[string, number]>} */
+    const marked = []
+    const { root, chat, stream } = heldAnswer()
+    chat.stop()
+    root.remove()
+    const again = mount({
+      fetchThreads: async () => ({
+        ...PLACED,
+        threads: PLACED.threads.map(t => (t.name.endsWith('t1') ? { ...t, unseen: 1 } : t)),
+      }),
+      markThreadUnseen: async (_pr, name, unseen) => {
+        marked.push([name, unseen])
+        return { name, unseen }
+      },
+    })
+    void stream
+    await flush()
+    // The unseen answer from before the reload is still counted.
+    expect(el(again.root, '#thread-switch .threads-new').textContent).toBe('1 new')
+    expect(badges(again.root)).toEqual(['1', '1'])
+    again.chat.ask(POINT)
+    await flush()
+    expect(marked).toEqual([['pr-review-a-b-42-claude-t1', 0]])
+    expect(el(again.root, '#thread-switch .threads-new').hidden).toBe(true)
+  })
+
+  it('lists a first question’s thread by its place while it starts, with the way back to it', async () => {
+    const { root, chat } = mount({
+      fetchThreads: async () => PLACED,
+      // The turn never starts: the server has not named the thread yet.
+      streamChat: () => new Promise(() => {}),
+    })
+    await flush()
+    chat.ask(LAYER)
+    await flush()
+    await sendMessage(root, 'why this order?')
+    // Another place with no thread yet: its draft leads back to the layer's.
+    chat.ask({ kind: 'file', path: 'src/app.ts' })
+    await flush()
+    const back = el(root, '#chat-log [data-draft-open]')
+    expect(back.textContent).toBe('back to “layer · Run path”')
+    el(root, '#thread-switch').click()
+    const starting = el(root, '#thread-index [data-draft-open]')
+    expect(starting.textContent).toBe('Run pathstarting…')
+    back.click()
+    await flush()
+    expect(el(root, '#thread-title').textContent).toBe('Run path')
+    expect(el(root, '#chat-log').textContent).toContain('why this order?')
+  })
 
   it('counts an answer that ended in the open thread while the pane was minimized, until it opens', async () => {
     const { root, chat, stream } = heldAnswer()
