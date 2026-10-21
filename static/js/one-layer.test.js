@@ -158,17 +158,16 @@ describe('initOneLayer', () => {
     expect(shownIds()).toEqual(['overview'])
   })
 
-  it('follows a hash change to a hidden layer and scrolls to it, since the browser could not', () => {
+  it('follows a hash change to a layer in place, under a page that stays at the top', () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
     oneLayer = initOneLayer(root, { view: 'one' })
     const scrolled = vi.fn()
     section('layer-other').scrollIntoView = scrolled
     window.location.hash = '#layer-other'
     window.dispatchEvent(new Event('hashchange'))
     expect(shownIds()).toEqual(['layer-other'])
-    expect(scrolled).toHaveBeenCalledWith({ block: 'start' })
-    // A hash change to the section already showing does nothing more.
-    window.dispatchEvent(new Event('hashchange'))
-    expect(scrolled).toHaveBeenCalledTimes(1)
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 })
+    expect(scrolled).not.toHaveBeenCalled()
     window.location.hash = ''
     window.dispatchEvent(new Event('hashchange'))
     expect(shownIds()).toEqual(['overview'])
@@ -289,12 +288,18 @@ describe('the one-point view', () => {
     expect(window.location.hash).toBe('#step-p-2')
   })
 
-  it('leaves the browser’s own scroll to the layer view', () => {
+  it('swaps a layer in place in the layer view too, and leaves the all view to the browser', () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
     oneLayer = initOneLayer(root, { view: 'one' })
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
     root.querySelector('a[href="#layer-auth"]')?.dispatchEvent(event)
-    expect(event.defaultPrevented).toBe(false)
+    expect(event.defaultPrevented).toBe(true)
     expect(shownIds()).toEqual(['layer-auth'])
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0 })
+    oneLayer.setView('all')
+    const inAll = new MouseEvent('click', { bubbles: true, cancelable: true })
+    root.querySelector('a[href="#layer-storage"]')?.dispatchEvent(inAll)
+    expect(inAll.defaultPrevented).toBe(false)
   })
 
   it('opens on the point the URL names', () => {

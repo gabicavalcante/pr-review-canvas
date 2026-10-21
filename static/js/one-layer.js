@@ -161,14 +161,15 @@ export function initOneLayer(root, opts) {
   })
 
   /**
-   * In the one-point view a stop takes the place of the one before, under a page that stays where
-   * it is: the header and the rail do not scroll away. True when it moved to the section `fragment`
-   * names, which the URL then records.
+   * While one section shows at a time, a link to a whole section puts it in place of the one before,
+   * under a page that stays at the top: the header and the rail do not scroll away, whatever the
+   * section's height or where the reader was. True when it moved to the section `fragment` names,
+   * which the URL then records.
    * @param {string} fragment
    */
   const swapInPlace = fragment => {
     const target = elementForHash(root, fragment)
-    if (view !== 'points' || target === null || !isPageSection(target)) {
+    if (view === 'all' || target === null || !isPageSection(target)) {
       return false
     }
     revealFragment(fragment)
