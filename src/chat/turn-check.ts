@@ -27,6 +27,8 @@ export interface CheckoutSnapshot {
   refs: Record<string, string>
   /** Tracked files with a change not committed, as `git status` names them. */
   pending: string[]
+  /** Whether every pending change is staged, with nothing more in the working tree. */
+  pendingStaged: boolean
   /** The operation left in progress, as OPERATIONS names it, or null. */
   operation: (typeof OPERATIONS)[number] | null
 }
@@ -39,16 +41,19 @@ async function exists(file: string): Promise<boolean> {
 }
 
 /**
- * The path one line of `git status --porcelain=v2` names, the new one for a rename. The fields
- * before it are as many as the line's kind has: `1` a change, `2` a rename with its score, `u` a
- * conflict. Version 2 writes `.` for no change, so the line keeps its fields when git's output is
- * trimmed, where version 1's leading space was lost along with the path's first letter.
+ * One line of `git status --porcelain=v2`: the file's path, its new one for a rename, and whether
+ * its change is all in the index. The fields before the path are as many as the line's kind has:
+ * `1` a change, `2` a rename with its score, `u` a conflict. Version 2 writes `.` for no change, so
+ * the line keeps its fields when git's output is trimmed, where version 1's leading space was lost.
  */
-function statusPath(line: string): string {
+function statusEntry(line: string): { path: string; staged: boolean } {
   const fields = line.split(' ')
   const kind = fields[0]
   const rest = fields.slice(kind === '2' ? 9 : kind === 'u' ? 10 : 8).join(' ')
-  return kind === '2' ? (rest.split('\t')[0] ?? rest) : rest
+  return {
+    path: kind === '2' ? (rest.split('\t')[0] ?? rest) : rest,
+    staged: kind !== 'u' && fields[1]?.[1] === '.',
+  }
 }
 
 export async function snapshotCheckout(git: CheckoutGitExec): Promise<CheckoutSnapshot> {
@@ -65,10 +70,12 @@ export async function snapshotCheckout(git: CheckoutGitExec): Promise<CheckoutSn
       .filter(line => line !== '')
       .map(line => line.split(' ') as [string, string])
   )
-  const pending = status
+  const entries = status
     .split('\n')
     .filter(line => line !== '')
-    .map(statusPath)
+    .map(statusEntry)
+  const pending = entries.map(entry => entry.path)
+  const pendingStaged = entries.every(entry => entry.staged)
   let operation: CheckoutSnapshot['operation'] = null
   for (const candidate of OPERATIONS) {
     if (await exists(path.join(gitDir, candidate.file))) {
@@ -76,7 +83,7 @@ export async function snapshotCheckout(git: CheckoutGitExec): Promise<CheckoutSn
       break
     }
   }
-  return { head, branchRef: branchRef === '' ? null : branchRef, refs, pending, operation }
+  return { head, branchRef: branchRef === '' ? null : branchRef, refs, pending, pendingStaged, operation }
 }
 
 function shortRef(ref: string): string {
@@ -157,10 +164,20 @@ export async function checkTurn(
   }
 
   if (after.pending.length > 0) {
-    findings.push({
-      message: `tracked files changed outside a commit: ${after.pending.join(', ')}`,
-      fix: `if these changes are not yours: git restore --staged --worktree --source=HEAD -- ${after.pending.join(' ')}`,
-    })
+    const restore = `git restore --staged --worktree --source=HEAD -- ${after.pending.join(' ')}`
+    // Staged and nothing else is what a commit leaves when the turn's end stops it while its hooks
+    // run; a refused `git reset --hard` leaves the same, so the fix asks for a look first.
+    findings.push(
+      after.pendingStaged
+        ? {
+            message: `tracked files staged but not committed: ${after.pending.join(', ')}. A commit stopped while its hooks ran leaves this, as does a refused reset`,
+            fix: `check them with git diff --cached, then git commit; if these changes are not yours: ${restore}`,
+          }
+        : {
+            message: `tracked files changed outside a commit: ${after.pending.join(', ')}`,
+            fix: `if these changes are not yours: ${restore}`,
+          }
+    )
   }
 
   return { commits, findings }

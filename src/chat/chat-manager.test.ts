@@ -1078,6 +1078,7 @@ describe('a turn that may change code', () => {
       branchRef: 'refs/heads/feat',
       refs: {},
       pending: [],
+      pendingStaged: true,
       operation: null,
     }
     const REPORT = {

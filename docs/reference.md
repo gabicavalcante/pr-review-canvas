@@ -1277,7 +1277,9 @@ moves it to the background from two minutes to ten (`BASH_DEFAULT_TIMEOUT_MS` an
 
 After each such turn the answer lists the commits it made and anything else it left in your
 checkout, each with the command that puts it back: HEAD off the branch, the branch moved back, a ref
-added or removed, an operation left in progress, or a tracked file changed outside a commit. Nothing
+added or removed, an operation left in progress, or a tracked file changed outside a commit. Files
+staged and not committed are named as such: a commit stopped while its hooks ran leaves them, and so
+does a refused reset, so check them with `git diff --cached` before you commit them. Nothing
 is undone for you, since a changed file may be your own edit made in a terminal meanwhile.
 
 A commit moves the branch past the canvas, so the next turn may change code only once the canvas is
