@@ -9,6 +9,8 @@
   severe, each with only the chunk of code that holds it; the rest of the diff follows by layer. The
   rail lists the points under their layers. A stop takes the place of the one before under a page
   that stays at the top.
+- A switch at the head of the rail moves between **Attention points** and **Layers**, keeping your
+  place, and the rail lists what the view shows.
 - **Show layers: one at a time** is gone, replaced by this view; a `settings.yml` that names `one`
   opens it. Switching layers in it no longer scrolls the page.
 

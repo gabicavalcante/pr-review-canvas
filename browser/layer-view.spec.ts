@@ -49,12 +49,21 @@ test('reads the canvas one attention point at a time once the setting is saved, 
   await expect(layer).toBeVisible()
   await expect(page.locator('#step-p-3')).toBeHidden()
 
-  // Back to all at once: every section returns, and the stops are gone.
-  await page.locator('#settings').click()
-  await page.locator('#set-layer-view').selectOption('all')
-  await page.locator('[data-act="settings-save"]').click()
+  // The rail's switch goes back to the layers: every section returns, the stops are gone, and the
+  // rail lists the layers in place of the points.
+  await expect(page.locator('nav.rail a[href="#layer-run-path"]')).toHaveCount(0)
+  await page.locator('nav.rail .rail-view [data-view="all"]').click()
   await expect(overview).toBeVisible()
   await expect(layer).toBeVisible()
   await expect(page.locator('#layer-other')).toBeVisible()
   await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(page.locator('nav.rail a[href="#layer-run-path"]')).toBeVisible()
+  await expect(page.locator('nav.rail .rail-points')).toHaveCount(0)
+
+  // It is saved as the setting is, so a reload keeps the layers; the switch leads back to the points.
+  await page.reload()
+  await expect(page.locator('nav.rail .rail-view [data-view="all"]')).toHaveAttribute('aria-pressed', 'true')
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await expect(opening).toBeVisible()
+  await expect(overview).toBeHidden()
 })

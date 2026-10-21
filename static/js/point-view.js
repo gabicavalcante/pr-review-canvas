@@ -123,6 +123,34 @@ export function overviewWayOnHtml(artifact) {
 }
 
 /**
+ * Where the switch between the views lands, for the place the reader is at: the layer a layer's
+ * section, its opening stop, or one of its points' stops names, shown in the other view. Into the
+ * one-point view that is the layer's opening stop, or '' for the view's first stop when the layer
+ * has none or the place is no layer's; into the layers, the layer's section, or the place as it is.
+ * @param {ReviewArtifact} artifact
+ * @param {'all' | 'points'} view the view switched to
+ * @param {string} hash the place, as `#id`
+ */
+export function viewSwitchTarget(artifact, view, hash) {
+  const point = artifact.points.find(p => hash === `#${stepAnchorId(p.id)}`)
+  const layer = artifact.layers.find(
+    candidate =>
+      candidate.id === point?.layerId ||
+      hash === `#${layerAnchorId(candidate.key)}` ||
+      hash === `#${layerStepAnchorId(candidate.key)}`
+  )
+  if (view === 'all') {
+    return layer === undefined ? hash : `#${layerAnchorId(layer.key)}`
+  }
+  if (hash === '#overview') {
+    return hash
+  }
+  const opening = layer === undefined ? undefined : layerStepAnchorId(layer.key)
+  const stops = stopsOf(artifact, pointSteps(artifact, artifact.points))
+  return stops.some(stop => stop.id === opening) ? `#${opening}` : ''
+}
+
+/**
  * A layer's opening stop, without its way on: the layer's heading with its reviewed mark and ask
  * command, its description, and its tests, shown at once.
  * @param {Extract<Stop, { kind: 'layer' }>} stop

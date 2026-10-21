@@ -151,6 +151,17 @@ function railPointsLayerHtml(layer) {
 }
 
 /**
+ * The switch at the head of the rail between the two views, for a canvas with points: the one-point
+ * view's attention points, or the layers. The view shown is pressed.
+ * @param {boolean} points
+ */
+function railViewSwitchHtml(points) {
+  const option = (/** @type {string} */ view, /** @type {string} */ label, /** @type {boolean} */ on) =>
+    `<button type="button" data-act="layer-view" data-view="${view}" aria-pressed="${on}">${label}</button>`
+  return `<div class="rail-view" role="group" aria-label="Read by">${option('points', 'Attention points', points)}${option('all', 'Layers', !points)}</div>`
+}
+
+/**
  * The rail's group of attention points in the one-point view: every point in the view's order,
  * under the layer each belongs to. It is drawn from the state, so a point acted on dims at once.
  * @param {ReviewArtifact} artifact
@@ -159,9 +170,6 @@ function railPointsLayerHtml(layer) {
  */
 function railPointsHtml(artifact, state, current) {
   const steps = pointSteps(artifact, artifact.points)
-  if (steps.length === 0) {
-    return ''
-  }
   let shownLayer = /** @type {string | null | undefined} */ (undefined)
   const items = steps
     .map(({ point, layer }) => {
@@ -172,12 +180,13 @@ function railPointsHtml(artifact, state, current) {
       return `${heading}<li${handled}><a href="#${esc(id)}"${current(id)}>${levelIconHtml(point.level, null)}<span class="t">${esc(point.title)}</span></a></li>`
     })
     .join('')
-  return `<li class="grp"><span class="lbl grp-lbl">Attention points</span><ul class="rail-points">${items}</ul></li>`
+  return `<li class="grp">${railViewSwitchHtml(true)}<ul class="rail-points">${items}</ul></li>`
 }
 
 /**
- * With a render context, each layer shows the lines it adds and removes. `points` adds the group
- * of open attention points the one-point view walks.
+ * With a render context, each layer shows the lines it adds and removes. `points` draws, in place
+ * of the layers, the attention points the one-point view walks. A canvas with points heads the
+ * rail's group with the switch between the two.
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
  * @param {{ activeId?: string, points?: boolean }} [opts]
@@ -211,12 +220,13 @@ export function railInnerHtml(artifact, state, opts = {}) {
   const otherItem = other
     ? `<li class="other"><a href="#${esc(layerAnchorId(other.key))}"${current(layerAnchorId(other.key))}><span class="t">${esc(other.title)}</span><span class="m">${fileCount(other.files.length)}, ignored</span></a></li>`
     : ''
-  return (
-    '<ul class="tree">' +
-    `<li><a href="#overview"${current('overview')}><span class="t">Overview</span></a></li>` +
-    (opts.points === true ? railPointsHtml(artifact, state, current) : '') +
-    `<li class="grp"><span class="lbl grp-lbl">Layers</span><ul class="layers">${items}</ul></li>${otherItem}</ul>`
-  )
+  const overview = `<li><a href="#overview"${current('overview')}><span class="t">Overview</span></a></li>`
+  const hasPoints = artifact.points.length > 0
+  if (opts.points === true && hasPoints) {
+    return `<ul class="tree">${overview}${railPointsHtml(artifact, state, current)}</ul>`
+  }
+  const heading = hasPoints ? railViewSwitchHtml(false) : '<span class="lbl grp-lbl">Layers</span>'
+  return `<ul class="tree">${overview}<li class="grp">${heading}<ul class="layers">${items}</ul></li>${otherItem}</ul>`
 }
 
 /**

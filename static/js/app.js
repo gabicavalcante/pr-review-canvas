@@ -12,6 +12,7 @@ import {
   importCanvas,
   pollBundle,
   pollSettled,
+  saveSettings,
   setApiBase,
 } from './api.js'
 import { setChatEnabled } from './ask.js'
@@ -50,7 +51,7 @@ import { initOneLayer } from './one-layer.js'
 import { wireQuickQuestions } from './quick-questions.js'
 import { createGeneration } from './generate.js'
 import { isRunning } from './generation-phases.js'
-import { overviewWayOnHtml, renderPointSteps } from './point-view.js'
+import { overviewWayOnHtml, renderPointSteps, viewSwitchTarget } from './point-view.js'
 import { changesMoveCanvas, screenMoved, shouldAutoUpdate, watchReturns } from './local-return.js'
 import { canvasChanged, openRegenerateDialog } from './regenerate.js'
 import { createReviewSession } from './review-session.js'
@@ -420,6 +421,7 @@ export class PrAppElement extends HTMLElement {
         uncover: () => (this.chat ?? this.reviewPane)?.uncover(),
         openSettings: el =>
           void openSettingsDialog(this, el, { onSaved: data => void this.settingsSaved(data) }),
+        setLayerView: view => void this.switchLayerView(view),
       })
       this.interactions = interactions
       if (chatEnabled) {
@@ -591,6 +593,32 @@ export class PrAppElement extends HTMLElement {
         importImpl: importCanvas,
         onImported: () => void this.reload(),
       })
+    }
+  }
+
+  /**
+   * The rail's switch between the views: saved as the settings dialog saves it, then applied.
+   * @param {string} view
+   */
+  async switchLayerView(view) {
+    if (view !== 'all' && view !== 'points') {
+      return
+    }
+    try {
+      const data = await saveSettings({ layerView: view })
+      // The other view opens where the reader was, as far as it has that place.
+      const artifact = this.shown?.artifact
+      if (artifact !== undefined) {
+        const target = viewSwitchTarget(artifact, view, window.location.hash)
+        const url = `${window.location.pathname}${window.location.search}${target}`
+        window.history.replaceState(null, '', url)
+      }
+      await this.settingsSaved(data)
+      if (view === 'all' && window.location.hash !== '') {
+        document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
+      }
+    } catch (err) {
+      toast(this, `could not switch the view: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
