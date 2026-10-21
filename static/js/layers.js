@@ -132,6 +132,24 @@ export function dotColor(index) {
 }
 
 /**
+ * A layer's heading over its points in the rail's points group: a link to the layer, with the dot
+ * and number the layer has in the Layers group, so the two read as the same layer.
+ * @param {ReadonlyArray<Layer>} semantic the layers of the change, in order
+ * @param {Layer | null} layer
+ */
+function railPointsLayerHtml(semantic, layer) {
+  if (layer === null) {
+    return '<li class="pt-layer"><span class="t">No layer</span></li>'
+  }
+  const index = semantic.indexOf(layer)
+  const marks =
+    index === -1
+      ? ''
+      : `<span class="dot" style="--dc:${dotColor(index)}" aria-hidden="true"></span><span class="n">${index + 1}</span>`
+  return `<li class="pt-layer"><a href="#${esc(layerAnchorId(layer.key))}">${marks}<span class="t">${esc(layer.title)}</span></a></li>`
+}
+
+/**
  * The rail's group of attention points in the one-point view: every point in the view's order,
  * under the layer each belongs to. It is drawn from the state, so a point acted on dims at once.
  * @param {ReviewArtifact} artifact
@@ -139,6 +157,7 @@ export function dotColor(index) {
  * @param {(id: string) => string} current
  */
 function railPointsHtml(artifact, state, current) {
+  const semantic = artifact.layers.filter(l => l.kind !== 'other')
   const steps = pointSteps(artifact, artifact.points)
   if (steps.length === 0) {
     return ''
@@ -146,10 +165,7 @@ function railPointsHtml(artifact, state, current) {
   let shownLayer = /** @type {string | null | undefined} */ (undefined)
   const items = steps
     .map(({ point, layer }) => {
-      const heading =
-        (layer?.id ?? null) === shownLayer
-          ? ''
-          : `<li class="pt-layer"><span class="m">${esc(layer?.title ?? 'No layer')}</span></li>`
+      const heading = (layer?.id ?? null) === shownLayer ? '' : railPointsLayerHtml(semantic, layer)
       shownLayer = layer?.id ?? null
       const id = stepAnchorId(point.id)
       const handled = pointStatus(point, state) === 'open' ? '' : ' class="is-handled"'

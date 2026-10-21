@@ -141,10 +141,11 @@
   padding-left: 24px;
 }
 /* The one-point view's points, under the layer each belongs to, with their level's icon. */
-.tree .rail-points a {
+.tree .rail-points li:not(.pt-layer) a {
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas: 'd t';
-  padding-left: 24px;
+  padding-left: 40px;
+  font-size: 12.5px;
 }
 .tree .rail-points .lv {
   grid-area: d;
@@ -156,8 +157,16 @@
 .tree .rail-points .is-handled .lv {
   opacity: 0.5;
 }
+.tree .rail-points li:not(.pt-layer) .t {
+  font-weight: 400;
+}
 .tree .pt-layer {
-  padding: 8px 14px 0 24px;
+  margin-top: 6px;
+}
+.tree .pt-layer > .t {
+  display: block;
+  padding: 6px 14px 2px 24px;
+  font-size: 12px;
 }
 .tree .other a {
   color: var(--fg-muted);
