@@ -6,6 +6,7 @@ import { emptyState } from '../../src/contract/state.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { stepAnchorId } from './keys.js'
 import { POINT_STEPS_ID, renderPointSteps } from './point-view.js'
+import { pointCollapses } from './points.js'
 
 const artifact = syntheticArtifact()
 const files = SYNTHETIC_FILES.map(toFileEntry)
@@ -42,6 +43,20 @@ describe('renderPointSteps', () => {
     const card = document.querySelector('#step-p-1 li.finding')
     expect(card?.id).toBe('step-p-1-card')
     expect(card?.getAttribute('data-fingerprint')).toBe('fp-1')
+  })
+
+  it('draws the point’s card whole, whatever the list density', () => {
+    document.documentElement.removeAttribute('data-points')
+    draw(renderPointSteps(artifact, files, state))
+    const card = document.querySelector('#step-p-1-card')
+    if (!(card instanceof HTMLElement)) throw new Error('no card')
+    expect(card.parentElement?.classList.contains('step-card')).toBe(true)
+    expect(pointCollapses(card)).toBe(false)
+  })
+
+  it('names its point on the file card, so only that point marks the lines', () => {
+    draw(renderPointSteps(artifact, files, state))
+    expect(document.querySelector('#step-p-1-file')?.getAttribute('data-only-point')).toBe('fp-1')
   })
 
   it('draws the point’s file open, with only the chunk that holds its lines', () => {

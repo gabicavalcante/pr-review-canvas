@@ -581,7 +581,8 @@ export function refreshPoint(el, p, ctx) {
 export function pointCollapses(el) {
   return (
     el.classList.contains('is-handled') ||
-    (el.matches('.findings > li') && readPageDensity(el.ownerDocument.documentElement) === 'compact')
+    (el.matches('.findings:not(.step-card) > li') &&
+      readPageDensity(el.ownerDocument.documentElement) === 'compact')
   )
 }
 

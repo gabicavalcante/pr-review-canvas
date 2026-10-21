@@ -510,12 +510,13 @@ export function wireCardReveal(root) {
 
 /**
  * `id` names a card drawn outside its layer, such as in the one-point view, which leaves the file's
- * anchors to the layers; `open` draws its body at once rather than under its title.
+ * anchors to the layers; `open` draws its body at once rather than under its title; `onlyPoint`
+ * puts that one attention point on the card's lines, and no other.
  * @param {LayerFile} lf
  * @param {FileEntry | undefined} entry
  * @param {Layer} layer
  * @param {{ hunkIndex: Map<string, { layer: Layer, index: number }>, paths: ReadonlySet<string>, firstCardFor: Set<string>, state?: PrState }} ctx
- * @param {{ id?: string, open?: boolean }} [opts]
+ * @param {{ id?: string, open?: boolean, onlyPoint?: string }} [opts]
  * @returns {string}
  */
 export function renderFileCard(lf, entry, layer, ctx, opts = {}) {
@@ -542,7 +543,7 @@ export function renderFileCard(lf, entry, layer, ctx, opts = {}) {
     : ''
   const elsewhere = elsewhereHtml(lf, entry, layer, ctx.hunkIndex)
   return (
-    `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}" aria-labelledby="${esc(id)}-h">` +
+    `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}"${opts.onlyPoint === undefined ? '' : ` data-only-point="${esc(opts.onlyPoint)}"`} aria-labelledby="${esc(id)}-h">` +
     `<div class="file-h">${chevronHtml('Collapse file', false, { act: 'toggle-card' })}<h3 id="${esc(id)}-h" class="path" data-act="toggle-card">${path}${testTag}</h3>${status}${pills}` +
     `<label class="chk"><input type="checkbox" data-reviewed-id="${esc(cardReviewedId)}"${cardReviewed ? ' checked' : ''}> reviewed</label>` +
     `<span class="tbtns">${askButtonHtml({ kind: 'file', path: lf.path }, { title: 'Ask AI Chat about this file' })}</span></div>` +
@@ -750,10 +751,14 @@ function layerFileOf(ctx, layerId, path) {
  * @param {{ key: string, layerId: string, entry: FileEntry, hunkIds: ReadonlySet<string> }} at
  */
 function decorateCard(card, ctx, at) {
+  const only = card.getAttribute('data-only-point')
   return applyDecorations(card, at.key, {
     annotations: layerFileOf(ctx, at.layerId, at.entry.path)?.annotations ?? [],
     points: ctx.artifact.points.filter(
-      p => p.path === at.entry.path && at.hunkIds.has(hunkIdForPoint(p, at.entry))
+      p =>
+        (only === null || p.fingerprint === only) &&
+        p.path === at.entry.path &&
+        at.hunkIds.has(hunkIdForPoint(p, at.entry))
     ),
     threads: threadsForHunks(ctx.comments, at.entry, at.hunkIds),
     pending: draftsForCard(ctx, at.entry, at.hunkIds),

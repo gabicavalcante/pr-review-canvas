@@ -360,19 +360,23 @@
    open point shows its title line until the reader opens it; a point acted on keeps the rules
    above, with its one-line summary. A detailed list shows open points whole, with no toggle. */
 :root:not([data-points='detailed'])
-  .findings
+  .findings:not(.step-card)
   > li[data-point]:not(.is-handled, [data-expanded])
   :is(.prose, .tbtns, .settle-box) {
   display: none;
 }
-:root:not([data-points='detailed']) .findings > li:not(.is-handled, [data-expanded]) {
+:root:not([data-points='detailed']) .findings:not(.step-card) > li:not(.is-handled, [data-expanded]) {
   padding-top: 8px;
   padding-bottom: 8px;
 }
-:root:not([data-points='detailed']) .findings > li:not(.is-handled, [data-expanded]) .f-title {
+:root:not([data-points='detailed'])
+  .findings:not(.step-card)
+  > li:not(.is-handled, [data-expanded])
+  .f-title {
   margin-bottom: 0;
 }
 :root[data-points='detailed'] .findings > li:not(.is-handled) .p-toggle,
+.step-card > li:not(.is-handled) .p-toggle,
 :root:not([data-points='detailed']) .points-density .when-detailed,
 :root[data-points='detailed'] .points-density .when-compact {
   display: none;
@@ -668,4 +672,21 @@ img.av {
   padding: 10px 16px;
   border-top: 1px solid var(--line);
   font-size: 13px;
+}
+/* The card above says it all, whatever the list density; the point's line carries only a mark. */
+.point-step tr.ifind .x > :not(.f-title),
+.point-step tr.ifind .f-title > :not(.lvl) {
+  display: none;
+}
+.point-step tr.ifind .x {
+  padding: 3px 14px;
+}
+.point-step tr.ifind .f-title {
+  margin: 0;
+  font-size: 12px;
+}
+.point-step tr.ifind .lvl::after {
+  content: ' · the point above';
+  color: var(--fg-muted);
+  font-weight: 400;
 }

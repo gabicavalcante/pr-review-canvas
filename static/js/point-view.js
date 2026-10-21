@@ -1,6 +1,7 @@
 // @ts-check
 // The one-point-at-a-time view's stops: each open attention point with its code. A stop is the
-// point's card, then the file it is on, drawn with the one chunk that holds its lines, then the
+// point's card, whole, then the file it is on, drawn with the one chunk that holds its lines and a
+// mark on them where the point is, then the
 // way to the previous and the next stop. The last stop leads to the layers, for the rest of the
 // diff. Only that view draws them, and `one-layer.js` shows them one at a time.
 /** @typedef {import('./contract-types.js').FileEntry} FileEntry */
@@ -88,7 +89,7 @@ export function renderPointSteps(artifact, files, state, comments = []) {
             entry,
             layer,
             ctx,
-            { id: `${id}-file`, open: true }
+            { id: `${id}-file`, open: true, onlyPoint: point.fingerprint }
           )
     const where =
       layer === null
@@ -97,7 +98,7 @@ export function renderPointSteps(artifact, files, state, comments = []) {
     return (
       `<section class="point-step" id="${esc(id)}" aria-label="Attention point ${index + 1} of ${steps.length}">` +
       `<p class="step-h"><span class="step-n">Point ${index + 1} of ${steps.length}</span>${where}</p>` +
-      `<ol class="findings">${pointCardHtml(point, ctx, { id: `${id}-card` })}</ol>` +
+      `<ol class="findings step-card">${pointCardHtml(point, ctx, { id: `${id}-card` })}</ol>` +
       `<div class="files">${code}</div>${stepNavHtml(steps, index, artifact)}</section>`
     )
   })
