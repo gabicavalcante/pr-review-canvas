@@ -73,29 +73,28 @@
 .grp-lbl {
   padding: 14px 14px 6px;
 }
-/* The switch between the one-point view and the layers, at the head of the rail's group. */
+/* The switch between the one-point view and the layers, at the head of the rail's group: two
+   labels, the one shown underlined. */
 .rail-view {
   display: flex;
-  margin: 14px 14px 6px;
-  border: 1px solid var(--line);
+  gap: 14px;
+  padding: 14px 14px 6px;
 }
 .rail-view button {
-  flex: 1;
-  padding: 4px 8px;
+  padding: 0 0 2px;
   border: 0;
+  border-bottom: 2px solid transparent;
   background: none;
   color: var(--fg-muted);
   font: inherit;
   font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
-.rail-view button + button {
-  border-left: 1px solid var(--line);
-}
 .rail-view button[aria-pressed='true'] {
-  background: var(--accent-bg);
-  color: var(--accent);
+  border-bottom-color: var(--accent);
+  color: var(--fg);
   cursor: default;
 }
 .rail-view button[aria-pressed='false']:hover {
