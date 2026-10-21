@@ -1270,6 +1270,11 @@ of its own per thread, with every tool approved. What holds it in:
   repository. From your clone, a push to a `file://` URL is rewritten too, and the guard's
   `pre-push` refuses a push to a remote given as a path.
 
+A command still running when the turn ends is stopped, so a commit whose hooks run your tests must
+finish within it. For Claude, these turns raise the time a shell command runs before Claude Code
+moves it to the background from two minutes to ten (`BASH_DEFAULT_TIMEOUT_MS` and
+`BASH_MAX_TIMEOUT_MS`, or longer ones you set); the agent is also told to wait for such commands.
+
 After each such turn the answer lists the commits it made and anything else it left in your
 checkout, each with the command that puts it back: HEAD off the branch, the branch moved back, a ref
 added or removed, an operation left in progress, or a tracked file changed outside a commit. Nothing
