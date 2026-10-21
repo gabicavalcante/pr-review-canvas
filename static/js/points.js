@@ -373,11 +373,9 @@ function pointPartsHtml(p, ctx, opts) {
   const status = pointStatus(p, ctx.state)
   const parts =
     status === 'open' ? { pill: '', summary: '', outcome: '' } : statusPartsHtml(p, status, ctx, opts)
-  // A card in a layer's list can collapse while open too, so every card carries the toggle.
-  const toggle =
-    status === 'open' && !opts.card
-      ? ''
-      : `<button class="cmd p-toggle" type="button" data-act="point-expand" aria-expanded="false" aria-label="Show the point: ${esc(p.title)}">show</button>`
+  // A card in a layer's list can collapse while open too, and so can a row in a stop of the
+  // one-point view, so every point carries the toggle; the styles hide it where nothing collapses.
+  const toggle = `<button class="cmd p-toggle" type="button" data-act="point-expand" aria-expanded="false" aria-label="Show the point: ${esc(p.title)}">show</button>`
   const loc = opts.card ? `<a class="loc" href="${esc(pointLink(p))}">${esc(pointLocation(p))}</a>` : ''
   return {
     attrs:
@@ -574,13 +572,15 @@ export function refreshPoint(el, p, ctx) {
 }
 
 /**
- * Whether a point is drawn as its title line until the reader opens it: a point acted on, or any
- * point in a layer's list while the lists are compact. An open point in the diff is always whole.
+ * Whether a point is drawn as its title line until the reader opens it: a point acted on, any
+ * point in a layer's list while the lists are compact, or a point's line in a stop of the one-point
+ * view, whose card above shows it whole. Any other open point in the diff is always whole.
  * @param {Element} el the card or row that carries `data-point`
  */
 export function pointCollapses(el) {
   return (
     el.classList.contains('is-handled') ||
+    el.matches('.point-step tr[data-point]') ||
     (el.matches('.findings:not(.step-card) > li') &&
       readPageDensity(el.ownerDocument.documentElement) === 'compact')
   )

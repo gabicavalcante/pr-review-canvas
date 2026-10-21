@@ -673,20 +673,16 @@ img.av {
   border-top: 1px solid var(--line);
   font-size: 13px;
 }
-/* The card above says it all, whatever the list density; the point's line carries only a mark. */
-.point-step tr.ifind .x > :not(.f-title),
-.point-step tr.ifind .f-title > :not(.lvl) {
+/* The card above shows the point whole, whatever the list density. Its line in the diff carries
+   the point's title, and opens to the whole point and its commands for a reader who scrolled
+   down to it. */
+.point-step tr.ifind:not([data-expanded]) :is(.prose, .p-outcome, .tbtns, .settle-box, .p-summary) {
   display: none;
 }
-.point-step tr.ifind .x {
-  padding: 3px 14px;
+.point-step tr.ifind:not([data-expanded]) .x {
+  padding: 4px 14px;
 }
-.point-step tr.ifind .f-title {
+.point-step tr.ifind:not([data-expanded]) .f-title {
   margin: 0;
-  font-size: 12px;
-}
-.point-step tr.ifind .lvl::after {
-  content: ' · the point above';
-  color: var(--fg-muted);
-  font-weight: 400;
+  font-size: 13px;
 }

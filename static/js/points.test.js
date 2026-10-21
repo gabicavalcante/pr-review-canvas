@@ -19,6 +19,7 @@ import {
   readPageDensity,
   readPointsDensity,
   setMentionCanvas,
+  pointCollapses,
   setPointExpanded,
   setPointsDensity,
   postedUrls,
@@ -249,9 +250,19 @@ describe('where a point stands', () => {
     document.body.innerHTML = `<ol>${pointCardHtml(first, ctx)}</ol>`
     expect(document.querySelector('.is-handled, .p-summary')).toBeNull()
     expect(document.querySelector('.p-toggle')).not.toBeNull()
-    // Its row in the diff is drawn whole and has nothing to expand.
+    // Its row in the diff is drawn whole: nothing acted on, nothing to sum up, and nothing that
+    // collapses. It carries the toggle, which only a stop of the one-point view shows.
     document.body.innerHTML = `<table><tbody>${pointRowHtml(first, ctx)}</tbody></table>`
-    expect(document.querySelector('.is-handled, [data-act="point-expand"], .p-summary')).toBeNull()
+    expect(document.querySelector('.is-handled, .p-summary')).toBeNull()
+    const row = document.querySelector('tr[data-point]')
+    if (row === null) throw new Error('no row')
+    expect(pointCollapses(row)).toBe(false)
+    document.body.innerHTML = `<section class="point-step"><table><tbody>${pointRowHtml(first, ctx)}</tbody></table></section>`
+    const inStop = document.querySelector('tr[data-point]')
+    if (inStop === null) throw new Error('no row')
+    expect(pointCollapses(inStop)).toBe(true)
+    setPointExpanded(inStop)
+    expect(inStop.querySelector('.p-toggle')?.textContent).toBe('hide')
   })
 
   it('expands and collapses a point acted on, and an open one only in a compact list', () => {
