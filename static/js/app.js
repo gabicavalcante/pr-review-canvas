@@ -492,8 +492,8 @@ export class PrAppElement extends HTMLElement {
     }
     // Mermaid is fetched only when this screen holds a diagram, and again on a theme flip.
     this.diagrams = initDiagrams(this)
-    // One layer at a time hides the rest before the URL is followed, so a link into a layer lands
-    // on a layer that is showing.
+    // The one-point view hides every section but one before the URL is followed, so a link into a
+    // layer lands on a layer that is showing.
     this.layerView?.redraw()
     // The cards are in the page now, so a link in the URL has something to land on.
     this.deepLinks = initDeepLinks(this)
