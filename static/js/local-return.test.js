@@ -5,7 +5,7 @@ import { emptyState } from '../../src/contract/state.js'
 import { UNKNOWN_CAPABILITIES } from '../../src/host/capabilities.js'
 import { syntheticArtifact } from '../../src/testing/synthetic.js'
 import { PrAppElement } from './app.js'
-import { screenMoved, shouldAutoUpdate, watchReturns } from './local-return.js'
+import { changesMoveCanvas, screenMoved, shouldAutoUpdate, watchReturns } from './local-return.js'
 
 /** @typedef {import('./contract-types.js').PrBundle} PrBundle */
 /** @typedef {import('./contract-types.js').GenerationJob} GenerationJob */
@@ -334,5 +334,21 @@ describe('the end of an update the page started', () => {
 
     await el.generationEnded(job({ phase: 'done', sharing: { status: 'local' } }))
     expect(el.querySelector('.toast')?.textContent).toBe('canvas published')
+  })
+})
+
+describe('changesMoveCanvas', () => {
+  const finding = { message: 'tracked files changed outside a commit: a.ts', fix: 'git restore …' }
+
+  it('moves the canvas on after a turn that committed and left nothing else', () => {
+    expect(changesMoveCanvas({ commits: ['c1'], findings: [] })).toBe(true)
+  })
+
+  it('waits for the reader when the turn left something besides its commits', () => {
+    expect(changesMoveCanvas({ commits: ['c1'], findings: [finding] })).toBe(false)
+  })
+
+  it('has nothing to move on to when the turn committed nothing', () => {
+    expect(changesMoveCanvas({ commits: [], findings: [] })).toBe(false)
   })
 })

@@ -83,3 +83,12 @@ export function shouldAutoUpdate(bundle, page) {
     page.lastHead !== bundle.pr.headSha
   )
 }
+
+/**
+ * Whether a turn of AI Chat that changed code moves the canvas on by itself: it committed, and
+ * left nothing else behind. A finding waits for the reader, who may want the checkout back first.
+ * @param {import('./contract-types.js').ChangesReport} report
+ */
+export function changesMoveCanvas(report) {
+  return report.commits.length > 0 && report.findings.length === 0
+}

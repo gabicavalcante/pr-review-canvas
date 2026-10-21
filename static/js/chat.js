@@ -185,6 +185,7 @@ const PROPOSED_ACTS = { 'proposed-post': 'post', 'proposed-queue': 'queue', 'pro
  *   threadPerPlace?: boolean,
  *   onProposed?: (what: ProposedAct, comment: ProposedComment, el: HTMLElement) => void,
  *   onResolution?: (what: 'save' | 'edit', resolution: ProposedResolution, el: HTMLElement) => void,
+ *   onChanges?: (report: import('./contract-types.js').ChangesReport) => void,
  * }} ChatOptions
  */
 
@@ -1322,6 +1323,13 @@ export function wireChat(options) {
             }
             if (event.event === 'cancelled') {
               answer.turn.insertAdjacentHTML('beforeend', '<p class="muted small">stopped</p>')
+              return
+            }
+            // A turn that could change code says what it did; the page decides what follows.
+            const commits = field('commits')
+            const findings = field('findings')
+            if (event.event === 'changes' && Array.isArray(commits) && Array.isArray(findings)) {
+              options.onChanges?.({ commits, findings })
             }
           },
         }

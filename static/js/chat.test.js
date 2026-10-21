@@ -2015,6 +2015,29 @@ describe('a proposed resolution', () => {
     expect(document.querySelector('.proposed-invalid + p')?.textContent).toBe(why)
   })
 
+  it('hands the page what a turn that could change code did, and ignores a malformed report', async () => {
+    /** @type {import('./contract-types.js').ChangesReport[]} */
+    const seen = []
+    const report = { commits: ['c1'], findings: [] }
+    const { root } = mount(
+      {
+        streamChat: async (_pr, _input, opts) => {
+          opts.onEvent({ event: 'turn', data: { thread: 't1', agent: 'claude', seeded: true } })
+          opts.onEvent({ event: 'changes', data: { commits: 'c1' } })
+          opts.onEvent({ event: 'changes', data: report })
+          opts.onEvent({ event: 'done', data: { stopReason: 'end_turn' } })
+        },
+      },
+      { onChanges: changes => seen.push(changes) }
+    )
+    const box = el(root, '#msg')
+    if (!(box instanceof HTMLTextAreaElement)) throw new Error('no box')
+    box.value = 'fix it'
+    el(root, '#chat-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await flush()
+    expect(seen).toEqual([report])
+  })
+
   it('hands the page the resolution, and follows its point as the state changes', async () => {
     setSelfReview(true, {})
     /** @type {Array<[string, import('./proposed-comment.js').ProposedResolution]>} */

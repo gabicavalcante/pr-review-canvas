@@ -50,7 +50,7 @@ import { initOneLayer } from './one-layer.js'
 import { wireQuickQuestions } from './quick-questions.js'
 import { createGeneration } from './generate.js'
 import { isRunning } from './generation-phases.js'
-import { screenMoved, shouldAutoUpdate, watchReturns } from './local-return.js'
+import { changesMoveCanvas, screenMoved, shouldAutoUpdate, watchReturns } from './local-return.js'
 import { canvasChanged, openRegenerateDialog } from './regenerate.js'
 import { createReviewSession } from './review-session.js'
 import { initScrollSpy } from './scroll-spy.js'
@@ -421,6 +421,13 @@ export class PrAppElement extends HTMLElement {
           ...(bundle.chat.threadPerPlace === undefined ? {} : { threadPerPlace: bundle.chat.threadPerPlace }),
           onProposed: (what, comment, el) => interactions.onProposedComment(what, comment, el),
           onResolution: (what, resolution, el) => interactions.onProposedResolution(what, resolution, el),
+          // A commit moves the branch past the canvas, as one made in a terminal does; the page
+          // reads the work again as on the reader's return, which updates the canvas when it may.
+          onChanges: report => {
+            if (changesMoveCanvas(report)) {
+              void this.reread()
+            }
+          },
         })
         this.quickQuestions = wireQuickQuestions(this, {
           onPick: (context, question) => {

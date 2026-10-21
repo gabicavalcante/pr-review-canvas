@@ -23,6 +23,7 @@ export type {
 export type {
   ChangesCodeResponse,
   ChangesCodeStatus,
+  ChangesReport,
   ChatCheckoutEvent,
   ChatEvent,
   ChatHistoryResponse,
