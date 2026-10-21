@@ -23,8 +23,9 @@
 
 - `pr-review upgrade` checks the project's own prompt templates once pr-review moves: each token
   the new release added to a bundled template that a custom copy lacks is named, with the heading
-  to add it under. `pr-review doctor` has the same check as its `prompts` line, for any release up
-  to the running one.
+  to add it under, also when the upgrade is declined or cannot be asked without a terminal, and in
+  `--json` as `prompts`. `pr-review doctor` has the same check as its `prompts` line, for any
+  release up to the running one.
 
 ### Attention points
 

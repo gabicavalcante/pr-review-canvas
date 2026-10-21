@@ -346,8 +346,8 @@ If the install fails, the current version runs the remaining steps itself.
 Last, `upgrade` checks the project's own [prompt templates](#prompt-templates). For each token a
 release after the old version added to a bundled template, a custom copy that lacks it is named
 with the token and the heading the bundled template has it under, for you to add. Run at the
-latest version with nothing to upgrade, it names the tokens that version added. It never edits a
-template.
+latest version with nothing to upgrade, it names the tokens that version added; so does a run
+whose plan is declined or not applied. It never edits a template.
 
 - `--only` limits the run to the named kinds. Skipped kinds are listed in `notes`.
 - `upgrade` does not install a missing acpx or add a missing skill copy. It prints the command
@@ -358,8 +358,8 @@ template.
 
 Without a terminal, `upgrade` prints the plan and changes nothing. `--yes` applies it without
 asking. The plan and each step's outcome go to stderr. With `--json`, or when stdout is a pipe,
-stdout is one JSON line with `applied` and, after applying, `ok` and each step's `status` (`done`
-or `failed`, with a `detail`), and `prompts`, the tokens the project's templates lack. The exit
+stdout is one JSON line with `applied`, `prompts`, the tokens the project's templates lack, and,
+after applying, `ok` and each step's `status` (`done` or `failed`, with a `detail`). The exit
 code is `1` when a step fails; a missing token does not change it. When a skill copy changes,
 stderr says to commit and push it.
 
