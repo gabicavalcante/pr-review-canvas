@@ -101,6 +101,12 @@
 
 - A file's hunks share one width: scrolled sideways past the end of a short hunk under a long one,
   its added, removed, and hunk rows keep their colors. Before, they stopped at the card's width.
+- Diagrams draw smaller. A flowchart's decisions are hexagons tinted with the page's accent instead
+  of diamonds that grow with their question, its steps have rounded corners, and nodes sit closer.
+  A sequence diagram draws its participants once, on top. **copy** still gives the source as
+  written.
+- Every row of an `erDiagram` entity is readable in the dark theme; every other row was light, with
+  text in the dark theme's light color.
 
 ### Upgrade
 
