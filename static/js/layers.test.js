@@ -187,6 +187,38 @@ describe('rail', () => {
     expect(refreshRail(document, artifact, state)).toBe(true)
     expect(document.querySelector('.rail-points')).toBeNull()
   })
+
+  it('shows the points or the layers, under a switch between the two that presses the one shown', () => {
+    const pressed = () =>
+      [...document.querySelectorAll('.rail-view button')].map(button => [
+        button.textContent,
+        button.getAttribute('data-view'),
+        button.getAttribute('aria-pressed'),
+      ])
+    document.body.innerHTML = renderRail(artifact, state, { points: true })
+    expect(pressed()).toEqual([
+      ['Attention points', 'points', 'true'],
+      ['Layers', 'all', 'false'],
+    ])
+    expect(document.querySelector('.layers')).toBeNull()
+    expect(document.querySelector('li.other')).toBeNull()
+    document.body.innerHTML = renderRail(artifact, state)
+    expect(pressed()).toEqual([
+      ['Attention points', 'points', 'false'],
+      ['Layers', 'all', 'true'],
+    ])
+    expect(document.querySelector('.layers')).not.toBeNull()
+  })
+
+  it('names the layers with no switch, and in either view, for a canvas without points', () => {
+    const pointless = { ...artifact, points: [] }
+    for (const opts of [{}, { points: true }]) {
+      document.body.innerHTML = renderRail(pointless, state, opts)
+      expect(document.querySelector('.rail-view')).toBeNull()
+      expect(document.querySelector('.grp-lbl')?.textContent).toBe('Layers')
+      expect(document.querySelector('.layers')).not.toBeNull()
+    }
+  })
 })
 
 describe('layer sections', () => {

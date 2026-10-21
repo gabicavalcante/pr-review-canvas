@@ -73,6 +73,34 @@
 .grp-lbl {
   padding: 14px 14px 6px;
 }
+/* The switch between the one-point view and the layers, at the head of the rail's group. */
+.rail-view {
+  display: flex;
+  margin: 14px 14px 6px;
+  border: 1px solid var(--line);
+}
+.rail-view button {
+  flex: 1;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rail-view button + button {
+  border-left: 1px solid var(--line);
+}
+.rail-view button[aria-pressed='true'] {
+  background: var(--accent-bg);
+  color: var(--accent);
+  cursor: default;
+}
+.rail-view button[aria-pressed='false']:hover {
+  color: var(--fg);
+}
 .tree a {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr);

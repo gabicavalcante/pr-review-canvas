@@ -5,7 +5,13 @@ import { toFileEntry } from '../../src/git/diff-collector.js'
 import { emptyState } from '../../src/contract/state.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { stepAnchorId } from './keys.js'
-import { overviewWayOnHtml, POINT_STEPS_ID, renderPointSteps, stopsOf } from './point-view.js'
+import {
+  overviewWayOnHtml,
+  POINT_STEPS_ID,
+  renderPointSteps,
+  stopsOf,
+  viewSwitchTarget,
+} from './point-view.js'
 import { pointSteps } from './point-steps.js'
 import { pointCollapses } from './points.js'
 
@@ -162,5 +168,23 @@ describe('overviewWayOnHtml', () => {
 
   it('has nothing to lead to on a canvas without points', () => {
     expect(overviewWayOnHtml({ ...artifact, points: [] })).toBe('')
+  })
+})
+
+describe('viewSwitchTarget', () => {
+  it('opens the one-point view on the opening stop of the layer being read', () => {
+    expect(viewSwitchTarget(artifact, 'points', '#layer-run-path')).toBe('#step-layer-run-path')
+    expect(viewSwitchTarget(artifact, 'points', '#step-p-2')).toBe('#step-layer-other')
+    expect(viewSwitchTarget(artifact, 'points', '#overview')).toBe('#overview')
+    // Any other place starts the view from its first stop.
+    expect(viewSwitchTarget(artifact, 'points', '#line:src/app.ts:4')).toBe('')
+    expect(viewSwitchTarget(artifact, 'points', '')).toBe('')
+  })
+
+  it('opens the layers on the layer of the stop being read, and anywhere else where it was', () => {
+    expect(viewSwitchTarget(artifact, 'all', '#step-layer-other')).toBe('#layer-other')
+    expect(viewSwitchTarget(artifact, 'all', '#step-p-1')).toBe('#layer-run-path')
+    expect(viewSwitchTarget(artifact, 'all', '#overview')).toBe('#overview')
+    expect(viewSwitchTarget(artifact, 'all', '')).toBe('')
   })
 })

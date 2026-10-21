@@ -221,7 +221,7 @@ export function initOneLayer(root, opts) {
     setView(next) {
       if (next !== view) {
         view = next
-        // Moving into the one-point view starts it from its first stop, whatever was being read.
+        // Moving into the one-point view starts it where the URL points, else from its first stop.
         shownHash = ''
         redraw()
       }

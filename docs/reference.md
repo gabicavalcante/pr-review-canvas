@@ -732,9 +732,9 @@ it automatically.
 
 ### One point at a time
 
-By default the canvas is one page: the overview, then every layer in order. Set **Show layers** to
-**one point at a time** in the settings dialog to read it by its attention points instead, one
-section at a time:
+By default the canvas is one page: the overview, then every layer in order. Switch the rail to
+**Attention points**, or set **Show layers** to **one point at a time** in the settings dialog, to
+read it by its attention points instead, one section at a time:
 
 - Each layer with points or tests opens with a stop of its own: its heading with the **reviewed**
   mark and **ask about this layer**, its description, and its tests table, shown at once. **go to
@@ -748,12 +748,15 @@ section at a time:
   leads to the layers, shown one at a time. The overview ends with **start with Layer 1**.
 
 The view opens on its first stop. The rail lists the points under their layers, each layer's title
-leading to its opening stop, and marks the stop that shows. A stop takes the place of the one
+leading to its opening stop, and marks the stop that shows. On a canvas with points, a switch at the
+head of the rail moves between **Attention points** and **Layers**, and the rail lists what the view
+shows. The switch keeps your place: from a layer, or a point of it, to the layer's opening stop, and
+from a stop to its layer's section. A stop takes the place of the one
 before under a page that stays at the top, and the URL names it, so a reload or back and forward
 keep your place. A link to a line or a chunk lands in its layer. On a canvas with no point the
 view shows the overview and the layers, one at a time.
 
-The choice is saved as `layerView` in `settings.yml`, applies to the open page at once, and holds
+Either way, the choice is saved as `layerView` in `settings.yml`, applies to the open page at once, and holds
 for every review until changed. The **one at a time** view of earlier versions is gone: a
 `settings.yml` that names it opens this view.
 
