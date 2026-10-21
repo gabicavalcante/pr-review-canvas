@@ -5,7 +5,7 @@ import { toFileEntry } from '../../src/git/diff-collector.js'
 import { emptyState } from '../../src/contract/state.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { stepAnchorId } from './keys.js'
-import { POINT_STEPS_ID, renderPointSteps, stopsOf } from './point-view.js'
+import { overviewWayOnHtml, POINT_STEPS_ID, renderPointSteps, stopsOf } from './point-view.js'
 import { pointSteps } from './point-steps.js'
 import { pointCollapses } from './points.js'
 
@@ -147,5 +147,18 @@ describe('renderPointSteps', () => {
       'step-p-2',
       'step-p-3',
     ])
+  })
+})
+
+describe('overviewWayOnHtml', () => {
+  it('leads from the overview to the first layer’s opening stop', () => {
+    draw(overviewWayOnHtml(artifact))
+    const link = document.querySelector('.step-nav a')
+    expect(link?.textContent).toBe('start with Layer 1: Run path →')
+    expect(link?.getAttribute('href')).toBe('#step-layer-run-path')
+  })
+
+  it('has nothing to lead to on a canvas without points', () => {
+    expect(overviewWayOnHtml({ ...artifact, points: [] })).toBe('')
   })
 })

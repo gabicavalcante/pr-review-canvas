@@ -665,6 +665,10 @@ img.av {
 .point-step > .files {
   padding: 0 16px 12px;
 }
+/* A way on alone, as the overview's, sits on the right, where the stops have theirs. */
+.step-nav > :only-child {
+  margin-left: auto;
+}
 .layer-step > .test-map {
   padding-bottom: 12px;
 }

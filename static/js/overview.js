@@ -81,7 +81,8 @@ export function conversationHtml(comments, now) {
  * to read, so it draws none of the description, conversation, or review blocks; an empty
  * description is left out too, since there is nothing in it to read.
  * @param {PrBundle} bundle
- * @param {{ paths: ReadonlySet<string>, now: Date }} ctx
+ * @param {{ paths: ReadonlySet<string>, now: Date, wayOn?: string }} ctx `wayOn` ends the overview
+ *   with the way on, as the one-point view's stops end
  * @returns {string}
  */
 export function renderOverview(bundle, ctx) {
@@ -106,6 +107,7 @@ export function renderOverview(bundle, ctx) {
       ? `<details class="review-history">${detailsSummaryHtml(`<span>Review history · ${reviews.length}</span>`, 'Toggle review history')}${reviews.map(review => `<div class="body review-entry"><span class="pill">${esc(review.state.toLowerCase().replaceAll('_', ' '))}</span>${issueCommentHtml(review, ctx.now)}</div>`).join('')}</details>`
       : '') +
     outdatedCommentsHtml(bundle.comments.reviewComments, ctx.now) +
+    (ctx.wayOn ?? '') +
     '</section>'
   )
 }

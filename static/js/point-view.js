@@ -99,6 +99,28 @@ function stopNavHtml(stops, index, artifact) {
 }
 
 /**
+ * The way on from the overview in the one-point view: to its first stop, the first layer's opening
+ * when the layer has one. Nothing for a canvas with no point, which has no stops.
+ * @param {ReviewArtifact} artifact
+ */
+export function overviewWayOnHtml(artifact) {
+  // The stops are drawn only for a canvas with points, so with none there is nowhere to lead.
+  const steps = pointSteps(artifact, artifact.points)
+  const first = steps.length === 0 ? undefined : stopsOf(artifact, steps)[0]
+  if (first === undefined) {
+    return ''
+  }
+  const position = first.kind === 'layer' ? layerPosition(artifact, first.layer) : ''
+  const label =
+    first.kind === 'point'
+      ? 'the first attention point'
+      : position === ''
+        ? first.layer.title
+        : `Layer ${position.split(' ')[0]}: ${first.layer.title}`
+  return `<nav class="step-nav" aria-label="Attention points"><a class="step-on" href="#${esc(first.id)}">start with ${esc(label)} &rarr;</a></nav>`
+}
+
+/**
  * A layer's opening stop, without its way on: the layer's heading with its reviewed mark and ask
  * command, its description, and its tests, shown at once.
  * @param {Extract<Stop, { kind: 'layer' }>} stop
