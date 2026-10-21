@@ -140,6 +140,19 @@
 .tree .layers a {
   padding-left: 24px;
 }
+/* The one-point view's points, under the layer each belongs to, with their level's icon. */
+.tree .rail-points a {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'd t';
+  padding-left: 24px;
+}
+.tree .rail-points .lv {
+  grid-area: d;
+  margin-top: 2px;
+}
+.tree .pt-layer {
+  padding: 8px 14px 0 24px;
+}
 .tree .other a {
   color: var(--fg-muted);
 }

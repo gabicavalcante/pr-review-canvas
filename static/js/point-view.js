@@ -2,27 +2,19 @@
 // The one-point-at-a-time view's stops: each open attention point with its code. A stop is the
 // point's card, then the file it is on, drawn with the one chunk that holds its lines, then the
 // way to the previous and the next stop. The last stop leads to the layers, for the rest of the
-// diff. The stops are drawn on every page and shown only by that view (`one-layer.js`).
+// diff. Only that view draws them, and `one-layer.js` shows them one at a time.
 /** @typedef {import('./contract-types.js').FileEntry} FileEntry */
 /** @typedef {import('./contract-types.js').PrState} PrState */
 /** @typedef {import('./contract-types.js').ReviewArtifact} ReviewArtifact */
 /** @typedef {import('./contract-types.js').ReviewComment} ReviewComment */
 /** @typedef {import('./point-steps.js').PointStep} PointStep */
 import { esc } from './dom.js'
-import { layerAnchorId } from './keys.js'
+import { layerAnchorId, stepAnchorId } from './keys.js'
 import { hunkIdForPoint, hunkLayerIndex, pathSet, renderFileCard } from './layers.js'
 import { pointSteps } from './point-steps.js'
 import { openPoints, pointCardHtml, postedUrls } from './points.js'
 
 export const POINT_STEPS_ID = 'point-steps'
-
-/**
- * The id of a point's stop.
- * @param {{ id: string }} point
- */
-export function stepAnchorId(point) {
-  return `step-${point.id}`
-}
 
 /**
  * What a stop calls its layer: `Layer 2 · title` for a layer of the change, its title for Other.
@@ -53,10 +45,10 @@ function stepNavHtml(steps, index, artifact) {
   const back =
     previous === undefined
       ? '<a href="#overview">&larr; overview</a>'
-      : `<a href="#${esc(stepAnchorId(previous.point))}">&larr; previous point</a>`
+      : `<a href="#${esc(stepAnchorId(previous.point.id))}">&larr; previous point</a>`
   const on =
     next !== undefined
-      ? `<a href="#${esc(stepAnchorId(next.point))}">next point &rarr;</a>`
+      ? `<a href="#${esc(stepAnchorId(next.point.id))}">next point &rarr;</a>`
       : firstLayer === undefined
         ? ''
         : `<a href="#${esc(layerAnchorId(firstLayer.key))}">the rest of the diff, by layer &rarr;</a>`
@@ -64,8 +56,7 @@ function stepNavHtml(steps, index, artifact) {
 }
 
 /**
- * Every open attention point's stop, in the view's order, inside one container the page keeps
- * hidden until the view shows it. A canvas with no open point has none.
+ * Every open attention point's stop, in the view's order. A canvas with no open point has none.
  * @param {ReviewArtifact} artifact
  * @param {ReadonlyArray<FileEntry>} files
  * @param {PrState} state
@@ -85,7 +76,7 @@ export function renderPointSteps(artifact, files, state, comments = []) {
     posted: postedUrls(state, comments),
   }
   const stops = steps.map(({ point, layer }, index) => {
-    const id = stepAnchorId(point)
+    const id = stepAnchorId(point.id)
     const entry = files.find(f => f.path === point.path)
     const hunk = entry === undefined ? '' : hunkIdForPoint(point, entry)
     const layerFile = layer?.files.find(f => f.path === point.path)
@@ -110,5 +101,5 @@ export function renderPointSteps(artifact, files, state, comments = []) {
       `<div class="files">${code}</div>${stepNavHtml(steps, index, artifact)}</section>`
     )
   })
-  return `<div class="point-steps" id="${POINT_STEPS_ID}" hidden>${stops.join('')}</div>`
+  return `<div class="point-steps" id="${POINT_STEPS_ID}">${stops.join('')}</div>`
 }

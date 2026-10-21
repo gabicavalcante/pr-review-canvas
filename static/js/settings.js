@@ -190,7 +190,7 @@ export function settingsDialogHtml(data, agents, tab = 'reading') {
       '<p class="muted small">The level every review opens at. The <span class="mono">f</span> key steps through the levels for one page.</p>' +
       '<div class="field"><label for="set-layer-view">Show layers</label>' +
       `<select id="set-layer-view">${optionsHtml(LAYER_VIEWS, settings.layerView, LAYER_VIEW_LABELS)}</select></div>` +
-      '<p class="muted small">One at a time shows the overview or a single layer. The rail and the <span class="mono">j</span> and <span class="mono">k</span> keys move between them.</p>' +
+      '<p class="muted small">One at a time shows the overview or a single layer. The rail and the <span class="mono">j</span> and <span class="mono">k</span> keys move between them. One point at a time shows each open attention point with its code, layer by layer, then the rest of the diff.</p>' +
       '<div class="field"><label for="set-point-colors">Point colors</label>' +
       `<select id="set-point-colors">${optionsHtml(POINT_COLORS, settings.pointColors, POINT_COLORS_LABELS)}</select></div>` +
       '<p class="muted small">The colors of the attention point icons. The shapes say the level in both: a diamond to decide, a checked box to check, an i for context.</p>',

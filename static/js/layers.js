@@ -21,10 +21,12 @@ import { diffstatHtml, layerChanges } from './diffstat.js'
 import { chevronHtml, detailsSummaryHtml, esc } from './dom.js'
 import { collapsesAt, DEFAULT_FOLD_LEVEL, hiddenLines } from './fold-levels.js'
 import { hunkForLine } from './hunks.js'
-import { fileAnchorId, layerAnchorId, reviewedId, sanitizeKey } from './keys.js'
+import { fileAnchorId, layerAnchorId, reviewedId, sanitizeKey, stepAnchorId } from './keys.js'
 import { renderMarkdown } from './markdown.js'
 import { writtenOn } from './diff-identity.js'
 import { pendingForPath } from './pending.js'
+import { levelIconHtml } from './point-level.js'
+import { pointSteps } from './point-steps.js'
 import {
   openPoints,
   pointCardHtml,
@@ -129,10 +131,38 @@ export function dotColor(index) {
 }
 
 /**
- * With a render context, each layer shows the lines it adds and removes.
+ * The rail's group of attention points in the one-point view: the open points in the view's order,
+ * under the layer each belongs to. It is drawn from the state, so a point acted on leaves it.
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
- * @param {{ activeId?: string }} [opts]
+ * @param {(id: string) => string} current
+ */
+function railPointsHtml(artifact, state, current) {
+  const steps = pointSteps(artifact, openPoints(artifact.points, state))
+  if (steps.length === 0) {
+    return ''
+  }
+  let shownLayer = /** @type {string | null | undefined} */ (undefined)
+  const items = steps
+    .map(({ point, layer }) => {
+      const heading =
+        (layer?.id ?? null) === shownLayer
+          ? ''
+          : `<li class="pt-layer"><span class="m">${esc(layer?.title ?? 'No layer')}</span></li>`
+      shownLayer = layer?.id ?? null
+      const id = stepAnchorId(point.id)
+      return `${heading}<li><a href="#${esc(id)}"${current(id)}>${levelIconHtml(point.level, null)}<span class="t">${esc(point.title)}</span></a></li>`
+    })
+    .join('')
+  return `<li class="grp"><span class="lbl grp-lbl">Attention points</span><ul class="rail-points">${items}</ul></li>`
+}
+
+/**
+ * With a render context, each layer shows the lines it adds and removes. `points` adds the group
+ * of open attention points the one-point view walks.
+ * @param {ReviewArtifact} artifact
+ * @param {PrState} state
+ * @param {{ activeId?: string, points?: boolean }} [opts]
  * @returns {string}
  */
 export function railInnerHtml(artifact, state, opts = {}) {
@@ -166,6 +196,7 @@ export function railInnerHtml(artifact, state, opts = {}) {
   return (
     '<ul class="tree">' +
     `<li><a href="#overview"${current('overview')}><span class="t">Overview</span></a></li>` +
+    (opts.points === true ? railPointsHtml(artifact, state, current) : '') +
     `<li class="grp"><span class="lbl grp-lbl">Layers</span><ul class="layers">${items}</ul></li>${otherItem}</ul>`
   )
 }
@@ -173,11 +204,11 @@ export function railInnerHtml(artifact, state, opts = {}) {
 /**
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
- * @param {{ activeId?: string }} [opts]
+ * @param {{ activeId?: string, points?: boolean }} [opts]
  * @returns {string}
  */
 export function renderRail(artifact, state, opts = {}) {
-  return `<nav class="rail" aria-label="Review layers">${railInnerHtml(artifact, state, opts)}</nav>`
+  return `<nav class="rail" aria-label="Review layers"${opts.points === true ? ' data-points' : ''}>${railInnerHtml(artifact, state, opts)}</nav>`
 }
 
 /**
@@ -192,7 +223,10 @@ export function refreshRail(root, artifact, state) {
     return false
   }
   const active = rail.querySelector('a[aria-current]')?.getAttribute('href')?.slice(1)
-  rail.innerHTML = railInnerHtml(artifact, state, active === undefined ? {} : { activeId: active })
+  rail.innerHTML = railInnerHtml(artifact, state, {
+    ...(active === undefined ? {} : { activeId: active }),
+    points: rail.hasAttribute('data-points'),
+  })
   return true
 }
 

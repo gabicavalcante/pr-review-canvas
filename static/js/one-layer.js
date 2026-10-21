@@ -4,7 +4,8 @@
 // scrolls through one layer only. Whatever brings something on screen (a rail link, the j/k and
 // n/p keys, a canvas link) shows the section that holds it first, so nothing the reader is sent
 // to stays hidden. A review mark is the exception: it moves on to the next card only inside the
-// layer on screen. With `all` this module does nothing.
+// layer on screen. With `points` the page also has a stop per attention point (`point-view.js`),
+// shown the same way, one at a time, starting from the first. With `all` this module does nothing.
 import { cssEscape } from './anchors.js'
 import { decodeHash, plainClick } from './deep-link.js'
 import { scrollIntoViewSafe } from './dom.js'
@@ -12,8 +13,8 @@ import { setCardCollapsed } from './layers.js'
 
 /** @typedef {import('./layer-views.js').LayerView} LayerView */
 
-/** The overview and every layer section: the parts of the page the rail links to. */
-const SECTION_SELECTOR = '#overview, pr-layer > section'
+/** The overview, every point's stop, and every layer section: the parts the rail links to. */
+const SECTION_SELECTOR = '#overview, section.point-step, pr-layer > section'
 
 /**
  * The sections of the page, in page order.
@@ -85,8 +86,8 @@ export function elementForHash(root, hash) {
 }
 
 /**
- * Keeps one section on screen at a time while the view is `one`, and gets out of the way while
- * it is `all`. Made once for the app element; `redraw` runs after every render, before the deep
+ * Keeps one section on screen at a time while the view is `one` or `points`, and gets out of the
+ * way while it is `all`. Made once for the app element; `redraw` runs after every render, before the deep
  * links follow the URL, so a link into a layer lands on a layer that is showing. The URL names
  * the section on the first draw; after that the section last shown is the reader's place.
  * @param {HTMLElement} root
@@ -114,7 +115,7 @@ export function initOneLayer(root, opts) {
 
   /** @param {HTMLElement | null} section */
   const show = section => {
-    if (view === 'one' && section !== null && section.hidden) {
+    if (view !== 'all' && section !== null && section.hidden) {
       showSection(section)
     }
   }
@@ -140,7 +141,14 @@ export function initOneLayer(root, opts) {
       }
       return
     }
-    const section = sectionFor(shownHash) ?? sectionFor(win.location.hash) ?? pageSections(root)[0] ?? null
+    // The one-point view opens on its first point; the layer view, on the overview.
+    const first = view === 'points' ? root.querySelector('section.point-step') : null
+    const section =
+      sectionFor(shownHash) ??
+      sectionFor(win.location.hash) ??
+      (first instanceof HTMLElement ? first : null) ??
+      pageSections(root)[0] ??
+      null
     if (section !== null) {
       showSection(section)
     }

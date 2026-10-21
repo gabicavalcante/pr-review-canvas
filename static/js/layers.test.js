@@ -155,6 +155,28 @@ describe('rail', () => {
     )
     setRenderContext(null)
   })
+
+  it('lists the open points under their layers in the one-point view, and drops one acted on', () => {
+    document.body.innerHTML = renderRail(artifact, state, { points: true })
+    const group = () =>
+      [...document.querySelectorAll('.rail-points li')].map(li =>
+        li.classList.contains('pt-layer')
+          ? `[${li.textContent}]`
+          : li.querySelector('a')?.getAttribute('href')
+      )
+    expect(group()).toEqual(['[Run path]', '#step-p-1', '[Other changes]', '#step-p-2', '#step-p-3'])
+    expect(document.querySelector('a[href="#step-p-1"] .lv.decide')).not.toBeNull()
+    const dismissed = { ...state, dismissed: { 'fp-2': { at: 'x' } } }
+    expect(refreshRail(document, artifact, dismissed)).toBe(true)
+    expect(group()).toEqual(['[Run path]', '#step-p-1', '[Other changes]', '#step-p-3'])
+  })
+
+  it('has no points group in the other views', () => {
+    document.body.innerHTML = renderRail(artifact, state)
+    expect(document.querySelector('.rail-points')).toBeNull()
+    expect(refreshRail(document, artifact, state)).toBe(true)
+    expect(document.querySelector('.rail-points')).toBeNull()
+  })
 })
 
 describe('layer sections', () => {

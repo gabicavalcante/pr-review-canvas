@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { toFileEntry } from '../../src/git/diff-collector.js'
 import { emptyState } from '../../src/contract/state.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../../src/testing/synthetic.js'
-import { POINT_STEPS_ID, renderPointSteps, stepAnchorId } from './point-view.js'
+import { stepAnchorId } from './keys.js'
+import { POINT_STEPS_ID, renderPointSteps } from './point-view.js'
 
 const artifact = syntheticArtifact()
 const files = SYNTHETIC_FILES.map(toFileEntry)
@@ -22,10 +23,9 @@ function all(selector) {
 }
 
 describe('renderPointSteps', () => {
-  it('draws a stop per open point, layer by layer, in a container the page keeps hidden', () => {
+  it('draws a stop per open point, layer by layer', () => {
     const root = draw(renderPointSteps(artifact, files, state))
-    const container = root.querySelector(`#${POINT_STEPS_ID}`)
-    expect(container?.hasAttribute('hidden')).toBe(true)
+    expect(root.querySelector(`#${POINT_STEPS_ID}`)).not.toBeNull()
     expect(all('section.point-step').map(section => section.id)).toEqual(['step-p-1', 'step-p-2', 'step-p-3'])
     expect(all('.step-n').map(el => el.textContent)).toEqual(['Point 1 of 3', 'Point 2 of 3', 'Point 3 of 3'])
   })
@@ -58,7 +58,7 @@ describe('renderPointSteps', () => {
     draw(renderPointSteps(artifact, files, state))
     const links = (/** @type {string} */ id) =>
       all(`#${id} .step-nav a`).map(a => [a.textContent, a.getAttribute('href')])
-    expect(links(stepAnchorId({ id: 'p-1' }))).toEqual([
+    expect(links(stepAnchorId('p-1'))).toEqual([
       ['← overview', '#overview'],
       ['next point →', '#step-p-2'],
     ])

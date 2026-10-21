@@ -160,6 +160,12 @@ export class PrAppElement extends HTMLElement {
    * @type {ReturnType<typeof initOneLayer> | null}
    */
   layerView = null
+  /**
+   * The view the page is drawn for. Only the one-point view draws a stop per attention point, so
+   * moving into it or out of it draws the page again.
+   * @type {import('./layer-views.js').LayerView}
+   */
+  view = 'all'
   /** @type {{ stop: () => void } | null} */
   interactions = null
   /** @type {ReturnType<typeof wireChat>} */
@@ -242,6 +248,7 @@ export class PrAppElement extends HTMLElement {
     setFoldLevel(this, this.bootstrap.foldLevel)
     applyPointColors(this.bootstrap.pointColors, document.documentElement)
     this.layerView?.stop()
+    this.view = this.bootstrap.layerView
     this.layerView = initOneLayer(this, { view: this.bootstrap.layerView })
     this.autoUpdate = this.bootstrap.autoUpdateCanvas
     // The page only polls the head it was opened with, so a local review reads the work again when
@@ -377,7 +384,7 @@ export class PrAppElement extends HTMLElement {
       this.innerHTML =
         header +
         bannerHtml(bundle.warnings) +
-        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state)}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now })}${renderPointSteps(artifact, files, bundle.state, bundle.comments.reviewComments)}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
+        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state, { points: this.view === 'points' })}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now })}${this.view === 'points' ? renderPointSteps(artifact, files, bundle.state, bundle.comments.reviewComments) : ''}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
         footerHtml(boot.version, bundle)
       // A bar the reader dismissed goes before the review wiring measures the outdated bar.
       wireBarDismissal(this, storage)
@@ -411,7 +418,8 @@ export class PrAppElement extends HTMLElement {
         chat: () => this.chat,
         openReview: () => (this.chat ?? this.reviewPane)?.openReview(),
         uncover: () => (this.chat ?? this.reviewPane)?.uncover(),
-        openSettings: el => void openSettingsDialog(this, el, { onSaved: data => this.settingsSaved(data) }),
+        openSettings: el =>
+          void openSettingsDialog(this, el, { onSaved: data => void this.settingsSaved(data) }),
       })
       this.interactions = interactions
       if (chatEnabled) {
@@ -511,7 +519,7 @@ export class PrAppElement extends HTMLElement {
     if (settings instanceof HTMLElement && this.interactions === null) {
       settings.addEventListener(
         'click',
-        () => void openSettingsDialog(this, settings, { onSaved: data => this.settingsSaved(data) })
+        () => void openSettingsDialog(this, settings, { onSaved: data => void this.settingsSaved(data) })
       )
     }
     this.wireAppearance()
@@ -590,8 +598,14 @@ export class PrAppElement extends HTMLElement {
    * The settings the dialog saved, applied to the open page without a reload.
    * @param {import('./contract-types.js').SettingsResponse} data
    */
-  settingsSaved(data) {
-    this.layerView?.setView(data.settings.layerView)
+  async settingsSaved(data) {
+    const next = data.settings.layerView
+    const redraw = (this.view === 'points') !== (next === 'points')
+    this.view = next
+    if (redraw && this.shown) {
+      await this.render(this.shown)
+    }
+    this.layerView?.setView(next)
     this.chat?.followSettings(data.settings)
     applyPointColors(data.settings.pointColors, document.documentElement)
     this.autoUpdate = data.settings.autoUpdateCanvas
