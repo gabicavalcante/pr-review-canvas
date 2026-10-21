@@ -5,6 +5,7 @@ import type { AgentRunner, WriteTurn } from '../acpx/acpx.js'
 import { latestModel } from '../acpx/models.js'
 import {
   type ChangesCodeStatus,
+  type ChangesReport,
   type ChatContext,
   type ChatEvent,
   type ChatThreadsResponse,
@@ -35,6 +36,7 @@ import {
   threadName,
   threadTitle,
 } from './threads.js'
+import type { TurnCheck } from './turn-check.js'
 import { TurnSandboxError } from './turn-sandbox.js'
 import type { PrepareWriteTurn } from './write-turn.js'
 
@@ -70,6 +72,8 @@ export interface ChatManagerDeps {
   worktree?: string | null | undefined
   /** Makes the box and the git guard of a turn that changes code; without it no turn does. */
   prepareWriteTurn?: PrepareWriteTurn | undefined
+  /** Reads what a turn that changes code did to the checkout; without it nothing is reported. */
+  turnCheck?: TurnCheck | undefined
 }
 
 /** The session a thread's turns that may change code run in: a session of their own, only ever started inside the box. */
@@ -361,7 +365,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
   const changesFor = async (
     target: ChatTarget,
     settings: Settings
-  ): Promise<{ writes: WriteTurn } | { offReason: string } | null> => {
+  ): Promise<{ writes: WriteTurn; branchRef: string } | { offReason: string } | null> => {
     const status = target.changesCode ?? null
     if (status === null) {
       return null
@@ -379,6 +383,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
           agent: settings.chatAgent,
           branchRef: status.branchRef,
         }),
+        branchRef: status.branchRef,
       }
     } catch (err) {
       return {
@@ -480,6 +485,27 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
       return
     }
 
+    // What the checkout was before a turn that changes code, to say afterwards what the turn did.
+    const check = deps.turnCheck
+    const branchRef = changes !== null && 'branchRef' in changes ? changes.branchRef : undefined
+    const before =
+      check === undefined || branchRef === undefined ? null : await check.snapshot().catch(() => null)
+    let report: Promise<ChangesReport | null> | null = null
+    const reportOnce = (): Promise<ChangesReport | null> => {
+      report ??=
+        check === undefined || before === null || branchRef === undefined
+          ? Promise.resolve(null)
+          : check.check(before, branchRef).catch(() => null)
+      return report
+    }
+    // Sent before the turn's last event, so a reader who stops listening there has it.
+    async function* reported(): AsyncGenerator<ChatEvent> {
+      const changesReport = await reportOnce()
+      if (changesReport !== null) {
+        yield { event: 'changes', ...changesReport }
+      }
+    }
+
     const run = deps.runner.run({
       agent: settings.chatAgent,
       session,
@@ -529,6 +555,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
             yield { event: 'tool', id: event.id, title: event.title, status: event.status }
             break
           case 'done':
+            yield* reported()
             if (event.stopReason === 'cancelled') {
               incomplete = 'cancelled'
               yield { event: 'cancelled' }
@@ -544,6 +571,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
             }
             break
           case 'error':
+            yield* reported()
             incomplete = event.code
             yield { event: 'error', code: event.code, message: event.message, ...hintFor(event.code) }
             break
@@ -562,6 +590,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
           await run.cancel().catch(() => undefined)
         }
       }
+      const changesReport = await reportOnce()
       await saveTurn(
         target.key,
         thread,
@@ -572,6 +601,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
           at: deps.now().toISOString(),
           ...(incomplete === undefined ? {} : { incomplete }),
           ...fallback,
+          ...(changesReport === null ? {} : { changes: changesReport }),
         },
         target.headSha,
         cwd,

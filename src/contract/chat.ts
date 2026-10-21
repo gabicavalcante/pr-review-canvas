@@ -45,6 +45,17 @@ export type ChatSendInput = z.infer<typeof ChatSendSchema>
 export const ChatThreadInputSchema = z.object({ agent: z.string().min(1).max(40).optional() })
 
 /** One saved turn of a thread, as `chat/<name>.jsonl` stores it. */
+/** Something a turn that changes code left in the checkout besides its commits, and how to put it back. */
+export const TurnFindingSchema = z.object({ message: z.string(), fix: z.string() })
+export type TurnFinding = z.infer<typeof TurnFindingSchema>
+
+/** What a turn that changes code did: the commits it added to the branch, and anything else. */
+export const ChangesReportSchema = z.object({
+  commits: z.array(z.string()),
+  findings: z.array(TurnFindingSchema),
+})
+export type ChangesReport = z.infer<typeof ChangesReportSchema>
+
 export const ChatTurnSchema = z.object({
   role: z.enum(['user', 'assistant']),
   text: z.string(),
@@ -57,6 +68,8 @@ export const ChatTurnSchema = z.object({
    * checkout it read instead.
    */
   fallback: z.object({ message: z.string(), branch: z.string().nullable() }).optional(),
+  /** On an assistant turn that could change code: its commits, and what else it left. */
+  changes: ChangesReportSchema.optional(),
 })
 export type ChatTurn = z.infer<typeof ChatTurnSchema>
 
@@ -104,6 +117,7 @@ export const CHAT_EVENTS = [
   'done',
   'error',
   'cancelled',
+  'changes',
 ] as const
 export type ChatEventName = (typeof CHAT_EVENTS)[number]
 
@@ -124,3 +138,5 @@ export type ChatEvent =
   | { event: 'done'; stopReason: string }
   | { event: 'error'; code: string; message: string; hint?: string }
   | { event: 'cancelled' }
+  /** After a turn that could change code, before it ends: what it did to the checkout. */
+  | ({ event: 'changes' } & ChangesReport)

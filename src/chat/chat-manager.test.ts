@@ -21,6 +21,7 @@ import {
 } from './chat-manager.js'
 import { CheckoutBusyError, checkoutsFor, createReviewCheckouts, type ReviewCheckouts } from './checkouts.js'
 import { createTranscriptStore, THREAD_TITLE_MAX, type TranscriptStore } from './threads.js'
+import type { CheckoutSnapshot, TurnCheck } from './turn-check.js'
 import { TurnSandboxError } from './turn-sandbox.js'
 import type { PrepareWriteTurn } from './write-turn.js'
 
@@ -59,6 +60,7 @@ function build(
     checkoutGit?: FakeCheckoutGit
     turns?: RunningTurns
     prepareWriteTurn?: PrepareWriteTurn
+    turnCheck?: TurnCheck
   } = {}
 ) {
   runner = opts.runner ?? createFakeRunner()
@@ -89,6 +91,7 @@ function build(
     now: () => new Date('2026-09-11T10:00:00.000Z'),
     turns: opts.turns,
     prepareWriteTurn: opts.prepareWriteTurn,
+    turnCheck: opts.turnCheck,
   })
 }
 
@@ -1066,5 +1069,66 @@ describe('a turn that may change code', () => {
     await askChanging(offered, 'and the test')
     expect(runner.ensured).toEqual([changesSessionName(T1)])
     expect(runner.runs[1]?.prompt).not.toContain('## Earlier in this thread')
+  })
+
+  describe('what the turn did to the checkout', () => {
+    const SNAPSHOT: CheckoutSnapshot = {
+      head: 'a',
+      branchRef: 'refs/heads/feat',
+      refs: {},
+      pending: [],
+      operation: null,
+    }
+    const REPORT = {
+      commits: ['c1'],
+      findings: [{ message: 'tracked files changed outside a commit: a.ts', fix: 'git restore …' }],
+    }
+    const checks: string[] = []
+    const checking: TurnCheck = {
+      snapshot: async () => {
+        checks.push('snapshot')
+        return SNAPSHOT
+      },
+      check: async (before, branchRef) => {
+        checks.push(`check ${before.head} ${branchRef}`)
+        return REPORT
+      },
+    }
+
+    beforeEach(() => {
+      checks.splice(0)
+    })
+
+    it('reports it before the turn ends, and keeps it with the answer', async () => {
+      build({ prepareWriteTurn: boxing, turnCheck: checking })
+      const events = await collect(
+        manager.send({ ...target(), changesCode: offered }, { message: 'fix it', context: POINT })
+      )
+      const names = events.map(event => event.event)
+      expect(names.indexOf('changes')).toBeLessThan(names.indexOf('done'))
+      expect(events.find(event => event.event === 'changes')).toEqual({ event: 'changes', ...REPORT })
+      expect(checks).toEqual(['snapshot', 'check a refs/heads/feat'])
+      const turns = await transcripts.read(42, T1)
+      expect(turns.at(-1)).toMatchObject({ role: 'assistant', changes: REPORT })
+    })
+
+    it('reports it when the turn ends in an error too', async () => {
+      build({
+        runner: createFakeRunner({ script: [{ type: 'error', code: 'AGENT_FAILED', message: 'boom' }] }),
+        prepareWriteTurn: boxing,
+        turnCheck: checking,
+      })
+      const events = await collect(
+        manager.send({ ...target(), changesCode: offered }, { message: 'fix it', context: POINT })
+      )
+      expect(events.map(event => event.event)).toEqual(['turn', 'changes', 'error'])
+    })
+
+    it('checks nothing on a read-only turn', async () => {
+      build({ prepareWriteTurn: boxing, turnCheck: checking })
+      const events = await collect(manager.send(target(), { message: 'why?', context: POINT }))
+      expect(events.map(event => event.event)).not.toContain('changes')
+      expect(checks).toEqual([])
+    })
   })
 })
