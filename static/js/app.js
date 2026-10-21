@@ -614,8 +614,13 @@ export class PrAppElement extends HTMLElement {
         window.history.replaceState(null, '', url)
       }
       await this.settingsSaved(data)
-      if (view === 'all' && window.location.hash !== '') {
-        document.getElementById(window.location.hash.slice(1))?.scrollIntoView({ block: 'start' })
+      // The one-point view shows a stop under a page at its top, as a move between stops does; the
+      // layers open on the layer that was read.
+      const target = view === 'all' ? document.getElementById(window.location.hash.slice(1)) : null
+      if (target === null) {
+        window.scrollTo({ top: 0 })
+      } else {
+        target.scrollIntoView({ block: 'start' })
       }
     } catch (err) {
       toast(this, `could not switch the view: ${err instanceof Error ? err.message : String(err)}`)

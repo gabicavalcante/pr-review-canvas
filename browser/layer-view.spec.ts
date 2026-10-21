@@ -60,10 +60,13 @@ test('reads the canvas one attention point at a time once the setting is saved, 
   await expect(page.locator('nav.rail a[href="#layer-run-path"]')).toBeVisible()
   await expect(page.locator('nav.rail .rail-points')).toHaveCount(0)
 
-  // It is saved as the setting is, so a reload keeps the layers; the switch leads back to the points.
+  // It is saved as the setting is, so a reload keeps the layers; the switch leads back to the points,
+  // from anywhere down the page, under a page at its top.
   await page.reload()
   await expect(page.locator('nav.rail .rail-view [data-view="all"]')).toHaveAttribute('aria-pressed', 'true')
+  await page.mouse.wheel(0, 1500)
   await page.locator('nav.rail .rail-view [data-view="points"]').click()
   await expect(opening).toBeVisible()
   await expect(overview).toBeHidden()
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
 })
