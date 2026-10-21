@@ -1250,7 +1250,9 @@ These are checked again on every turn. With the mode on but a condition failing,
 reads, and the agent tells you what to do first.
 
 A turn that may change code runs in your checkout instead of the review checkout, in an acpx session
-of its own per thread, with every tool approved. What holds it in:
+of its own per thread, with every tool approved. Two layers hold it in: the sandbox says it may
+change only this repository, and the git guard says that in this repository it may only add commits
+to your branch.
 
 - **The sandbox.** acpx and the agent run under bubblewrap with the whole filesystem read-only,
   except your checkout and its git directory, acpx's own state (`~/.acpx`, its socket folder under
