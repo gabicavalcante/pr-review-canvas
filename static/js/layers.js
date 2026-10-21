@@ -21,7 +21,14 @@ import { diffstatHtml, layerChanges } from './diffstat.js'
 import { chevronHtml, detailsSummaryHtml, esc } from './dom.js'
 import { collapsesAt, DEFAULT_FOLD_LEVEL, hiddenLines } from './fold-levels.js'
 import { hunkForLine } from './hunks.js'
-import { fileAnchorId, layerAnchorId, reviewedId, sanitizeKey, stepAnchorId } from './keys.js'
+import {
+  fileAnchorId,
+  layerAnchorId,
+  layerStepAnchorId,
+  reviewedId,
+  sanitizeKey,
+  stepAnchorId,
+} from './keys.js'
 import { renderMarkdown } from './markdown.js'
 import { writtenOn } from './diff-identity.js'
 import { pendingForPath } from './pending.js'
@@ -132,12 +139,15 @@ export function dotColor(index) {
 }
 
 /**
- * A layer's heading over its points in the rail's points group: its title, which says where the
- * points below belong without leading anywhere itself.
+ * A layer's heading over its points in the rail's points group: its title, leading to the layer's
+ * opening stop, with its description and tests.
  * @param {Layer | null} layer
  */
 function railPointsLayerHtml(layer) {
-  return `<li class="pt-layer"><span class="t">${esc(layer?.title ?? 'No layer')}</span></li>`
+  if (layer === null) {
+    return '<li class="pt-layer"><span class="t">No layer</span></li>'
+  }
+  return `<li class="pt-layer"><a href="#${esc(layerStepAnchorId(layer.key))}"><span class="t">${esc(layer.title)}</span></a></li>`
 }
 
 /**
@@ -249,8 +259,9 @@ export function fileCount(n) {
 /**
  * @param {Layer} layer
  * @param {ReadonlySet<string>} paths
+ * @param {{ open?: boolean }} [opts] `open` shows the table at once, as a layer's opening stop does
  */
-export function testMapHtml(layer, paths) {
+export function testMapHtml(layer, paths, opts = {}) {
   if (layer.tests.length === 0) {
     return ''
   }
@@ -268,7 +279,7 @@ export function testMapHtml(layer, paths) {
     .join('')
   const coverage = testCoverage(layer.tests)
   return (
-    `<details class="test-map">${detailsSummaryHtml(`<h3>Tests</h3><span class="pill test-cov ${coverage.level}">${coverage.label}</span>`, 'Toggle tests', 'lbl sub')}` +
+    `<details class="test-map"${opts.open === true ? ' open' : ''}>${detailsSummaryHtml(`<h3>Tests</h3><span class="pill test-cov ${coverage.level}">${coverage.label}</span>`, 'Toggle tests', 'lbl sub')}` +
     `<table class="testmap"><thead><tr><th scope="col">Behavior</th><th scope="col">Status</th><th scope="col">Test</th></tr></thead><tbody>${rows}</tbody></table></details>`
   )
 }

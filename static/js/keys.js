@@ -115,3 +115,11 @@ export function reviewedId(layerKey, path) {
 export function stepAnchorId(pointId) {
   return `step-${pointId}`
 }
+
+/**
+ * The id of a layer's opening stop in the one-point view, before the layer's points.
+ * @param {string} layerKey
+ */
+export function layerStepAnchorId(layerKey) {
+  return `step-layer-${layerKey}`
+}

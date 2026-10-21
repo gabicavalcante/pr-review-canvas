@@ -5,7 +5,8 @@ import { toFileEntry } from '../../src/git/diff-collector.js'
 import { emptyState } from '../../src/contract/state.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { stepAnchorId } from './keys.js'
-import { POINT_STEPS_ID, renderPointSteps } from './point-view.js'
+import { POINT_STEPS_ID, renderPointSteps, stopsOf } from './point-view.js'
+import { pointSteps } from './point-steps.js'
 import { pointCollapses } from './points.js'
 
 const artifact = syntheticArtifact()
@@ -24,18 +25,36 @@ function all(selector) {
 }
 
 describe('renderPointSteps', () => {
-  it('draws a stop per open point, layer by layer', () => {
+  it('opens each layer with a stop of its own, then its points, layer by layer', () => {
     const root = draw(renderPointSteps(artifact, files, state))
     expect(root.querySelector(`#${POINT_STEPS_ID}`)).not.toBeNull()
-    expect(all('section.point-step').map(section => section.id)).toEqual(['step-p-1', 'step-p-2', 'step-p-3'])
+    expect(all('section.point-step').map(section => section.id)).toEqual([
+      'step-layer-run-path',
+      'step-p-1',
+      'step-layer-other',
+      'step-p-2',
+      'step-p-3',
+    ])
     expect(all('.step-n').map(el => el.textContent)).toEqual(['Point 1 of 3', 'Point 2 of 3', 'Point 3 of 3'])
   })
 
-  it('names the layer each point belongs to, as a link to it', () => {
+  it('shows a layer’s heading, description and tests, the tests open, in its opening stop', () => {
+    draw(renderPointSteps(artifact, files, state))
+    const stop = document.querySelector('#step-layer-run-path')
+    expect(stop?.querySelector('h2')?.textContent).toBe('Layer 1 of 1Run path')
+    expect(stop?.querySelector('input[data-reviewed-id="layer:run-path"]')).not.toBeNull()
+    expect(stop?.querySelector('.rationale')?.textContent).toContain('The change to')
+    expect(stop?.querySelector('details.test-map')?.hasAttribute('open')).toBe(true)
+    // Other has no position among the layers and nothing to mark reviewed.
+    expect(document.querySelector('#step-layer-other h2')?.textContent).toBe('Other changes')
+    expect(document.querySelector('#step-layer-other input[data-reviewed-id]')).toBeNull()
+  })
+
+  it('names the layer each point belongs to, as a link to the layer’s opening stop', () => {
     draw(renderPointSteps(artifact, files, state))
     const link = document.querySelector('#step-p-1 .step-h a')
     expect(link?.textContent).toBe('Layer 1 · Run path')
-    expect(link?.getAttribute('href')).toBe('#layer-run-path')
+    expect(link?.getAttribute('href')).toBe('#step-layer-run-path')
   })
 
   it('draws the point’s card under an id of its own, so the layer’s card keeps the point’s anchor', () => {
@@ -73,9 +92,21 @@ describe('renderPointSteps', () => {
     draw(renderPointSteps(artifact, files, state))
     const links = (/** @type {string} */ id) =>
       all(`#${id} .step-nav a`).map(a => [a.textContent, a.getAttribute('href')])
-    expect(links(stepAnchorId('p-1'))).toEqual([
+    expect(links('step-layer-run-path')).toEqual([
       ['← overview', '#overview'],
-      ['next point →', '#step-p-2'],
+      ['go to its 1 attention point →', '#step-p-1'],
+    ])
+    expect(links(stepAnchorId('p-1'))).toEqual([
+      ['← Run path', '#step-layer-run-path'],
+      ['next layer: Other changes →', '#step-layer-other'],
+    ])
+    expect(links('step-layer-other')).toEqual([
+      ['← previous point', '#step-p-1'],
+      ['go to its 2 attention points →', '#step-p-2'],
+    ])
+    expect(links('step-p-2')).toEqual([
+      ['← Other changes', '#step-layer-other'],
+      ['next point →', '#step-p-3'],
     ])
     expect(links('step-p-3')).toEqual([
       ['← previous point', '#step-p-2'],
@@ -86,8 +117,35 @@ describe('renderPointSteps', () => {
   it('keeps a point the reader acted on in its place, and draws nothing for a canvas without points', () => {
     const dismissed = { ...state, dismissed: { 'fp-2': { at: 'x' } } }
     draw(renderPointSteps(artifact, files, dismissed))
-    expect(all('section.point-step').map(section => section.id)).toEqual(['step-p-1', 'step-p-2', 'step-p-3'])
+    expect(all('section.point-step').map(section => section.id)).toEqual([
+      'step-layer-run-path',
+      'step-p-1',
+      'step-layer-other',
+      'step-p-2',
+      'step-p-3',
+    ])
     expect(document.querySelector('#step-p-2-card')?.classList.contains('is-handled')).toBe(true)
     expect(renderPointSteps({ ...artifact, points: [] }, files, state)).toBe('')
+  })
+
+  it('opens a layer with tests and no points, and skips one with neither', () => {
+    const [runPath, other] = artifact.layers
+    if (runPath === undefined || other === undefined) throw new Error('two layers')
+    const testsOnly = { ...artifact, points: artifact.points.filter(p => p.layerId === other.id) }
+    expect(stopsOf(testsOnly, pointSteps(testsOnly, testsOnly.points)).map(stop => stop.id)).toEqual([
+      'step-layer-run-path',
+      'step-layer-other',
+      'step-p-2',
+      'step-p-3',
+    ])
+    const bare = {
+      ...testsOnly,
+      layers: testsOnly.layers.map(layer => (layer.id === runPath.id ? { ...layer, tests: [] } : layer)),
+    }
+    expect(stopsOf(bare, pointSteps(bare, bare.points)).map(stop => stop.id)).toEqual([
+      'step-layer-other',
+      'step-p-2',
+      'step-p-3',
+    ])
   })
 })

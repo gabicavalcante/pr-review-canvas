@@ -1,65 +1,132 @@
 // @ts-check
-// The one-point-at-a-time view's stops: each attention point with its code. A stop is the
-// point's card, whole, then the file it is on, drawn with the one chunk that holds its lines and a
-// mark on them where the point is, then the
-// way to the previous and the next stop. The last stop leads to the layers, for the rest of the
-// diff. Only that view draws them, and `one-layer.js` shows them one at a time.
+// The one-point-at-a-time view's stops, layer by layer. Each layer opens with a stop of its own:
+// its heading, its description, and its tests shown at once, leading on to its attention points.
+// Each point's stop is the point's card, whole, then the file it is on, drawn with the one chunk
+// that holds its lines and a mark on them where the point is. Every stop leads to the one before
+// and after; the last leads to the layers, for the rest of the diff. Only that view draws the
+// stops, and `one-layer.js` shows them one at a time.
 /** @typedef {import('./contract-types.js').FileEntry} FileEntry */
 /** @typedef {import('./contract-types.js').PrState} PrState */
 /** @typedef {import('./contract-types.js').ReviewArtifact} ReviewArtifact */
 /** @typedef {import('./contract-types.js').ReviewComment} ReviewComment */
+/** @typedef {ReviewArtifact['layers'][number]} Layer */
 /** @typedef {import('./point-steps.js').PointStep} PointStep */
+import { askButtonHtml } from './ask.js'
 import { esc } from './dom.js'
-import { layerAnchorId, stepAnchorId } from './keys.js'
-import { hunkIdForPoint, hunkLayerIndex, pathSet, renderFileCard } from './layers.js'
+import { layerAnchorId, layerStepAnchorId, reviewedId, stepAnchorId } from './keys.js'
+import { hunkIdForPoint, hunkLayerIndex, pathSet, renderFileCard, testMapHtml } from './layers.js'
+import { renderMarkdown } from './markdown.js'
 import { pointSteps } from './point-steps.js'
 import { pointCardHtml, postedUrls } from './points.js'
+import { layerProgress } from './progress.js'
 
 export const POINT_STEPS_ID = 'point-steps'
 
 /**
- * What a stop calls its layer: `Layer 2 · title` for a layer of the change, its title for Other.
- * @param {ReviewArtifact} artifact
- * @param {PointStep['layer']} layer
+ * One stop of the view: a layer's opening, with the points that follow it, or a point, with its
+ * number among all the points.
+ * @typedef {{ kind: 'layer', id: string, layer: Layer, points: PointStep[] }
+ *   | { kind: 'point', id: string, step: PointStep, number: number }} Stop
  */
-function layerLabel(artifact, layer) {
-  if (layer === null) {
-    return 'no layer'
+
+/**
+ * The stops in reading order: each layer that has points or tests opens with its stop, followed by
+ * its points from the most severe. Points of no listed layer come last, with no opening.
+ * @param {ReviewArtifact} artifact
+ * @param {ReadonlyArray<PointStep>} steps
+ * @returns {Stop[]}
+ */
+export function stopsOf(artifact, steps) {
+  /** @type {Stop[]} */
+  const stops = []
+  let number = 0
+  /** @param {PointStep} step */
+  const pointStop = step => {
+    number += 1
+    stops.push({ kind: 'point', id: stepAnchorId(step.point.id), step, number })
   }
-  if (layer.kind === 'other') {
-    return layer.title
+  for (const layer of artifact.layers) {
+    const points = steps.filter(step => step.layer?.id === layer.id)
+    if (points.length === 0 && layer.tests.length === 0) {
+      continue
+    }
+    stops.push({ kind: 'layer', id: layerStepAnchorId(layer.key), layer, points })
+    points.forEach(pointStop)
   }
-  const number = artifact.layers.filter(l => l.kind !== 'other').indexOf(layer) + 1
-  return `Layer ${number} · ${layer.title}`
+  steps.filter(step => step.layer === null).forEach(pointStop)
+  return stops
 }
 
 /**
- * The way on from a stop: the previous stop, and the next one or, after the last, the layers.
- * @param {ReadonlyArray<PointStep>} steps
+ * The position of a layer of the change, `2 of 5`, or '' for Other, which has none.
+ * @param {ReviewArtifact} artifact
+ * @param {Layer} layer
+ */
+function layerPosition(artifact, layer) {
+  const semantic = artifact.layers.filter(l => l.kind !== 'other')
+  return layer.kind === 'other' ? '' : `${semantic.indexOf(layer) + 1} of ${semantic.length}`
+}
+
+/**
+ * The way on from a stop: back to the one before, and on to the next, whose label says what it is.
+ * After the last stop come the layers, for the rest of the diff.
+ * @param {ReadonlyArray<Stop>} stops
  * @param {number} index
  * @param {ReviewArtifact} artifact
  */
-function stepNavHtml(steps, index, artifact) {
-  const previous = steps[index - 1]
-  const next = steps[index + 1]
+function stopNavHtml(stops, index, artifact) {
+  const stop = stops[index]
+  const previous = stops[index - 1]
+  const next = stops[index + 1]
   const firstLayer = artifact.layers[0]
   const back =
     previous === undefined
       ? '<a href="#overview">&larr; overview</a>'
-      : `<a href="#${esc(stepAnchorId(previous.point.id))}">&larr; previous point</a>`
-  const on =
-    next !== undefined
-      ? `<a href="#${esc(stepAnchorId(next.point.id))}">next point &rarr;</a>`
-      : firstLayer === undefined
+      : `<a href="#${esc(previous.id)}">&larr; ${previous.kind === 'layer' ? esc(previous.layer.title) : 'previous point'}</a>`
+  let on = ''
+  if (next === undefined) {
+    on =
+      firstLayer === undefined
         ? ''
         : `<a href="#${esc(layerAnchorId(firstLayer.key))}">the rest of the diff, by layer &rarr;</a>`
+  } else if (stop?.kind === 'layer' && next.kind === 'point') {
+    const count = stop.points.length
+    on = `<a class="step-on" href="#${esc(next.id)}">go to its ${count} attention point${count === 1 ? '' : 's'} &rarr;</a>`
+  } else {
+    on = `<a href="#${esc(next.id)}">${next.kind === 'layer' ? `next layer: ${esc(next.layer.title)}` : 'next point'} &rarr;</a>`
+  }
   return `<nav class="step-nav" aria-label="Attention points">${back}${on}</nav>`
 }
 
 /**
- * Every attention point's stop, in the view's order. A point the reader acted on keeps its stop,
- * so the sequence stays the same while the reader works through it. A canvas with no point has
- * none.
+ * A layer's opening stop, without its way on: the layer's heading with its reviewed mark and ask
+ * command, its description, and its tests, shown at once.
+ * @param {Extract<Stop, { kind: 'layer' }>} stop
+ * @param {ReviewArtifact} artifact
+ * @param {PrState} state
+ * @param {ReadonlySet<string>} paths
+ */
+function layerStopHtml(stop, artifact, state, paths) {
+  const { layer } = stop
+  const position = layerPosition(artifact, layer)
+  const reviewed = layerProgress(layer, state) === 'done'
+  const controls =
+    layer.kind === 'other'
+      ? ''
+      : `<div class="layer-ctl"><label class="chk"><input type="checkbox" data-reviewed-id="${esc(reviewedId(layer.key))}"${reviewed ? ' checked' : ''}> reviewed</label>` +
+        `${askButtonHtml({ kind: 'layer', layerId: layer.id }, { label: 'ask about this layer' })}</div>`
+  return (
+    `<section class="point-step layer-step" id="${esc(stop.id)}" data-layer="${esc(layer.id)}" aria-label="${esc(layer.title)}">` +
+    `<div class="panel-h layer-h"><h2>${position === '' ? '' : `<span class="lbl">Layer ${position}</span>`}${esc(layer.title)}</h2>${controls}</div>` +
+    `<div class="body"><div class="rationale prose">${renderMarkdown(layer.rationale, { paths, diagrams: true })}</div></div>` +
+    testMapHtml(layer, paths, { open: true })
+  )
+}
+
+/**
+ * Every layer's opening stop and every attention point's stop, in the view's order. A point the
+ * reader acted on keeps its stop, so the sequence stays the same while the reader works through
+ * it. A canvas with no point has none.
  * @param {ReviewArtifact} artifact
  * @param {ReadonlyArray<FileEntry>} files
  * @param {PrState} state
@@ -78,8 +145,13 @@ export function renderPointSteps(artifact, files, state, comments = []) {
     state,
     posted: postedUrls(state, comments),
   }
-  const stops = steps.map(({ point, layer }, index) => {
-    const id = stepAnchorId(point.id)
+  const stops = stopsOf(artifact, steps)
+  const html = stops.map((stop, index) => {
+    const nav = stopNavHtml(stops, index, artifact)
+    if (stop.kind === 'layer') {
+      return `${layerStopHtml(stop, artifact, state, ctx.paths)}${nav}</section>`
+    }
+    const { point, layer } = stop.step
     const entry = files.find(f => f.path === point.path)
     const hunk = entry === undefined ? '' : hunkIdForPoint(point, entry)
     const layerFile = layer?.files.find(f => f.path === point.path)
@@ -91,18 +163,19 @@ export function renderPointSteps(artifact, files, state, comments = []) {
             entry,
             layer,
             ctx,
-            { id: `${id}-file`, open: true, onlyPoint: point.fingerprint }
+            { id: `${stop.id}-file`, open: true, onlyPoint: point.fingerprint }
           )
+    const position = layer === null ? '' : layerPosition(artifact, layer)
     const where =
       layer === null
         ? ''
-        : ` · <a href="#${esc(layerAnchorId(layer.key))}">${esc(layerLabel(artifact, layer))}</a>`
+        : ` · <a href="#${esc(layerStepAnchorId(layer.key))}">${esc(position === '' ? layer.title : `Layer ${position.split(' ')[0]} · ${layer.title}`)}</a>`
     return (
-      `<section class="point-step" id="${esc(id)}" aria-label="Attention point ${index + 1} of ${steps.length}">` +
-      `<p class="step-h"><span class="step-n">Point ${index + 1} of ${steps.length}</span>${where}</p>` +
-      `<ol class="findings step-card">${pointCardHtml(point, ctx, { id: `${id}-card` })}</ol>` +
-      `<div class="files">${code}</div>${stepNavHtml(steps, index, artifact)}</section>`
+      `<section class="point-step" id="${esc(stop.id)}" aria-label="Attention point ${stop.number} of ${steps.length}">` +
+      `<p class="step-h"><span class="step-n">Point ${stop.number} of ${steps.length}</span>${where}</p>` +
+      `<ol class="findings step-card">${pointCardHtml(point, ctx, { id: `${stop.id}-card` })}</ol>` +
+      `<div class="files">${code}</div>${nav}</section>`
     )
   })
-  return `<div class="point-steps" id="${POINT_STEPS_ID}">${stops.join('')}</div>`
+  return `<div class="point-steps" id="${POINT_STEPS_ID}">${html.join('')}</div>`
 }
