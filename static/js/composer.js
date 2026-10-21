@@ -5,7 +5,7 @@
 /** @typedef {import('./contract-types.js').PostCommentInput} PostCommentInput */
 import { cssEscape } from './anchors.js'
 import { renderMarkdown } from './markdown.js'
-import { esc } from './dom.js'
+import { esc, wideCellHtml } from './dom.js'
 import { noPostingTitle, postToLabel } from './host.js'
 
 /**
@@ -116,10 +116,7 @@ export function composerHtml(opts) {
  * @param {ComposerOptions} opts
  */
 export function composerRowHtml(opts) {
-  return (
-    `<tr class="composer" data-decoration="composer">` +
-    `<td class="code x" colspan="4">${composerHtml(opts)}</td></tr>`
-  )
+  return `<tr class="composer" data-decoration="composer">${wideCellHtml(composerHtml(opts))}</tr>`
 }
 
 /** The pending item shown while GitHub answers, replaced by the comment it returns. */

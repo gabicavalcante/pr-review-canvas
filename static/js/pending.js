@@ -7,7 +7,7 @@
 /** @typedef {import('./contract-types.js').Side} Side */
 /** The diff on screen: its commit, and the merge base it runs from. @typedef {import('./diff-identity.js').Diff} DiffOnScreen */
 import { writtenOn } from './diff-identity.js'
-import { esc, timeAgo } from './dom.js'
+import { esc, timeAgo, wideCellHtml } from './dom.js'
 import { hostLabel } from './host.js'
 import { renderMarkdown } from './markdown.js'
 import { settlementOf } from './self-review.js'
@@ -129,11 +129,7 @@ export function pendingCommentHtml(p, now) {
  * @param {Date} now
  */
 export function pendingRowHtml(drafts, now) {
-  return (
-    '<tr class="pending-row"><td class="code x" colspan="4">' +
-    drafts.map(p => pendingCommentHtml(p, now)).join('') +
-    '</td></tr>'
-  )
+  return `<tr class="pending-row">${wideCellHtml(drafts.map(p => pendingCommentHtml(p, now)).join(''))}</tr>`
 }
 
 /**

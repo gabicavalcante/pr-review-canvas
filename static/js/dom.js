@@ -31,6 +31,16 @@ export function optionsHtml(values, selected, labels) {
     .join('')
 }
 
+/**
+ * The one cell of a diff row that spans the table: a point card, a note, a thread, a composer.
+ * CSS keeps `.x-in` at the scroller's visible width and in view while the code scrolls sideways,
+ * so a long text wraps there instead of widening the code, and a long code line does not widen it.
+ * @param {string} inner HTML
+ */
+export function wideCellHtml(inner) {
+  return `<td class="code x" colspan="4"><div class="x-in">${inner}</div></td>`
+}
+
 /** The chevron every collapse toggle draws. It points right; CSS turns it down while open. */
 export const CHEVRON_ICON =
   '<svg class="chev-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">' +

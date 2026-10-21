@@ -4,7 +4,7 @@
 /** @typedef {import('./contract-types.js').PrState} PrState */
 import { askButtonHtml } from './ask.js'
 import { sendCommandsHtml, viewCommentHtml } from './comment-link.js'
-import { esc } from './dom.js'
+import { esc, wideCellHtml } from './dom.js'
 import { hostLabel } from './host.js'
 import { lineLink } from './links.js'
 import { pendingCommentHtml, pendingForPoint, pendingRange } from './pending.js'
@@ -418,8 +418,9 @@ export function pointCardHtml(p, ctx) {
 export function pointRowHtml(p, ctx) {
   const { attrs, handled, title, rest } = pointPartsHtml(p, ctx, { card: false })
   return (
-    `<tr class="ifind ${p.level}${handled}" ${attrs}><td class="code x" colspan="4">` +
-    `<div class="f-title">${levelIconHtml(p.level)}${title}</div>${rest}</td></tr>`
+    `<tr class="ifind ${p.level}${handled}" ${attrs}>` +
+    wideCellHtml(`<div class="f-title">${levelIconHtml(p.level)}${title}</div>${rest}`) +
+    '</tr>'
   )
 }
 
