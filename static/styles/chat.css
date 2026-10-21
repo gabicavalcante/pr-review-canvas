@@ -220,6 +220,13 @@ textarea:disabled {
   color: var(--fg-muted);
   font-size: 13px;
 }
+/* "back to" names a thread by its place, which can be a long title: it wraps instead of
+   scrolling the pane sideways. */
+.transcript .empty .cmd {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
 .turn {
   margin-bottom: 18px;
   padding-left: 12px;
