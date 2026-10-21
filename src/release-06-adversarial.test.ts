@@ -74,11 +74,13 @@ it.each([
   'agent: codex\nmodel: old-model\n',
   'agent: claude\nchatAgent: codex\nmodel: discarded\nchatModel: old-model\n',
 ])('legacy settings migrate without losing personal sharing settings (%#)', legacy => {
-  const saved = applySettings(legacy + 'canvasComment: false\nmentionCanvas: false\n', { layerView: 'one' })
+  const saved = applySettings(legacy + 'canvasComment: false\nmentionCanvas: false\n', {
+    layerView: 'points',
+  })
   expect(parseSettings(saved.text)).toMatchObject({
     chatAgent: 'codex',
     chatModel: 'old-model',
-    layerView: 'one',
+    layerView: 'points',
     canvasComment: false,
     mentionCanvas: false,
   })
@@ -262,7 +264,7 @@ it('personal sharing overrides apply to publish-facing APIs and survive settings
   const saved = await app.request('/api/settings', {
     method: 'PUT',
     headers,
-    body: JSON.stringify({ layerView: 'one' }),
+    body: JSON.stringify({ layerView: 'points' }),
   })
   expect(saved.status).toBe(200)
   const bundle = await app.request('/api/prs/42', { headers })

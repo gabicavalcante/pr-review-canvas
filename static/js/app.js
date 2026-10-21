@@ -154,7 +154,7 @@ export class PrAppElement extends HTMLElement {
   /** @type {{ stop: () => void } | null} */
   scrollSpy = null
   /**
-   * Whether the canvas shows every layer or one at a time. Made once per boot, from the setting
+   * Whether the canvas shows every layer or one attention point at a time. Made once per boot, from the setting
    * the page came with, and kept across renders: it redraws with each one, and a save in the
    * settings dialog changes its view without a reload.
    * @type {ReturnType<typeof initOneLayer> | null}
@@ -384,7 +384,7 @@ export class PrAppElement extends HTMLElement {
       this.innerHTML =
         header +
         bannerHtml(bundle.warnings) +
-        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state, { points: this.view === 'points' })}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now, ...(this.view === 'points' ? { wayOn: overviewWayOnHtml(artifact) } : {}) })}${this.view === 'points' ? renderPointSteps(artifact, files, bundle.state, bundle.comments.reviewComments) : ''}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
+        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state, { points: this.view === 'points' })}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now, ...(this.view === 'points' ? { wayOn: overviewWayOnHtml(artifact) } : {}) })}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}${this.view === 'points' ? renderPointSteps(artifact, files, bundle.state, bundle.comments.reviewComments) : ''}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
         footerHtml(boot.version, bundle)
       // A bar the reader dismissed goes before the review wiring measures the outdated bar.
       wireBarDismissal(this, storage)

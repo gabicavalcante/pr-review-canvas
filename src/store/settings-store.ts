@@ -21,9 +21,8 @@ theme: auto
 # control on the page changes it for that page only.
 foldLevel: light
 
-# How a review shows its layers: all on one page (all), one at a time with the rail to move
-# between them (one), or one attention point at a time with its code, then the rest by layer
-# (points).
+# How a review shows its layers: all on one page (all), or one attention point at a time, each
+# layer opening with its description and tests, then the rest of the diff (points).
 layerView: all
 
 # The colors of the attention point level icons: classic (red, amber, gray) or action (purple,

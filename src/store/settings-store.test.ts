@@ -220,11 +220,17 @@ describe('applySettings', () => {
   })
 
   it('saves the layer view under its comment, and refuses one it does not know', () => {
-    const { text, settings } = applySettings(SETTINGS_TEMPLATE, { layerView: 'one' })
-    expect(settings.layerView).toBe('one')
+    const { text, settings } = applySettings(SETTINGS_TEMPLATE, { layerView: 'points' })
+    expect(settings.layerView).toBe('points')
     expect(text).toContain('# How a review shows its layers')
-    expect(text).toContain('layerView: one')
+    expect(text).toContain('layerView: points')
     expect(parseSettings('layerView: some\n')).toEqual(DEFAULT_SETTINGS)
+  })
+
+  it('reads the one-layer view of an earlier version as the one-point view, keeping the rest', () => {
+    const settings = parseSettings('layerView: one\nchatAgent: codex\n')
+    expect(settings.layerView).toBe('points')
+    expect(settings.chatAgent).toBe('codex')
   })
 
   it('saves the point colors under their comment, reads a file without them as classic, and refuses one it does not know', () => {

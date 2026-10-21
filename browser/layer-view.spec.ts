@@ -1,92 +1,60 @@
 import { expect, test } from './fixtures.js'
 
-test('shows one layer at a time once the setting is saved, on this page and after a reload', async ({
+test('reads the canvas one attention point at a time once the setting is saved, on this page and after a reload', async ({
   page,
   reviewUrl,
 }) => {
   await page.goto(reviewUrl)
   const overview = page.locator('#overview')
   const layer = page.locator('#layer-run-path')
-  const other = page.locator('#layer-other')
+  const opening = page.locator('#step-layer-run-path')
+  const first = page.locator('#step-p-1')
   await expect(overview).toBeVisible()
   await expect(layer).toBeVisible()
 
-  // The save applies to the open page: the overview stays, the layers go.
+  // The save draws the page again, opening on the first layer's opening stop alone.
   await page.locator('#settings').click()
-  await page.locator('#set-layer-view').selectOption('one')
+  await page.locator('#set-layer-view').selectOption('points')
   await page.locator('[data-act="settings-save"]').click()
   await expect(page.locator('#settings-dialog')).toBeHidden()
-  await expect(overview).toBeVisible()
-  await expect(layer).toBeHidden()
-  await expect(other).toBeHidden()
-
-  // The rail moves between layers, and marks the one that shows.
-  await page.locator('nav.rail a[href="#layer-run-path"]').click()
-  await expect(layer).toBeVisible()
+  await expect(opening).toBeVisible()
+  await expect(opening.locator('details.test-map')).toHaveAttribute('open', '')
   await expect(overview).toBeHidden()
-  await expect(page.locator('nav.rail a[href="#layer-run-path"]')).toHaveAttribute('aria-current', 'location')
-  await expect(page.locator('nav.rail a[href="#overview"]')).not.toHaveAttribute('aria-current', 'location')
-
-  // The choice is in settings.yml, and the URL names the layer, so a reload opens on it alone.
-  await page.reload()
-  await expect(layer).toBeVisible()
-  await expect(overview).toBeHidden()
-  await expect(other).toBeHidden()
-
-  // With nothing in focus, j starts from the layer on screen, though it is too short to scroll.
-  await page.keyboard.press('j')
-  await expect(other).toBeVisible()
-  await expect(page).toHaveURL(/#layer-other$/)
-  await expect(other.locator('details > .body')).toBeVisible()
-  await page.reload()
-  await expect(other.locator('details > .body')).toBeVisible()
-  // A refresh keeps the layer the reader moved to.
-  await page.locator('#refresh').click()
-  await expect(page.locator('#refresh')).toBeEnabled()
-  await expect(other).toBeVisible()
   await expect(layer).toBeHidden()
 
-  // The keys move too: g o to the overview, j to the first layer, j again to Other.
-  await page.keyboard.press('g')
-  await page.keyboard.press('o')
-  await expect(overview).toBeVisible()
-  await expect(layer).toBeHidden()
-  await page.keyboard.press('j')
-  await expect(layer).toBeVisible()
-  await expect(overview).toBeHidden()
-  await page.keyboard.press('j')
-  await expect(other).toBeVisible()
-  await expect(layer).toBeHidden()
+  // The opening leads to the layer's points, each with only its chunk of code.
+  await opening.locator('.step-nav a.step-on').click()
+  await expect(first).toBeVisible()
+  await expect(opening).toBeHidden()
+  await expect(first.locator('table.diff')).toHaveCount(1)
+  await expect(page).toHaveURL(/#step-p-1$/)
 
-  // After the rail moves away, j steps on from the layer that shows, not the card it left.
-  await page.locator('nav.rail a[href="#overview"]').click()
-  await expect(overview).toBeVisible()
-  await page.keyboard.press('j')
-  await expect(layer).toBeVisible()
-  await expect(other).toBeHidden()
+  // The rail lists the points under their layers; a stop takes the place of the one before, under a
+  // page that stays at the top.
+  await page.mouse.wheel(0, 600)
+  await page.locator('nav.rail a[href="#step-p-2"]').click()
+  await expect(page.locator('#step-p-2')).toBeVisible()
+  await expect(first).toBeHidden()
+  await expect(page.locator('nav.rail a[href="#step-p-2"]')).toHaveAttribute('aria-current', 'location')
+  expect(await page.evaluate(() => window.scrollY)).toBe(0)
 
-  // And k, from a reload onto the last layer.
-  await page.locator('nav.rail a[href="#layer-other"]').click()
+  // The URL names the stop, so a reload opens on it alone.
   await page.reload()
-  await expect(other).toBeVisible()
-  await page.keyboard.press('k')
+  await expect(page.locator('#step-p-2')).toBeVisible()
+  await expect(first).toBeHidden()
+
+  // After the last point come the layers, for the rest of the diff.
+  await page.locator('#step-p-2 .step-nav a', { hasText: 'next point' }).click()
+  await page.locator('#step-p-3 .step-nav a', { hasText: 'the rest of the diff' }).click()
   await expect(layer).toBeVisible()
-  await expect(other).toBeHidden()
+  await expect(page.locator('#step-p-3')).toBeHidden()
 
-  await expect(page).toHaveURL(/#layer-run-path$/)
-  await page.keyboard.press('k')
-  await expect(overview).toBeVisible()
-  await expect(page).toHaveURL(/#overview$/)
-  await page.keyboard.press('j')
-  await page.keyboard.press('Shift+r')
-  await page.reload()
-  await expect(layer.locator('.layer-body')).toBeVisible()
-
-  // Back to all at once, and every section returns.
+  // Back to all at once: every section returns, and the stops are gone.
   await page.locator('#settings').click()
   await page.locator('#set-layer-view').selectOption('all')
   await page.locator('[data-act="settings-save"]').click()
   await expect(overview).toBeVisible()
   await expect(layer).toBeVisible()
-  await expect(other).toBeVisible()
+  await expect(page.locator('#layer-other')).toBeVisible()
+  await expect(page.locator('section.point-step')).toHaveCount(0)
 })

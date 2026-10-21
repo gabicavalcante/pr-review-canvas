@@ -1,7 +1,13 @@
 // @ts-check
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_LAYER_VIEW, isLayerView, LAYER_VIEW_LABELS, LAYER_VIEWS } from './layer-views.js'
+import {
+  currentLayerView,
+  DEFAULT_LAYER_VIEW,
+  isLayerView,
+  LAYER_VIEW_LABELS,
+  LAYER_VIEWS,
+} from './layer-views.js'
 import { elementForHash, initOneLayer, pageSections, sectionOf, showOnly } from './one-layer.js'
 
 /** @type {HTMLElement} */
@@ -60,13 +66,16 @@ const click = el => el?.dispatchEvent(new MouseEvent('click', { bubbles: true, c
 const reveal = el => el?.dispatchEvent(new Event('reveal-code', { bubbles: true }))
 
 describe('the layer views', () => {
-  it('names three views, all by default, each with a label', () => {
-    expect(LAYER_VIEWS).toEqual(['all', 'one', 'points'])
+  it('names two views, all by default, each with a label, and reads the old one-layer view as points', () => {
+    expect(LAYER_VIEWS).toEqual(['all', 'points'])
     expect(DEFAULT_LAYER_VIEW).toBe('all')
-    expect(isLayerView('one')).toBe(true)
+    expect(isLayerView('points')).toBe(true)
+    expect(isLayerView('one')).toBe(false)
+    expect(currentLayerView('one')).toBe('points')
+    expect(currentLayerView('all')).toBe('all')
     expect(isLayerView('some')).toBe(false)
     expect(isLayerView(1)).toBe(false)
-    expect(Object.keys(LAYER_VIEW_LABELS)).toEqual(['all', 'one', 'points'])
+    expect(Object.keys(LAYER_VIEW_LABELS)).toEqual(['all', 'points'])
   })
 })
 
@@ -117,19 +126,19 @@ describe('initOneLayer', () => {
   })
 
   it('opens on the overview alone in the one view, and leaves the bar above the canvas', () => {
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     expect(shownIds()).toEqual(['overview'])
     expect(root.querySelector('.stale-bar')?.hasAttribute('hidden')).toBe(false)
   })
 
   it('opens on the layer the URL names', () => {
     window.location.hash = '#layer-storage'
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     expect(shownIds()).toEqual(['layer-storage'])
   })
 
   it('shows the layer that holds whatever is scrolled to', () => {
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     reveal(root.querySelector('#src_auth_ts-new-4'))
     expect(shownIds()).toEqual(['layer-auth'])
     // The overview again, the way `g o` gets there.
@@ -141,7 +150,7 @@ describe('initOneLayer', () => {
   })
 
   it('shows the layer a rail link or a "more chunks" link points at before the browser scrolls', () => {
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     click(root.querySelector('nav.rail a[href="#layer-storage"]'))
     expect(shownIds()).toEqual(['layer-storage'])
     click(root.querySelector('.more-hunks a'))
@@ -149,7 +158,7 @@ describe('initOneLayer', () => {
   })
 
   it('leaves a modified click, and one on no link, alone', () => {
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     root
       .querySelector('nav.rail a[href="#layer-storage"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))
@@ -160,7 +169,7 @@ describe('initOneLayer', () => {
 
   it('follows a hash change to a layer in place, under a page that stays at the top', () => {
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     const scrolled = vi.fn()
     section('layer-other').scrollIntoView = scrolled
     window.location.hash = '#layer-other'
@@ -194,29 +203,29 @@ describe('initOneLayer', () => {
     expect(shownIds()).toHaveLength(4)
   })
 
-  it('switches views on the open page, keeping the section the rail marks as being read', () => {
-    oneLayer = initOneLayer(root, { view: 'one' })
-    // The URL still names where the reader was sent, not where they scrolled to since.
-    window.location.hash = '#overview'
+  it('switches views on the open page, starting the one-point view where the URL says or at its first stop', () => {
+    oneLayer = initOneLayer(root, { view: 'points' })
+    window.location.hash = '#layer-storage'
     oneLayer.setView('all')
     expect(shownIds()).toHaveLength(4)
+    // The rail's mark is where the reader scrolled to in the all view; the view starts afresh.
     root.querySelector('nav.rail a[aria-current]')?.removeAttribute('aria-current')
-    root.querySelector('nav.rail a[href="#layer-storage"]')?.setAttribute('aria-current', 'location')
-    oneLayer.setView('one')
+    root.querySelector('nav.rail a[href="#layer-auth"]')?.setAttribute('aria-current', 'location')
+    oneLayer.setView('points')
     expect(shownIds()).toEqual(['layer-storage'])
     // Setting the view it already has changes nothing.
-    oneLayer.setView('one')
+    oneLayer.setView('points')
     expect(shownIds()).toEqual(['layer-storage'])
-    // With no section marked, the URL names one.
+    // With nothing in the URL, the first stop, or the overview of a canvas with none.
+    window.location.hash = ''
     oneLayer.setView('all')
-    root.querySelector('nav.rail a[aria-current]')?.removeAttribute('aria-current')
-    oneLayer.setView('one')
+    oneLayer.setView('points')
     expect(shownIds()).toEqual(['overview'])
   })
 
   it('keeps the section on screen when the page is redrawn, whatever the URL says', () => {
     window.location.hash = '#layer-storage'
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     expect(shownIds()).toEqual(['layer-storage'])
     // Revealing code moves on to another layer without writing the URL.
     reveal(root.querySelector('#src_auth_ts-new-4'))
@@ -230,7 +239,7 @@ describe('initOneLayer', () => {
   })
 
   it('stops listening when told to', () => {
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     oneLayer.stop()
     reveal(section('layer-auth'))
     expect(shownIds()).toEqual(['overview'])
@@ -238,7 +247,7 @@ describe('initOneLayer', () => {
 
   it('does nothing on a screen without sections', () => {
     root.innerHTML = '<main id="main"><div class="empty">no canvas</div></main>'
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     oneLayer.redraw()
     expect(pageSections(root)).toEqual([])
   })
@@ -290,7 +299,7 @@ describe('the one-point view', () => {
 
   it('swaps a layer in place in the layer view too, and leaves the all view to the browser', () => {
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
-    oneLayer = initOneLayer(root, { view: 'one' })
+    oneLayer = initOneLayer(root, { view: 'points' })
     const event = new MouseEvent('click', { bubbles: true, cancelable: true })
     root.querySelector('a[href="#layer-auth"]')?.dispatchEvent(event)
     expect(event.defaultPrevented).toBe(true)

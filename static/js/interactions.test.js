@@ -619,7 +619,7 @@ describe('reviewed state', () => {
 
     it('stays in its layer when one layer shows at a time', async () => {
       const { root, calls } = setup({ artifact: withSecondLayer(), state: lastOpen })
-      wirings.push(initOneLayer(root, { view: 'one' }))
+      wirings.push(initOneLayer(root, { view: 'points' }))
       click(root, 'nav.rail a[href="#layer-run-path"]')
       await markLast(root)
       expect(calls).toEqual([['reviewed', { id: 'layer:run-path/file:src_app_test_ts', reviewed: true }]])

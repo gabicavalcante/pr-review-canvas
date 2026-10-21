@@ -4,7 +4,9 @@
 // Each point's stop is the point's card, whole, then the file it is on, drawn with the one chunk
 // that holds its lines and a mark on them where the point is. Every stop leads to the one before
 // and after; the last leads to the layers, for the rest of the diff. Only that view draws the
-// stops, and `one-layer.js` shows them one at a time.
+// stops, and `one-layer.js` shows them one at a time. They come after the layers on the page: a
+// point's code is the layer's drawn again, under the same ids, so a link to a line or a chunk
+// lands in its layer, the first on the page.
 /** @typedef {import('./contract-types.js').FileEntry} FileEntry */
 /** @typedef {import('./contract-types.js').PrState} PrState */
 /** @typedef {import('./contract-types.js').ReviewArtifact} ReviewArtifact */

@@ -209,7 +209,7 @@ describe('settingsDialogHtml', () => {
   it('offers both layer views with the saved one selected', () => {
     const html = settingsDialogHtml(SETTINGS, AGENTS)
     expect(html).toContain('<option value="all" selected>all at once</option>')
-    expect(html).toContain('<option value="one">one at a time</option>')
+    expect(html).toContain('<option value="points">one point at a time</option>')
   })
 
   it('says that a missing acpx turns the pane off', () => {
@@ -259,11 +259,11 @@ describe('readSettingsForm', () => {
   it('reads the layer view the reader picked', () => {
     const holder = document.createElement('div')
     holder.innerHTML = settingsDialogHtml(
-      { ...SETTINGS, settings: { ...SETTINGS.settings, layerView: 'one' } },
+      { ...SETTINGS, settings: { ...SETTINGS.settings, layerView: 'points' } },
       AGENTS
     )
-    expect(holder.querySelector('#set-layer-view option[selected]')?.textContent).toBe('one at a time')
-    expect(readSettingsForm(holder).layerView).toBe('one')
+    expect(holder.querySelector('#set-layer-view option[selected]')?.textContent).toBe('one point at a time')
+    expect(readSettingsForm(holder).layerView).toBe('points')
   })
 
   it('reads a thread per place the reader turned off', () => {

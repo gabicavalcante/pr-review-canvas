@@ -1,11 +1,11 @@
 // @ts-check
-// One layer at a time. With `layerView: one` the page shows the overview or a single layer
-// section and hides the rest, so the rail is how the reader moves between layers and the page
-// scrolls through one layer only. Whatever brings something on screen (a rail link, the j/k and
-// n/p keys, a canvas link) shows the section that holds it first, so nothing the reader is sent
-// to stays hidden. A review mark is the exception: it moves on to the next card only inside the
-// layer on screen. With `points` the page also has a stop per attention point (`point-view.js`),
-// shown the same way, one at a time, starting from the first. With `all` this module does nothing.
+// One section at a time, for the one-point view (`layerView: points`): the page shows the overview,
+// a layer's opening or a point's stop (`point-view.js`), or a layer, and hides the rest, so the
+// rail is how the reader moves between them. It opens on the first stop, or on the overview of a
+// canvas with no point. Whatever brings something on screen (a rail link, the j/k and n/p keys, a
+// canvas link) shows the section that holds it first, so nothing the reader is sent to stays
+// hidden. A review mark is the exception: it moves on to the next card only inside the section on
+// screen. With `all` this module does nothing.
 import { cssEscape } from './anchors.js'
 import { decodeHash, plainClick } from './deep-link.js'
 import { scrollIntoViewSafe } from './dom.js'
@@ -38,7 +38,7 @@ export function inHiddenSection(el) {
 }
 
 /**
- * True for the overview or a layer section, the elements one layer at a time shows and hides.
+ * True for the overview, a stop, or a layer section, the elements one at a time shows and hides.
  * @param {Element} el
  */
 export function isPageSection(el) {
@@ -86,8 +86,8 @@ export function elementForHash(root, hash) {
 }
 
 /**
- * Keeps one section on screen at a time while the view is `one` or `points`, and gets out of the
- * way while it is `all`. Made once for the app element; `redraw` runs after every render, before the deep
+ * Keeps one section on screen at a time while the view is `points`, and gets out of the way while
+ * it is `all`. Made once for the app element; `redraw` runs after every render, before the deep
  * links follow the URL, so a link into a layer lands on a layer that is showing. The URL names
  * the section on the first draw; after that the section last shown is the reader's place.
  * @param {HTMLElement} root
@@ -98,7 +98,7 @@ export function initOneLayer(root, opts) {
   const win = opts.win ?? window
   let view = opts.view
   /**
-   * The fragment of the section on screen while the view is `one`, empty before the first draw.
+   * The fragment of the section on screen while one shows at a time, empty before the first draw.
    * A fragment and not the element, since a render replaces the sections.
    */
   let shownHash = ''
@@ -141,8 +141,8 @@ export function initOneLayer(root, opts) {
       }
       return
     }
-    // The one-point view opens on its first point; the layer view, on the overview.
-    const first = view === 'points' ? root.querySelector('section.point-step') : null
+    // The view opens on its first stop, and on the overview of a canvas with none.
+    const first = root.querySelector('section.point-step')
     const section =
       sectionFor(shownHash) ??
       sectionFor(win.location.hash) ??
@@ -221,8 +221,8 @@ export function initOneLayer(root, opts) {
     setView(next) {
       if (next !== view) {
         view = next
-        // Coming from `all`, the reader is on the section the rail marks as being read.
-        shownHash = root.querySelector('nav.rail a[aria-current]')?.getAttribute('href') ?? ''
+        // Moving into the one-point view starts it from its first stop, whatever was being read.
+        shownHash = ''
         redraw()
       }
     },

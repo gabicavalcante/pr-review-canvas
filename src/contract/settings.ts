@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { GenerationModels, Sharing } from '../project-config.js'
 import type { ReviewKey } from './review-key.js'
 import { DEFAULT_FOLD_LEVEL, FOLD_LEVELS } from '../../static/js/fold-levels.js'
-import { DEFAULT_LAYER_VIEW, LAYER_VIEWS } from '../../static/js/layer-views.js'
+import { currentLayerView, DEFAULT_LAYER_VIEW, LAYER_VIEWS } from '../../static/js/layer-views.js'
 import { DEFAULT_POINT_COLORS, POINT_COLORS } from '../../static/js/point-colors.js'
 import { DEFAULT_SKIN, isSkin, SKINS, type Skin } from '../../static/js/skin.js'
 import { DEFAULT_THEME, isTheme, THEMES, type Theme } from '../../static/js/theme.js'
@@ -53,8 +53,8 @@ export const SettingsSchema = z.object({
   theme: z.enum(THEMES),
   /** The reading level every review opens at; the control on the page changes it for one page. */
   foldLevel: z.enum(FOLD_LEVELS),
-  /** Whether a review shows every layer on one page, or the overview or one layer at a time. */
-  layerView: z.enum(LAYER_VIEWS),
+  /** Whether a review shows every layer on one page, or one attention point at a time. */
+  layerView: z.preprocess(currentLayerView, z.enum(LAYER_VIEWS)),
   /** The palette of the attention point level icons; their shapes are the same in each. */
   pointColors: z.enum(POINT_COLORS),
   /** The agent that answers in AI Chat. Canvas generation does not read it. */
@@ -122,7 +122,7 @@ export const SettingsInputSchema = z.strictObject({
   skin: z.enum(SKINS).optional(),
   theme: z.enum(THEMES).optional(),
   foldLevel: z.enum(FOLD_LEVELS).optional(),
-  layerView: z.enum(LAYER_VIEWS).optional(),
+  layerView: z.preprocess(currentLayerView, z.enum(LAYER_VIEWS)).optional(),
   pointColors: z.enum(POINT_COLORS).optional(),
   chatAgent: z.enum(CHAT_AGENTS).optional(),
   chatModel: z.string().max(200).nullable().optional(),

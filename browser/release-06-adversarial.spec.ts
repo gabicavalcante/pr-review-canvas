@@ -189,7 +189,7 @@ test('saving Reading settings migrates legacy chat keys and preserves sharing ov
   })
   await page.goto(url)
   await page.locator('#settings').click()
-  await page.locator('#set-layer-view').selectOption('one')
+  await page.locator('#set-layer-view').selectOption('points')
   await page.locator('[data-act="settings-save"]').click()
   await expect(page.locator('#settings-dialog')).toBeHidden()
   expect(await ctx.settings.read()).toMatchObject({
@@ -197,17 +197,18 @@ test('saving Reading settings migrates legacy chat keys and preserves sharing ov
     chatModel: 'chosen-model',
     canvasComment: false,
     mentionCanvas: false,
-    layerView: 'one',
+    layerView: 'points',
   })
   await page.reload()
-  await expect(page.locator('#overview')).toBeVisible()
+  await expect(page.locator('#step-layer-run-path')).toBeVisible()
+  await expect(page.locator('#overview')).toBeHidden()
   await expect(page.locator('#layer-run-path')).toBeHidden()
 })
 
-test('one-layer navigation supports deep links and browser back/forward', async ({ page, reviewUrl }) => {
+test('one-at-a-time navigation supports deep links and browser back/forward', async ({ page, reviewUrl }) => {
   await page.goto(reviewUrl)
   await page.locator('#settings').click()
-  await page.locator('#set-layer-view').selectOption('one')
+  await page.locator('#set-layer-view').selectOption('points')
   await page.locator('[data-act="settings-save"]').click()
   await page.locator('nav.rail a[href="#layer-run-path"]').click()
   await page.locator('nav.rail a[href="#layer-other"]').click()
@@ -218,13 +219,14 @@ test('one-layer navigation supports deep links and browser back/forward', async 
   await expect(page.locator('#layer-other')).toBeVisible()
   await page.goto(reviewUrl + '#line:src/app.ts:4')
   await expect(page.locator('#layer-run-path')).toBeVisible()
-  await expect(page.locator('#L-src_app_ts-new-4')).toBeInViewport()
+  // A point's stop draws the line again; the link lands in the layer.
+  await expect(page.locator('pr-layer #L-src_app_ts-new-4')).toBeInViewport()
 })
 
 test('marking the only displayed layer reviewed stays on that layer', async ({ page, reviewUrl }) => {
   await page.goto(reviewUrl)
   await page.locator('#settings').click()
-  await page.locator('#set-layer-view').selectOption('one')
+  await page.locator('#set-layer-view').selectOption('points')
   await page.locator('[data-act="settings-save"]').click()
   await expect(page.locator('#settings-dialog')).toBeHidden()
   await page.keyboard.press('j')
