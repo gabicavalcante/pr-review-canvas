@@ -271,6 +271,14 @@ function maskFlowchartText(line) {
 }
 
 /**
+ * An id right before a decision's brace, in the characters mermaid takes for a node id: letters
+ * and digits, `_`, `.`, a few symbols, and a dash inside it that does not start a link (`--`,
+ * `->`, `-.`). `&` is left out, since it joins two nodes.
+ */
+const ID_CHAR = String.raw`[\p{L}\p{N}_.!#$%*+?/\\]`
+const DECISION_ID = new RegExp(String.raw`(${ID_CHAR}(?:${ID_CHAR}|-(?![->.]))*)\{(?!\{)`, 'gu')
+
+/**
  * A flowchart drawn compact: every decision `id{text}` becomes a hexagon `id{{text}}`. Mermaid
  * grows a diamond with its text, so a decision that asks a full question took most of the
  * drawing; a hexagon is as wide as its text and only a line taller. The ids stay, so node links
@@ -294,7 +302,7 @@ export function compactFlowchart(source) {
     const masked = maskFlowchartText(line)
     const chars = line.split('')
     // An id right before one brace opens a diamond; `{{` is a hexagon already, and `@{` a shape.
-    for (const match of masked.matchAll(/([A-Za-z0-9_]+)\{(?!\{)/g)) {
+    for (const match of masked.matchAll(DECISION_ID)) {
       const id = match[1] ?? ''
       const at = (match.index ?? 0) + id.length
       const close = masked.indexOf('}', at)

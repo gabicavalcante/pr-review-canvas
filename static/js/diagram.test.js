@@ -183,6 +183,33 @@ describe('compactFlowchart', () => {
     })
   })
 
+  it('takes an id with dashes, dots, or other letters whole, and not the link before it', () => {
+    const source = [
+      'flowchart TD',
+      '  start-->is-ready{Ready?}',
+      '  is-ready---v1.2{Newer?}',
+      '  v1.2-.->é_ok{Accents?}',
+      '  é_ok==>done',
+    ].join('\n')
+    const result = compactFlowchart(source)
+    expect(result.decisions).toEqual(['is-ready', 'v1.2', 'é_ok'])
+    expect(result.source).toBe(
+      [
+        'flowchart TD',
+        '  start-->is-ready{{Ready?}}',
+        '  is-ready---v1.2{{Newer?}}',
+        '  v1.2-.->é_ok{{Accents?}}',
+        '  é_ok==>done',
+      ].join('\n')
+    )
+  })
+
+  it('tints a decision whose id has a dash', () => {
+    const drawn = drawnSource('flowchart TD\n  is-ready{Ready?} --> b', COLORS)
+    expect(drawn).toContain('is-ready{{Ready?}}')
+    expect(drawn).toMatch(/\n {2}class is-ready \S+$/)
+  })
+
   it('leaves braces in quotes, edge labels, other shapes, and styling lines alone', () => {
     const source = [
       'flowchart LR',
