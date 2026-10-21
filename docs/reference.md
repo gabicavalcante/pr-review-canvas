@@ -1279,9 +1279,12 @@ of its own per thread, with every tool approved. What holds it in:
 - **The git guard.** A `reference-transaction` hook lets the turn move only its branch, and only
   forward: an amend, reset, rebase, branch switch, new branch, tag or stash is refused. It is set
   through `GIT_CONFIG_*` for the turn alone and runs your repository's own hooks after it, so your
-  `pre-commit` still runs and nothing is written to the repository.
-- **Pushes.** Every push URL is rewritten to one that does not exist, and the guard's `pre-push`
-  refuses a push to a remote given as a path.
+  `pre-commit` still runs and nothing is written to the repository. It applies to your clone and
+  its worktrees only: a repository the turn makes, such as a test's fixture made with `git init`,
+  keeps its own HEAD and its own hooks.
+- **Pushes.** Every push to the network is rewritten to a URL that does not exist, from any
+  repository. From your clone, a push to a `file://` URL is rewritten too, and the guard's
+  `pre-push` refuses a push to a remote given as a path.
 
 After each such turn the answer lists the commits it made and anything else it left in your
 checkout, each with the command that puts it back: HEAD off the branch, the branch moved back, a ref

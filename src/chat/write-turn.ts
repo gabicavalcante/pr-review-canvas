@@ -45,10 +45,11 @@ export function createWriteTurnPreparer(opts: WriteTurnPreparerOptions): Prepare
   return async request => {
     hooksWritten ??= writeGuardHooks(opts.guardHooksDir)
     const commonDir = await execFileAsync('git', ['rev-parse', '--git-common-dir'], { cwd: opts.checkout })
+    const gitCommonDir = path.resolve(opts.checkout, commonDir.stdout.trim())
     const input = {
       agent: request.agent,
       checkout: opts.checkout,
-      gitCommonDir: path.resolve(opts.checkout, commonDir.stdout.trim()),
+      gitCommonDir,
       dataDir: opts.dataDir,
       codexHome: path.join(opts.reviewDir(request.key), 'codex-home'),
       home,
@@ -61,6 +62,7 @@ export function createWriteTurnPreparer(opts: WriteTurnPreparerOptions): Prepare
     ])
     const guard = gitGuardConfig({
       hooksDir: opts.guardHooksDir,
+      gitCommonDir,
       branchRef: request.branchRef,
       originalHooksDir,
     })

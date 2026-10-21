@@ -43,8 +43,8 @@ describe('createWriteTurnPreparer', () => {
     expect(bound('--ro-bind', dataDir)).toBe(true)
     expect(turn.box.at(-1)).toBe('--')
     expect(turn.env).toMatchObject({
-      GIT_CONFIG_KEY_0: 'core.hooksPath',
-      GIT_CONFIG_VALUE_0: guardHooksDir,
+      GIT_CONFIG_KEY_0: `includeIf.gitdir:${path.join(checkout, '.git')}.path`,
+      GIT_CONFIG_VALUE_0: path.join(guardHooksDir, 'config'),
       PR_REVIEW_BRANCH: 'refs/heads/feat',
       PR_REVIEW_ORIG_HOOKS: path.join(checkout, '.git', 'hooks'),
     })

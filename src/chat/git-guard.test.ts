@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { execFile } from 'node:child_process'
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { promisify } from 'node:util'
@@ -76,23 +76,33 @@ describe('the guard in a real repository', () => {
     return `${stdout}${head}`
   }
 
-  /** Runs `args` with the guard on, and says whether git refused it and whether any ref moved. */
-  const guarded = async (
-    repo: string,
-    args: string[]
-  ): Promise<{ refused: boolean; moved: boolean; message: string }> => {
+  /** The environment of a turn on `repo`'s `feat`. */
+  const guardEnv = async (repo: string): Promise<NodeJS.ProcessEnv> => {
     const guard = gitGuardConfig({
       hooksDir,
+      gitCommonDir: path.join(repo, '.git'),
       branchRef: 'refs/heads/feat',
       originalHooksDir: await repositoryHooksDir(repo),
     })
-    const env = { ...process.env, ...gitConfigEnv(process.env, guard.pairs), ...guard.env }
-    const before = await refs(repo)
-    const outcome = await git(repo, args, env).then(
+    return { ...process.env, ...gitConfigEnv(process.env, guard.pairs), ...guard.env }
+  }
+
+  /**
+   * Runs `args` in `cwd`, `repo` itself unless given, with the guard on for `repo`, and says
+   * whether git refused it and whether any ref of `cwd` moved.
+   */
+  const guarded = async (
+    repo: string,
+    args: string[],
+    cwd: string = repo
+  ): Promise<{ refused: boolean; moved: boolean; message: string }> => {
+    const env = await guardEnv(repo)
+    const before = await refs(cwd)
+    const outcome = await git(cwd, args, env).then(
       () => ({ refused: false, message: '' }),
       (err: { stderr?: string }) => ({ refused: true, message: err.stderr ?? '' })
     )
-    return { ...outcome, moved: (await refs(repo)) !== before }
+    return { ...outcome, moved: (await refs(cwd)) !== before }
   }
 
   it('lets a commit through and still runs the repository’s own pre-commit', async () => {
@@ -190,6 +200,51 @@ describe('the guard in a real repository', () => {
     expect(result).toMatchObject({ refused: true })
     expect(result.message).toContain('does not push')
     expect(await remoteHead(bare)).toBe(before)
+  })
+
+  it('guards a worktree of the reader’s clone, which shares its refs', async () => {
+    const repo = await repository()
+    const worktree = path.join(await mkdtemp(path.join(root, 'worktree-')), 'wt')
+    await git(repo, ['worktree', 'add', '-q', worktree, 'other'])
+    await writeFile(path.join(worktree, 'f'), 'c\n')
+    const result = await guarded(repo, ['commit', '-q', '-am', 'c'], worktree)
+    expect(result).toMatchObject({ refused: true, moved: false })
+    expect(result.message).toContain('not refs/heads/other')
+  })
+
+  it('leaves a repository the turn makes to itself, with its own HEAD and its own hooks', async () => {
+    const repo = await repository()
+    const scratch = path.join(await mkdtemp(path.join(root, 'scratch-')), 'repo')
+    // A test's fixture repository, made and committed to while the turn runs.
+    const env = await guardEnv(repo)
+    await git(root, ['init', '-q', '-b', 'main', scratch], env)
+    const hook = path.join(scratch, '.git', 'hooks', 'pre-commit')
+    await writeFile(hook, `#!/bin/sh\necho own >> "${path.join(scratch, 'precommit.log')}"\n`)
+    await chmod(hook, 0o755)
+    await writeFile(path.join(scratch, 'f'), 'a\n')
+    await git(scratch, ['add', 'f'], env)
+    expect(await guarded(repo, ['commit', '-q', '-m', 'a'], scratch)).toMatchObject({
+      refused: false,
+      moved: true,
+    })
+    expect(await guarded(repo, ['checkout', '-q', '-b', 'side'], scratch)).toMatchObject({ refused: false })
+    expect(await readFile(path.join(scratch, 'precommit.log'), 'utf8')).toBe('own\n')
+    await expect(access(path.join(repo, 'precommit.log'))).rejects.toThrow()
+  })
+
+  it('lets a repository the turn makes push to a local one, and to the network from none', async () => {
+    const repo = await repository()
+    const scratch = path.join(await mkdtemp(path.join(root, 'scratch-')), 'repo')
+    const bare = await mkdtemp(path.join(root, 'remote-'))
+    await git(bare, ['init', '-q', '--bare'])
+    await git(root, ['clone', '-q', repo, scratch])
+    await git(scratch, ['remote', 'add', 'local', `file://${bare}`])
+    await git(scratch, ['remote', 'add', 'network', 'https://example.invalid/r.git'])
+    expect(await guarded(repo, ['push', '-q', 'local', 'feat'], scratch)).toMatchObject({ refused: false })
+    expect(await remoteHead(bare)).toBe((await git(repo, ['rev-parse', 'feat'])).stdout.trim())
+    const network = await guarded(repo, ['push', '-q', 'network', 'feat'], scratch)
+    expect(network).toMatchObject({ refused: true })
+    expect(network.message).toContain('pr-review-push-blocked')
   })
 
   it('still fetches', async () => {
