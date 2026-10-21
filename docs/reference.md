@@ -737,8 +737,9 @@ callers, whatever it takes to change the code back. **critical** cannot be taken
 ships, such as data lost or exposed, content shared that was not meant to be, an outage, or a break
 for callers. **high** shows users or callers wrong behavior until a fix ships. **low** goes
 unnoticed outside the code: the cost is rework or readability.
-Its card shows the impact next to the title, and `decide` points list the worst impact first. A
-canvas generated before impact existed shows its `decide` points without one.
+Its card shows the impact next to the title, in the color of the **decide** icon: filled for
+**critical**, outlined for **high**, and dashed for **low**. `decide` points list the worst impact
+first. A canvas generated before impact existed shows its `decide` points without one.
 
 The icons are red, amber, and gray by default. Set **Point colors** in the settings dialog to
 **action** for purple, blue, and gray instead, so no level reads as a warning. The choice is saved

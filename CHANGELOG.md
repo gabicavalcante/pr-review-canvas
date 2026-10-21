@@ -35,7 +35,9 @@
   default) or **action** (purple, blue, gray), for readers who took the red and amber for a
   severity scale. It is saved as `pointColors` in `settings.yml`.
 - A **decide** point has an impact: **critical**, **high**, or **low**, for what a wrong call would
-  cost. Its card shows it next to the title, and decide points list the worst impact first. A
+  cost. Its card shows it next to the title in the decide icon's color, filled for critical,
+  outlined for high, and dashed for low, apart from the kind and audience tags. Decide
+  points list the worst impact first. A
   canvas generated before this version shows its decide points without one; generate again to get
   them.
 - A generation that leaves a decide point without an impact, or gives one to another point, is

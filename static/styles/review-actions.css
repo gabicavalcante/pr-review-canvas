@@ -139,19 +139,23 @@ table.keys td:first-child {
 .pill.audience {
   font-weight: 500;
 }
-/* Critical is the high red, filled, so the two read apart. */
+/* Every impact takes the decide level's color, so none reads as a kind or an audience tag, and
+   weighs less the less a wrong call costs: critical filled, high outlined, low dashed. */
+.pill.impact.critical,
+.pill.impact.high,
+.pill.impact.low {
+  color: var(--level-decide);
+  background: transparent;
+  border-color: currentcolor;
+}
 .pill.impact.critical {
   color: var(--bg);
-  background: var(--point-red);
-  border-color: var(--point-red);
-}
-.pill.impact.high {
-  color: var(--point-red);
-  border-color: currentcolor;
+  background: var(--level-decide);
+  border-color: var(--level-decide);
 }
 .pill.impact.low {
-  color: var(--fg-muted);
-  border-color: currentcolor;
+  border-style: dashed;
+  font-weight: 500;
 }
 .pill.audience.author {
   color: var(--accent);
