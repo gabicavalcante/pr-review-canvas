@@ -38,6 +38,23 @@
 - A generation that leaves a decide point without an impact, or gives one to another point, is
   sent back to the agent to fix (`POINT_IMPACT`).
 
+### Settled decisions
+
+- A question the author already answered is recorded in the commit that carries the answer, as a
+  `Settled-decision: <path>:<line> <question>? <decision and reason>` line, and publish adds it to
+  the canvas as a resolved attention point titled by the question, with the answer as its reason,
+  so the canvas does not ask it again. The question is optional. The point costs the generator
+  none of its own.
+- `prepare` reads the decisions of the author's own commits, and on a pull request only when its
+  author prepares the canvas. A decision is carried to its line while the line reads the same at
+  the head, and kept as context the generator does not reopen once it does not, or once a deleted
+  line it is about comes back. The line counts
+  anywhere in the message, so a blank line before `Co-Authored-By` loses nothing.
+- A reason the author wrote on the canvas stands over the commit's until a later commit changes
+  the answer; a later decision on the same line replaces an earlier one.
+- The review loop skill writes a decision line for each question its gate asks, and its Claude and
+  Codex copies are the same again.
+
 ### AI Chat threads
 
 - **Ask** opens the thread of the place it was asked from: an attention point, a selection of lines,
@@ -66,11 +83,18 @@
   template has it under **Attention points**; `pr-review upgrade` and `doctor` say so. Without it
   the generator is not told which points the author resolved: a point that comes back with the same
   title stays resolved unchecked, and one reworded comes back open.
+- A project with its own `generation-format.md` adds the `{{SETTLED_DECISIONS}}` token, where the
+  bundled template has it under **Settled decisions**; `pr-review upgrade` and `doctor` say so.
+  Without it the generator is not told the author's settled decisions and may ask their questions
+  again; publish still adds the ones in the diff as resolved points.
 - A project with its own `generation-format.md`, `quality-standards.md`, `judging-strict.md`, or
   `judging-surfacing.md` merges in the bundled copies' definitions of impact. `pr-review upgrade`
   and `doctor` do not name this one, since it adds no token. Without them, every generated decide
   point comes back with `POINT_IMPACT`, and the agent picks an impact without the definitions.
-- Teammates on 0.9.0 can still open new canvases; they do not see the impact.
+- Teammates on 0.9.0 can still open new canvases; they do not see the impact, and see a settled
+  decision as a point the author resolved. A pull request author who resolves or reopens a point
+  on 0.9.0 saves the canvas without the marks that tell settled decisions apart, so the next
+  canvas built on it can ask a decision's question again.
 
 ## 0.9.0
 

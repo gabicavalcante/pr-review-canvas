@@ -304,9 +304,11 @@ function statusPartsHtml(p, status, ctx, opts) {
     }
     case 'resolved': {
       const reason = settlementOf(p)?.reason ?? ''
+      const first = reason.split('\n')[0] ?? ''
       return {
         pill,
-        summary: line(`Resolved by the author: ${esc(reason.split('\n')[0] ?? '')}`),
+        // A settled decision that states no question is titled by its reason; the line would repeat it.
+        summary: first === p.title ? '' : line(`Resolved by the author: ${esc(first)}`),
         outcome:
           '<div class="p-outcome"><h4 class="lbl">Author’s reason</h4>' +
           `<div class="prose settled-reason">${renderMarkdown(reason, { paths: ctx.paths })}</div></div>`,
