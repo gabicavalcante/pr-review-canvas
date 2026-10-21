@@ -328,7 +328,11 @@
     width: 26px;
     height: 26px;
     padding: 0;
+    /* Quiet even where the terminal skin fills it: with AI Chat off, the copy of the empty page and
+       of the regenerate dialog is the primary command. */
+    border: 0;
     border-radius: var(--r);
+    background: none;
     color: var(--fg-muted);
     font-size: 0;
     vertical-align: middle;
@@ -348,6 +352,13 @@
     &:disabled {
       color: var(--fg-dim);
       background: none;
+    }
+    /* How a copy went, here: the IDs in this list outweigh the glyph rules below. */
+    &[data-copied='copied'] {
+      color: var(--ok);
+    }
+    &[data-copied='failed'] {
+      color: var(--bad);
     }
   }
   #chat-minimize {
