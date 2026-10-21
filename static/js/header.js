@@ -107,9 +107,13 @@ export function renderHeader(bundle, opts) {
   // A stale canvas can be exported and regenerated too, so both commands stay live for it.
   const hasCanvas = artifact !== undefined && (bundle.status === 'ready' || bundle.status === 'stale')
   const generate = generateCommand(bundle, hasCanvas)
+  // A time that does not parse says nothing, so the page leaves it out.
+  const when = ready ? fullDate(artifact.generatedAt) : ''
   const agent = ready
     ? `<span class="pill agent" title="The agent and model that generated this canvas">canvas by ${esc(artifact.generator.agent)}${artifact.generator.model ? ` · ${esc(artifact.generator.model)}` : ''}</span>` +
-      `<span title="${esc(fullDate(artifact.generatedAt))}">generated ${esc(timeAgo(artifact.generatedAt, opts.now))}</span>`
+      (when === ''
+        ? ''
+        : `<span title="${esc(when)}">generated ${esc(timeAgo(artifact.generatedAt, opts.now))}</span>`)
     : ''
   const number = pr.number === null ? '' : `<span class="mono num">#${pr.number}</span>`
   // Work that is not pushed has no page on the forge, and nothing to refresh from it either.

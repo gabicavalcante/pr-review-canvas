@@ -277,6 +277,22 @@ describe('header', () => {
     expect(hdr?.querySelector('.notice.large-pr')).toBeNull()
   })
 
+  it('leaves out when the canvas was generated if its time does not parse', () => {
+    const b = bundle()
+    if (b.artifact === undefined) throw new Error('fixture has a canvas')
+    b.artifact.generatedAt = 'not a date'
+    document.body.innerHTML = renderHeader(b, {
+      host: 'localhost:3010',
+      theme: 'auto',
+      skin: 'terminal',
+      now: NOW,
+    })
+    const meta = document.querySelector('.hdr .meta')
+    expect(meta?.querySelector('.pill.agent')?.textContent).toBe('canvas by claude · claude-opus-4-1')
+    expect(meta?.querySelector('.pill.agent + span')).toBeNull()
+    expect(meta?.textContent).not.toContain('generated')
+  })
+
   it('says the canvas was capped when the change set is large, on every screen', () => {
     document.body.innerHTML = renderHeader(bundle({ largePr: true }), {
       host: 'h',
