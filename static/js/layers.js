@@ -30,6 +30,7 @@ import { pointSteps } from './point-steps.js'
 import {
   openPoints,
   pointCardHtml,
+  pointStatus,
   pointsDensityToggleHtml,
   pointStatusesHtml,
   postedUrls,
@@ -131,14 +132,14 @@ export function dotColor(index) {
 }
 
 /**
- * The rail's group of attention points in the one-point view: the open points in the view's order,
- * under the layer each belongs to. It is drawn from the state, so a point acted on leaves it.
+ * The rail's group of attention points in the one-point view: every point in the view's order,
+ * under the layer each belongs to. It is drawn from the state, so a point acted on dims at once.
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
  * @param {(id: string) => string} current
  */
 function railPointsHtml(artifact, state, current) {
-  const steps = pointSteps(artifact, openPoints(artifact.points, state))
+  const steps = pointSteps(artifact, artifact.points)
   if (steps.length === 0) {
     return ''
   }
@@ -151,7 +152,8 @@ function railPointsHtml(artifact, state, current) {
           : `<li class="pt-layer"><span class="m">${esc(layer?.title ?? 'No layer')}</span></li>`
       shownLayer = layer?.id ?? null
       const id = stepAnchorId(point.id)
-      return `${heading}<li><a href="#${esc(id)}"${current(id)}>${levelIconHtml(point.level, null)}<span class="t">${esc(point.title)}</span></a></li>`
+      const handled = pointStatus(point, state) === 'open' ? '' : ' class="is-handled"'
+      return `${heading}<li${handled}><a href="#${esc(id)}"${current(id)}>${levelIconHtml(point.level, null)}<span class="t">${esc(point.title)}</span></a></li>`
     })
     .join('')
   return `<li class="grp"><span class="lbl grp-lbl">Attention points</span><ul class="rail-points">${items}</ul></li>`

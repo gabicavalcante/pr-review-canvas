@@ -1,5 +1,5 @@
 // @ts-check
-// The one-point-at-a-time view's stops: each open attention point with its code. A stop is the
+// The one-point-at-a-time view's stops: each attention point with its code. A stop is the
 // point's card, whole, then the file it is on, drawn with the one chunk that holds its lines and a
 // mark on them where the point is, then the
 // way to the previous and the next stop. The last stop leads to the layers, for the rest of the
@@ -13,7 +13,7 @@ import { esc } from './dom.js'
 import { layerAnchorId, stepAnchorId } from './keys.js'
 import { hunkIdForPoint, hunkLayerIndex, pathSet, renderFileCard } from './layers.js'
 import { pointSteps } from './point-steps.js'
-import { openPoints, pointCardHtml, postedUrls } from './points.js'
+import { pointCardHtml, postedUrls } from './points.js'
 
 export const POINT_STEPS_ID = 'point-steps'
 
@@ -57,7 +57,9 @@ function stepNavHtml(steps, index, artifact) {
 }
 
 /**
- * Every open attention point's stop, in the view's order. A canvas with no open point has none.
+ * Every attention point's stop, in the view's order. A point the reader acted on keeps its stop,
+ * so the sequence stays the same while the reader works through it. A canvas with no point has
+ * none.
  * @param {ReviewArtifact} artifact
  * @param {ReadonlyArray<FileEntry>} files
  * @param {PrState} state
@@ -65,7 +67,7 @@ function stepNavHtml(steps, index, artifact) {
  * @returns {string}
  */
 export function renderPointSteps(artifact, files, state, comments = []) {
-  const steps = pointSteps(artifact, openPoints(artifact.points, state))
+  const steps = pointSteps(artifact, artifact.points)
   if (steps.length === 0) {
     return ''
   }

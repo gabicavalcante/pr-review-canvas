@@ -83,11 +83,11 @@ describe('renderPointSteps', () => {
     ])
   })
 
-  it('leaves out a point the reader acted on, and draws nothing when none is open', () => {
+  it('keeps a point the reader acted on in its place, and draws nothing for a canvas without points', () => {
     const dismissed = { ...state, dismissed: { 'fp-2': { at: 'x' } } }
     draw(renderPointSteps(artifact, files, dismissed))
-    expect(all('section.point-step').map(section => section.id)).toEqual(['step-p-1', 'step-p-3'])
-    const allDone = { ...state, dismissed: { 'fp-1': { at: 'x' }, 'fp-2': { at: 'x' }, 'fp-3': { at: 'x' } } }
-    expect(renderPointSteps(artifact, files, allDone)).toBe('')
+    expect(all('section.point-step').map(section => section.id)).toEqual(['step-p-1', 'step-p-2', 'step-p-3'])
+    expect(document.querySelector('#step-p-2-card')?.classList.contains('is-handled')).toBe(true)
+    expect(renderPointSteps({ ...artifact, points: [] }, files, state)).toBe('')
   })
 })
