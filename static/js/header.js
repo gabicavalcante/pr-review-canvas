@@ -3,7 +3,7 @@
 /** @typedef {import('./contract-types.js').RiskTag} RiskTag */
 import { setDisabledReason } from './composer.js'
 import { diffstatHtml, testChanges } from './diffstat.js'
-import { esc, timeAgo } from './dom.js'
+import { esc, fullDate, timeAgo } from './dom.js'
 import { generationMode } from './generate.js'
 import { authorProfileUrl, currentHost, hostLabel } from './host.js'
 import { canvasHiddenLines, getFoldLevel, refreshRail } from './layers.js'
@@ -108,7 +108,8 @@ export function renderHeader(bundle, opts) {
   const hasCanvas = artifact !== undefined && (bundle.status === 'ready' || bundle.status === 'stale')
   const generate = generateCommand(bundle, hasCanvas)
   const agent = ready
-    ? `<span class="pill agent" title="The agent, model, and harness that generated this canvas">canvas by ${esc(artifact.generator.agent)}${artifact.generator.model ? ` · ${esc(artifact.generator.model)}` : ''} · ${esc(artifact.generator.harness)}</span><span>generated ${esc(timeAgo(artifact.generatedAt, opts.now))}</span>`
+    ? `<span class="pill agent" title="The agent and model that generated this canvas">canvas by ${esc(artifact.generator.agent)}${artifact.generator.model ? ` · ${esc(artifact.generator.model)}` : ''}</span>` +
+      `<span title="${esc(fullDate(artifact.generatedAt))}">generated ${esc(timeAgo(artifact.generatedAt, opts.now))}</span>`
     : ''
   const number = pr.number === null ? '' : `<span class="mono num">#${pr.number}</span>`
   // Work that is not pushed has no page on the forge, and nothing to refresh from it either.

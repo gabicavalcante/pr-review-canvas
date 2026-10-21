@@ -107,6 +107,9 @@
   written.
 - Every row of an `erDiagram` entity is readable in the dark theme; every other row was light, with
   text in the dark theme's light color.
+- The header names the agent and model that generated the canvas, without the harness, which a
+  canvas generated from the review app always gave as `other`. Hover **generated … ago** for the
+  full date and time.
 
 ### Upgrade
 

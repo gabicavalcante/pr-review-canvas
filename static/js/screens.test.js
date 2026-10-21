@@ -6,6 +6,7 @@ import { UNKNOWN_CAPABILITIES } from '../../src/host/capabilities.js'
 import { mapReviewComment } from '../../src/github/comments.js'
 import { GH_ISSUE_COMMENTS, GH_REVIEW_COMMENTS, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { renderChatShell } from './chat.js'
+import { fullDate } from './dom.js'
 import { renderEmptyState, renderStaleState, sharedCanvasCalloutHtml, staleBarHtml } from './empty-state.js'
 import {
   bareHeaderHtml,
@@ -251,9 +252,11 @@ describe('header', () => {
     )
     expect(hdr?.querySelector('.meta .pill.open')?.textContent).toBe('open')
     expect(hdr?.querySelector('.diffstat')?.textContent).toBe('+7 −5 (code +5 −4 · tests +2 −1)')
-    expect(hdr?.querySelector('.pill.agent')?.textContent).toBe(
-      'canvas by claude · claude-opus-4-1 · claude-code'
-    )
+    expect(hdr?.querySelector('.pill.agent')?.textContent).toBe('canvas by claude · claude-opus-4-1')
+    // The relative time shows the full date on hover.
+    const generated = hdr?.querySelector('.pill.agent + span')
+    expect(generated?.textContent).toMatch(/^generated /)
+    expect(generated?.getAttribute('title')).toBe(fullDate(syntheticArtifact().generatedAt))
     expect(hdr?.querySelector('.touches')?.textContent).toBe('touches:schema')
     expect(hdr?.querySelector('.ptext')?.textContent).toBe('0 of 1 layers reviewed')
     expect(hdr?.querySelector('.pline span')?.getAttribute('style')).toBe('width:0%')
@@ -344,7 +347,7 @@ describe('header', () => {
       skin: 'terminal',
       now: NOW,
     })
-    expect(document.querySelector('.pill.agent')?.textContent).toBe('canvas by codex · codex')
+    expect(document.querySelector('.pill.agent')?.textContent).toBe('canvas by codex')
   })
 
   it('redraws the line, its text, and the approve gate from the state', () => {

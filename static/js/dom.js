@@ -132,6 +132,19 @@ export function timeAgo(iso, now = new Date()) {
 }
 
 /**
+ * The full date and time of a timestamp, in the reader's locale and time zone, for the tooltip of
+ * a relative time.
+ * @param {string} iso
+ * @returns {string}
+ */
+export function fullDate(iso) {
+  const t = Date.parse(iso)
+  return Number.isNaN(t)
+    ? ''
+    : new Date(t).toLocaleString(undefined, { dateStyle: 'full', timeStyle: 'long' })
+}
+
+/**
  * Two-letter initials for the avatar square.
  * @param {string} login
  */
