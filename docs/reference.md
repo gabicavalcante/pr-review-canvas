@@ -1088,14 +1088,16 @@ again when the PR's head, the folder the agent reads, or your right to resolve p
 place's thread belongs to the chat agent it was made with: after you switch agents, an ask about the
 place starts a new thread. The ask command of a place with a thread carries a dot, which fills with
 the accent when an answer arrived there while you were not reading it: you were reading another
-thread, the pane was minimized, or it showed another tab. The **Threads** tab carries the same dot,
-and the **AI Chat** tab and its launcher count those answers, up to 9, until you see each thread.
-**go to code** at the top of a thread leads back to its place. The `a` key asks about the focused target, and `/` focuses the message box.
+thread, the pane was minimized, or it showed another tab. The thread's name at the top of the pane
+carries the same dot, and the **AI Chat** tab and its launcher count those answers, up to 9, until
+you see each thread. The line above the message box names the thread's place, with **go to code** to
+lead back to it and **clear** to take what the box holds to the latest thread about the whole PR. The `a` key asks about the focused target, and `/` focuses the message box.
 
-The **Threads** tab lists the review's threads by kind of place (attention points, lines, files,
-layers, whole PR) with the number of questions in each; pick one to open it in **AI Chat**. **new
-thread** starts one about the whole PR, and an ask about the whole PR comes back to the latest of
-those. Threads saved before threads had a place still appear in the Threads tab, under whole PR.
+The thread's name at the top of the pane opens the list of the review's threads, by kind of place
+(attention points, lines, files, layers, whole PR), with the number of questions in each and a
+filter; pick one to open it, or use the arrow keys and Enter. **new thread**, beside the name and at
+the bottom of the list, starts one about the whole PR, and an ask about the whole PR comes back to
+the latest of those. Threads saved before threads had a place appear in the list under whole PR.
 When the canvas is generated again without a thread's place, the thread's head says the place is no
 longer on this canvas, and its questions are about the whole PR.
 
@@ -1108,7 +1110,7 @@ Chat can propose an inline comment. A valid proposal appears with controls to po
 or copy it. A proposal outside the current diff remains text with an explanation.
 
 Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time. While an answer is
-coming in, ask, the Threads tab and **new thread** still open any thread, and the answer keeps
+coming in, ask, the list of threads, and **new thread** still open any thread, and the answer keeps
 arriving in its own. A question asked in another thread meanwhile waits, marked as waiting, and is
 sent once the answer ends; one question waits at a time. If the server cannot take it then, a
 message says so wherever you are, and its thread shows the question with the reason; for a question

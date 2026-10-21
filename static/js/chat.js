@@ -39,19 +39,12 @@ import { pointStatus, resolvable } from './points.js'
 import { proposalFingerprint, splitChatAnswer, targetsFromFiles } from './proposed-comment.js'
 import { REVIEW_PANEL_ID } from './review-panel.js'
 import { canSettle } from './self-review.js'
-import {
-  CHAT_NEW_BADGE,
-  THREADS_PANEL_ID,
-  openReviewTab,
-  selectSideTab,
-  sideTabsHtml,
-  wireSideTabs,
-} from './side-pane.js'
+import { CHAT_NEW_BADGE, openReviewTab, selectSideTab, sideTabsHtml, wireSideTabs } from './side-pane.js'
 
 export const CHAT_WIDTH_KEY = 'pr-review.chat-width'
 export const CHAT_MINIMIZED_KEY = 'pr-review.chat-minimized'
-// The narrowest pane still fits its tab strip with every count on it: AI Chat at 9, the Threads
-// dot, and a two-digit review.
+// The narrowest pane still fits the thread head's name, and its tab strip with every count on it:
+// AI Chat at 9 and a two-digit review.
 export const CHAT_WIDTH_MIN = 360
 export const CHAT_WIDTH_MAX = 560
 export const CHAT_WIDTH_DEFAULT = 380
@@ -72,15 +65,19 @@ export function renderChatShell(opts) {
     `<button class="handle" type="button" id="chat-handle" role="separator" aria-orientation="vertical" aria-label="Resize AI Chat" aria-valuenow="${width}" aria-valuemin="${CHAT_WIDTH_MIN}" aria-valuemax="${CHAT_WIDTH_MAX}"></button>` +
     sideTabsHtml({ chat: true }) +
     // The tab names the pane on screen; the heading stays for screen readers and the dialog's name.
-    // One thread at a time, under a head naming what it is about. The Threads tab lists them all;
-    // a thread about the whole PR starts from either tab.
+    // One thread at a time, under a head naming what it is about. The head opens the list of every
+    // thread, which can also start one about the whole PR.
     '<div class="chat-h"><h2 class="sr" id="chat-h">AI Chat</h2>' +
+    '<button class="thread-switch" type="button" id="thread-switch" aria-haspopup="dialog" aria-expanded="false" aria-controls="thread-pop" title="Switch thread">' +
     '<span class="thread-kind" id="thread-kind" hidden></span>' +
-    '<p class="thread-title" id="thread-title">New thread</p>' +
-    '<button class="cmd" type="button" id="chat-new-thread" title="New thread about the whole PR">new thread</button></div>' +
-    `<section class="threads-panel" id="${THREADS_PANEL_ID}" role="tabpanel" aria-labelledby="side-tab-threads" hidden>` +
-    '<div class="threads-h"><button class="cmd" type="button" id="new-thread" title="New thread about the whole PR">new thread</button></div>' +
-    '<nav class="thread-index" id="thread-index" aria-label="Threads"></nav></section>' +
+    '<span class="thread-title" id="thread-title">New thread</span>' +
+    '<span class="threads-new" hidden></span><span class="thread-caret" aria-hidden="true"></span></button>' +
+    '<button class="cmd" type="button" id="chat-new-thread" title="New thread about the whole PR">new thread</button>' +
+    '<div class="thread-pop" id="thread-pop" role="dialog" aria-label="Threads" hidden>' +
+    '<input class="thread-filter" id="thread-filter" type="search" placeholder="Filter threads…" aria-label="Filter threads" autocomplete="off">' +
+    '<nav class="thread-index" id="thread-index" aria-label="Threads"></nav>' +
+    '<button class="thread-pop-new" type="button" id="new-thread">+ New thread about the whole PR</button>' +
+    '</div></div>' +
     '<div class="transcript" id="chat-log" role="log" aria-label="Transcript" aria-live="polite" tabindex="0">' +
     '<p class="empty">Ask AI Chat about a layer, a file, or a selection. Answers come with a verdict first, then evidence.</p>' +
     '</div>' +
@@ -565,6 +562,9 @@ export function wireChat(options) {
   const threadTitleEl = mustFind(root, '#thread-title', HTMLElement)
   const gotoButton = mustFind(root, '#thread-goto', HTMLElement)
   const index = mustFind(root, '#thread-index', HTMLElement)
+  const switchButton = mustFind(root, '#thread-switch', HTMLElement)
+  const pop = mustFind(root, '#thread-pop', HTMLElement)
+  const filter = mustFind(root, '#thread-filter', HTMLInputElement)
   const chip = mustFind(root, '#chat-ctx', HTMLElement)
   const clearButton = mustFind(root, '#chat-clear', HTMLElement)
   const bubble = mustFind(root, '#chat-unseen', HTMLElement)
@@ -857,6 +857,8 @@ export function wireChat(options) {
         '<p class="empty">No threads yet. Use ask on an attention point, a selection of lines, a file or a layer, or start a thread about the whole PR.</p>'
       return
     }
+    // A redraw while the list is open keeps the reader's filter and the thread they are on.
+    const focused = document.activeElement?.closest?.('[data-thread-open]')?.getAttribute('data-thread-open')
     index.innerHTML = INDEX_GROUPS.map(([kind, label]) => {
       const group = threads.filter(t => (t.anchor?.kind ?? 'pr') === kind)
       if (group.length === 0) return ''
@@ -873,7 +875,7 @@ export function wireChat(options) {
                     ? '1 question'
                     : `${t.turns} questions`
           return (
-            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current' : ''}" data-thread-open="${esc(t.name)}">` +
+            `<li><button type="button" class="thread-item${t.name === activeThread ? ' current" aria-current="true' : ''}" data-thread-open="${esc(t.name)}">` +
             `<span class="thread-item-t">${esc(shownTitle(t))}</span>` +
             `<span class="small ${status === 'new answer' ? 'thread-new' : 'muted'}">${esc(status)}</span></button></li>`
           )
@@ -881,6 +883,96 @@ export function wireChat(options) {
         .join('')
       return `<h3 class="thread-group">${esc(label)}</h3><ul class="thread-list">${items}</ul>`
     }).join('')
+    applyFilter()
+    if (focused !== undefined && focused !== null) {
+      ;/** @type {HTMLElement | null} */ (qs(`[data-thread-open="${cssEscape(focused)}"]`, index))?.focus()
+    }
+  }
+
+  /** Hides the threads whose name the filter does not match, and a group left empty. */
+  const applyFilter = () => {
+    const query = filter.value.trim().toLowerCase()
+    for (const list of Array.from(index.querySelectorAll('.thread-list'))) {
+      for (const li of Array.from(list.children)) {
+        const name = li.querySelector('.thread-item-t')?.textContent ?? ''
+        li.toggleAttribute('hidden', query !== '' && !name.toLowerCase().includes(query))
+      }
+      const empty = !Array.from(list.children).some(li => !li.hasAttribute('hidden'))
+      list.toggleAttribute('hidden', empty)
+      list.previousElementSibling?.toggleAttribute('hidden', empty)
+    }
+  }
+
+  /** The threads the filter leaves, in the order the list draws them. */
+  const shownItems = () =>
+    /** @type {HTMLElement[]} */ (
+      Array.from(index.querySelectorAll('.thread-item')).filter(
+        el => el instanceof HTMLElement && el.closest('[hidden]') === null
+      )
+    )
+
+  /** Opens the list of threads under the head, with the filter empty and in focus. */
+  const openPop = () => {
+    filter.value = ''
+    drawIndex()
+    pop.hidden = false
+    switchButton.setAttribute('aria-expanded', 'true')
+    filter.focus()
+  }
+
+  /** @param {{ back?: boolean }} [opts] `back` returns the focus to the head */
+  const closePop = (opts = {}) => {
+    if (pop.hidden) {
+      return
+    }
+    pop.hidden = true
+    switchButton.setAttribute('aria-expanded', 'false')
+    if (opts.back === true) {
+      switchButton.focus()
+    }
+  }
+
+  /**
+   * The list's keys: the arrows move between the threads and back up to the filter, Enter in the
+   * filter opens the first thread it leaves, and Escape closes the list.
+   * @param {KeyboardEvent} event
+   */
+  const onPopKey = event => {
+    if (event.key === 'Escape') {
+      // The list closes, not the dialog the pane floats in.
+      event.preventDefault()
+      event.stopPropagation()
+      closePop({ back: true })
+      return
+    }
+    const items = shownItems()
+    if (event.key === 'Enter' && event.target === filter) {
+      event.preventDefault()
+      items[0]?.click()
+      return
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+      return
+    }
+    event.preventDefault()
+    const at = items.indexOf(/** @type {HTMLElement} */ (document.activeElement))
+    if (event.key === 'ArrowUp' && at === 0) {
+      filter.focus()
+      return
+    }
+    const next = event.key === 'ArrowDown' ? (at + 1) % items.length : at < 0 ? items.length - 1 : at - 1
+    items[next]?.focus()
+  }
+
+  /**
+   * A press outside the list and its head closes the list.
+   * @param {Event} event
+   */
+  const onOutside = event => {
+    const target = event.target instanceof Node ? event.target : null
+    if (!pop.hidden && target !== null && !pop.contains(target) && !switchButton.contains(target)) {
+      closePop()
+    }
   }
 
   /**
@@ -1528,7 +1620,16 @@ export function wireChat(options) {
       void runCommand(el, () => api.cancelChat(prNumber), { pendingLabel: 'stopping…' })
       return
     }
+    if (el.id === 'thread-switch') {
+      if (pop.hidden) {
+        openPop()
+      } else {
+        closePop()
+      }
+      return
+    }
     if (el.id === 'new-thread' || el.id === 'chat-new-thread') {
+      closePop()
       openDraft(WHOLE_PR, { fresh: true })
       return
     }
@@ -1538,6 +1639,7 @@ export function wireChat(options) {
     }
     const picked = el.getAttribute('data-thread-open')
     if (picked !== null) {
+      closePop()
       if (picked === activeThread) {
         showThread()
       } else {
@@ -1599,10 +1701,13 @@ export function wireChat(options) {
    */
   const onPaneWheel = event => {
     const target = event.target instanceof Element ? event.target : null
-    // The tab on screen owns the wheel: the transcript, the list of threads, or the list of the
-    // review being written.
+    // The open list of threads scrolls itself.
+    if (target !== null && pop.contains(target)) {
+      return
+    }
+    // The tab on screen owns the wheel: the transcript, or the list of the review being written.
     const tab = pane.getAttribute('data-tab')
-    const scroller = (tab === 'review' ? reviewPanel : tab === 'threads' ? index : null) ?? log
+    const scroller = (tab === 'review' ? reviewPanel : null) ?? log
     const insideOwnScroller =
       target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement
         ? canScrollBy(target, event.deltaY)
@@ -1693,6 +1798,9 @@ export function wireChat(options) {
   root.addEventListener('click', onClick)
   log.addEventListener('scroll', onScroll)
   pane.addEventListener('wheel', onPaneWheel, { passive: false })
+  pop.addEventListener('keydown', onPopKey)
+  filter.addEventListener('input', applyFilter)
+  document.addEventListener('pointerdown', onOutside)
   box.addEventListener('keydown', /** @type {EventListener} */ (onKeyDown))
   drawContext()
   void restoreThread().catch(() => undefined)
@@ -1812,6 +1920,9 @@ export function wireChat(options) {
       root.removeEventListener('click', onClick)
       log.removeEventListener('scroll', onScroll)
       marks.remove()
+      pop.removeEventListener('keydown', onPopKey)
+      filter.removeEventListener('input', applyFilter)
+      document.removeEventListener('pointerdown', onOutside)
       box.removeEventListener('keydown', /** @type {EventListener} */ (onKeyDown))
       stopResize()
       panel.stop()

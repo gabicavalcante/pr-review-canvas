@@ -68,23 +68,23 @@
   conversation about one point no longer mixes with another's.
 - The chat pane shows one thread at a time, its place named on top with a tag for its kind. The
   context line above the message box stays, with **go to code** to lead back to the place and
-  **clear** to take what the box holds to the latest thread about the whole PR. **new thread**, on
-  the pane's head and in the new **Threads** tab, starts one about the whole PR. The tab lists the
-  threads by kind of place, with the questions in each, and replaces the thread list in the pane's
-  head.
+  **clear** to take what the box holds to the latest thread about the whole PR. The place's name
+  opens the list of every thread, by kind of place, with the questions in each and a filter, in
+  place of the pane's old thread select. **new thread**, beside it and at the bottom of the list,
+  starts one about the whole PR.
 - An ask that leaves the thread the reader was reading for a new one offers **back to** that thread
   until its first question.
-- The ask command of a place with a thread carries a dot. The dot fills, and the **Threads** tab
-  shows one too, when an answer arrived there while the reader was not reading it: in another
+- The ask command of a place with a thread carries a dot. The dot fills, and the thread's name on
+  top of the pane shows one too, when an answer arrived there while the reader was not reading it: in another
   thread, with the pane minimized, or on another tab. The **AI Chat** tab and its launcher count
   those answers, up to 9.
-- While an answer comes in, ask, the Threads tab and **new thread** still open any thread, and the
+- While an answer comes in, ask, the list of threads, and **new thread** still open any thread, and the
   answer keeps arriving in its own. A question asked elsewhere meanwhile is sent once it ends.
 - The open thread comes back when the page is reloaded.
 - `chatThreadPerPlace: false` in `settings.yml`, or **A thread per place** cleared in the settings
   dialog, sends every ask to the open thread as before.
-- Threads saved by earlier versions still appear in the Threads tab, under whole PR, since they have
-  no place.
+- Threads saved by earlier versions still appear in the list of threads, under whole PR, since they
+  have no place.
 
 ### Commands
 

@@ -315,7 +315,6 @@
   :is(
     #chat-minimize,
     #chat-new-thread,
-    #new-thread,
     #thread-goto,
     #chat-clear,
     .proposed .tbtns .cmd:is([data-act$='-post'], [data-act$='-edit'], [data-copy]),
@@ -354,7 +353,7 @@
   #chat-minimize {
     --icon: var(--i-dash);
   }
-  :is(#chat-new-thread, #new-thread) {
+  #chat-new-thread {
     --icon: var(--i-plus);
   }
   #thread-goto {

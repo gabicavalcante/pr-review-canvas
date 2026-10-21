@@ -41,6 +41,7 @@
   background: var(--panel-2);
 }
 .chat-h {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -52,25 +53,42 @@
 .chat-h h2 {
   margin-right: auto;
 }
-/* The AI Chat tab shows one thread at a time; the Threads tab lists them all. */
-.chat[data-tab='threads'] > :is(.chat-h, .transcript, .chat-composer) {
-  display: none;
-}
-.threads-panel {
+/* The head names the open thread and opens the list of every thread under it. */
+/* Drawn as a field, on the page's own background, so it reads as something to open. */
+.thread-switch {
   display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: -3px 0;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
 }
-.threads-panel[hidden] {
-  display: none;
+.thread-switch:hover,
+.thread-switch[aria-expanded='true'] {
+  border-color: var(--fg-muted);
 }
-.threads-h {
-  display: flex;
-  justify-content: flex-end;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--ink);
-  background: var(--panel-2);
+.thread-switch > .thread-caret {
+  margin-left: auto;
+}
+.thread-switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.thread-caret {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-top: 5px solid var(--fg-muted);
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
 }
 .thread-kind {
   flex: none;
@@ -86,7 +104,7 @@
   display: none;
 }
 .thread-title {
-  flex: 1 1 0;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
   font-weight: 600;
@@ -94,56 +112,122 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.thread-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 8px;
+  left: 8px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  max-height: min(60vh, 460px);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--panel);
+  box-shadow: 0 8px 24px #0003;
+}
+.thread-pop[hidden] {
+  display: none;
+}
+.thread-filter {
+  margin: 8px 8px 0;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+}
+.thread-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -1px;
+}
 /* No `overscroll-behavior: contain`, as on the review list: a short list would swallow the wheel. */
 .thread-index {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  padding: 8px 14px 14px;
+  padding: 0 4px 6px;
 }
 .thread-index .empty {
+  margin: 10px 8px 4px;
   color: var(--fg-muted);
   font-size: 13px;
 }
 .thread-group {
-  margin: 12px 0 6px;
-  font-size: 12px;
+  margin: 10px 8px 4px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--fg-muted);
 }
+:is(.thread-group, .thread-list, .thread-list > li)[hidden] {
+  display: none;
+}
 .thread-list {
-  display: grid;
-  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
+/* One line per thread: a check for the open one, its name, and its state at the end. */
 .thread-item {
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--ink);
+  padding: 5px 8px 5px 24px;
+  border: 0;
   border-radius: var(--r);
-  background: var(--bg);
+  background: none;
   color: var(--fg);
   font: inherit;
-  text-align: left;
+  font-size: 13px;
+  text-align: start;
   cursor: pointer;
 }
 .thread-item:hover,
 .thread-item:focus-visible {
+  outline: none;
   background: var(--panel-2);
 }
 .thread-item.current {
-  border-color: var(--accent);
+  position: relative;
+  font-weight: 600;
+}
+.thread-item.current::before {
+  content: '✓';
+  position: absolute;
+  left: 8px;
+  color: var(--accent);
 }
 .thread-item-t {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.thread-item > .small {
+  flex: none;
+}
+.thread-pop-new {
+  padding: 8px 12px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--r) var(--r);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  cursor: pointer;
+}
+.thread-pop-new:hover,
+.thread-pop-new:focus-visible {
+  outline: none;
+  background: var(--panel-2);
 }
 /* An ask command whose place has a thread carries a dot after its label, which chat.js turns on;
    the dot takes the accent while an answer the reader has not seen waits there. It hangs off the
@@ -159,7 +243,7 @@
   mask: var(--i-dot) center / contain no-repeat;
   vertical-align: middle;
 }
-/* The Threads tab and an index entry say where an answer arrived that the reader has not seen. */
+/* The thread head and an entry of its list say where an answer arrived that the reader has not seen. */
 .threads-new,
 .thread-new::before {
   display: inline-block;
