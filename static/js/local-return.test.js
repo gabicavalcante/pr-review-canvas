@@ -287,6 +287,26 @@ describe('a local review page coming back into view', () => {
     expect(autoUpdate).not.toHaveBeenCalled()
   })
 
+  it('waits for an answer of AI Chat coming in, which a redraw would cut off, then reads the work once', async () => {
+    const next = bundle({ head: NEXT_HEAD })
+    const fetchImpl = serveBundle(() => next)
+    const { el, render, autoUpdate } = reviewPage({ enabled: false })
+    const chat = { answering: true }
+    el.chat = /** @type {PrAppElement['chat']} */ (/** @type {unknown} */ (chat))
+    await el.reread()
+    await el.reread({ update: true })
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(render).not.toHaveBeenCalled()
+    chat.answering = false
+    await el.answered()
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    expect(render).toHaveBeenCalledTimes(1)
+    // One of the reads that waited asked to update the canvas, so the one that runs does.
+    expect(autoUpdate.mock.calls).toEqual([[next]])
+    await el.answered()
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
   it('updates with the setting off when the reader asks for it, as from AI Chat', async () => {
     const next = bundle({ head: NEXT_HEAD })
     serveBundle(() => next)

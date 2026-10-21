@@ -189,6 +189,11 @@ export class PrAppElement extends HTMLElement {
    * @type {PrBundle | null}
    */
   shown = null
+  /**
+   * A read of the work that waits for the answer coming in, and whether it updates the canvas.
+   * @type {{ update: boolean } | null}
+   */
+  rereadWaiting = null
   /** Whether a branch review updates its outdated canvas by itself, from the settings file. */
   autoUpdate = true
   /**
@@ -441,6 +446,7 @@ export class PrAppElement extends HTMLElement {
           },
           canvasUpdatesItself: () => this.autoUpdate,
           onUpdateCanvas: () => void this.reread({ update: true }),
+          onAnswered: () => void this.answered(),
         })
         this.quickQuestions = wireQuickQuestions(this, {
           onPick: (context, question) => {
@@ -657,6 +663,13 @@ export class PrAppElement extends HTMLElement {
     if (!boot || !shown) {
       return
     }
+    // Drawing the page again takes the chat pane down, and the answer coming in with it: the
+    // server stops a turn whose page went away. The read waits for the answer, as one asked to
+    // update the canvas if any of the reads that waited was.
+    if (this.chat?.answering === true) {
+      this.rereadWaiting = { update: this.rereadWaiting?.update === true || opts.update === true }
+      return
+    }
     /** @type {PrBundle} */
     let next
     try {
@@ -687,6 +700,15 @@ export class PrAppElement extends HTMLElement {
     }
     this.autoUpdatedHead = next.pr.headSha
     await generation.autoUpdate(next)
+  }
+
+  /** The last answer of AI Chat is in: a read of the work that waited for it runs now. */
+  async answered() {
+    const waiting = this.rereadWaiting
+    if (waiting !== null) {
+      this.rereadWaiting = null
+      await this.reread(waiting)
+    }
   }
 
   /**
