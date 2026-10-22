@@ -11,7 +11,8 @@
   point's lines, or any `--force`, brought the point back open.
 - Resolved points start hidden for every reader. The overview line counts them as **resolved by the
   author** and its **show the N resolved** command brings them back, collapsed in place. A layer
-  whose points are all resolved drops its points heading while they are hidden.
+  whose points are all resolved drops its points heading while they are hidden, and the heading
+  says **none open** while one of them is still on the page.
 - A reviewer's page reads the author's resolutions back from the canvas comment when it opens and
   every two minutes after while its tab is in view, hides the newly resolved points, and says so.
   Before, a reviewer who had already loaded the canvas saw them only after **refresh**.
@@ -144,9 +145,9 @@
 - A toast shows left of the docked side pane instead of over its message box.
 - A draft's **back to** link names the thread by its title once the server gives it one, not as
   **New thread**.
-- The header names the agent and model that generated the canvas, without the harness, which a
-  canvas generated from the review app always gave as `other`. Hover **generated … ago** for the
-  full date and time.
+- The header names the agent and model that generated the canvas on screen, an outdated one
+  opened with **view stale canvas** too, without the harness, which a canvas generated from the
+  review app always gave as `other`. Hover **generated … ago** for the full date and time.
 
 ### Upgrade
 
