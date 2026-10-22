@@ -91,7 +91,8 @@
   until its first question. A thread whose first question is still starting is listed by its place
   until the server has made it.
 - Each thread keeps its own unsent text: a half-written question stays with the thread it was
-  written in when an ask opens another one. **clear** still takes it along to the whole PR.
+  written in when an ask opens another one. **clear** still takes it along to the whole PR, below
+  any text that thread already had.
 - The thread list matches the filter against each thread's name and its kind of place, says when
   nothing matches, opens at the open thread, and gives each entry its whole name as a tooltip.
   Picking a thread puts the focus in the message box, and tabbing out of the list closes it.

@@ -1103,9 +1103,12 @@ place's thread belongs to the chat agent it was made with: after you switch agen
 place starts a new thread. The ask command of a place with a thread carries a dot, which fills with
 the accent when an answer arrived there while you were not reading it: you were reading another
 thread, the pane was minimized, or it showed another tab. The thread's name at the top of the pane
-carries the same dot, and the **AI Chat** tab and its launcher count those answers, up to 9, until
-you see each thread. The line above the message box names the thread's place, with **go to code** to
-lead back to it and **clear** to take what the box holds to the latest thread about the whole PR. The `a` key asks about the focused target, and `/` focuses the message box.
+counts the threads with such an answer, as in **2 new**, and the **AI Chat** tab and its launcher
+count the answers, up to 9, until you see each thread. The marks are kept with the review, so a
+reload keeps them. The line above the message box names the thread's place, with **go to code** to
+lead back to it and **clear** to take what the box holds to the latest thread about the whole PR,
+below any text that thread already had. Each thread keeps its own unsent text. The `a` key asks
+about the focused target, and `/` focuses the message box.
 
 The thread's name at the top of the pane opens the list of the review's threads, by kind of place
 (attention points, lines, files, layers, whole PR), with the number of questions in each and a

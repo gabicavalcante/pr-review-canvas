@@ -7,6 +7,7 @@ import { mapReviewComment } from '../../src/github/comments.js'
 import { GH_ISSUE_COMMENTS, GH_REVIEW_COMMENTS, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { renderChatShell } from './chat.js'
 import { fullDate } from './dom.js'
+import { drawnCanvas } from './layers.js'
 import { renderEmptyState, renderStaleState, sharedCanvasCalloutHtml, staleBarHtml } from './empty-state.js'
 import {
   bareHeaderHtml,
@@ -424,7 +425,8 @@ describe('header', () => {
     }
     document.body.innerHTML = renderHeader(bundle({ status: 'stale' }), opts)
     expect(document.querySelector('#fold-level')).toBeNull()
-    document.body.innerHTML = renderHeader(bundle({ status: 'stale' }), { ...opts, viewStale: true })
+    const stale = bundle({ status: 'stale' })
+    document.body.innerHTML = renderHeader(stale, { ...opts, drawn: drawnCanvas(stale, true) })
     expect(document.querySelector('#fold-level')).not.toBeNull()
     // The review's progress belongs to the current head, so it stays off.
     expect(document.querySelector('.ptext')).toBeNull()

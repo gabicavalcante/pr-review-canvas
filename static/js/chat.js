@@ -25,6 +25,8 @@ import {
   WHOLE_PR,
 } from './chat-context.js'
 import { wireChatPanel } from './chat-panel.js'
+import { quickQuestionsFor } from './quick-questions.js'
+import { wireThreadList } from './thread-list.js'
 import { navigateLink } from './deep-link.js'
 import {
   canScrollBy,
@@ -161,31 +163,6 @@ export function readChatMinimized(storage) {
  */
 export function writeChatMinimized(storage, minimized) {
   storage?.setItem(CHAT_MINIMIZED_KEY, minimized ? '1' : '0')
-}
-
-/** The questions the quick menu offers, and the one that just focuses the box. */
-export const QUICK_QUESTIONS = [
-  'Suggestion to solve this?',
-  'Why this way, and what were the alternatives?',
-  'What could break?',
-  'Does this follow how the codebase already does it?',
-  'Is this covered by tests?',
-]
-
-/** What the quick menu offers on a layer, which asks about a whole step of the change. */
-export const LAYER_QUESTIONS = [
-  'Walk me through this layer.',
-  'What could this layer break?',
-  'Does this follow how the codebase already does it?',
-  'Are its tests enough?',
-]
-
-/**
- * The quick questions for what a command asks about.
- * @param {import('./chat-context.js').ChatContext} context
- */
-export function quickQuestionsFor(context) {
-  return context.kind === 'layer' ? LAYER_QUESTIONS : QUICK_QUESTIONS
 }
 
 /** @typedef {'post' | 'queue' | 'edit'} ProposedAct */
@@ -574,7 +551,14 @@ export function wireChat(options) {
   const index = mustFind(root, '#thread-index', HTMLElement)
   const switchButton = mustFind(root, '#thread-switch', HTMLElement)
   const pop = mustFind(root, '#thread-pop', HTMLElement)
-  const filter = mustFind(root, '#thread-filter', HTMLInputElement)
+  // The list redraws its entries as it opens; `drawIndex` is defined below and runs only then.
+  const threadList = wireThreadList({
+    head: switchButton,
+    pop,
+    filter: mustFind(root, '#thread-filter', HTMLInputElement),
+    index,
+    draw: () => drawIndex(),
+  })
   const chip = mustFind(root, '#chat-ctx', HTMLElement)
   const clearButton = mustFind(root, '#chat-clear', HTMLElement)
   const bubble = mustFind(root, '#chat-unseen', HTMLElement)
@@ -919,7 +903,7 @@ export function wireChat(options) {
         .join('')
       return `<h3 class="thread-group">${esc(label)}</h3><ul class="thread-list">${items}${unsaved}</ul>`
     }).join('')
-    applyFilter()
+    threadList.refilter()
     if (focused !== undefined && focused !== null) {
       ;/** @type {HTMLElement | null} */ (qs(`[data-thread-open="${cssEscape(focused)}"]`, index))?.focus()
     }
@@ -933,97 +917,6 @@ export function wireChat(options) {
   const itemTooltip = thread => {
     const started = timeAgo(thread.createdAt)
     return started === '' ? shownTitle(thread) : `${shownTitle(thread)} · started ${started}`
-  }
-
-  /**
-   * Hides the threads the filter does not match, by name or by the kind of place their group
-   * names, and a group left empty. A filter that leaves nothing says so.
-   */
-  const applyFilter = () => {
-    const query = filter.value.trim().toLowerCase()
-    for (const list of Array.from(index.querySelectorAll('.thread-list'))) {
-      const group = (list.previousElementSibling?.textContent ?? '').toLowerCase()
-      for (const li of Array.from(list.children)) {
-        const name = (li.querySelector('.thread-item-t')?.textContent ?? '').toLowerCase()
-        li.toggleAttribute('hidden', query !== '' && !name.includes(query) && !group.includes(query))
-      }
-      const empty = !Array.from(list.children).some(li => !li.hasAttribute('hidden'))
-      list.toggleAttribute('hidden', empty)
-      list.previousElementSibling?.toggleAttribute('hidden', empty)
-    }
-    index.querySelector('.thread-nomatch')?.remove()
-    if (query !== '' && threads.length > 0 && shownItems().length === 0) {
-      index.insertAdjacentHTML(
-        'beforeend',
-        `<p class="empty thread-nomatch">No thread matches “${esc(filter.value.trim())}”.</p>`
-      )
-    }
-  }
-
-  /** The threads the filter leaves, in the order the list draws them. */
-  const shownItems = () =>
-    /** @type {HTMLElement[]} */ (
-      Array.from(index.querySelectorAll('.thread-item')).filter(
-        el => el instanceof HTMLElement && el.closest('[hidden]') === null
-      )
-    )
-
-  /** Opens the list of threads under the head, with the filter empty and in focus. */
-  const openPop = () => {
-    filter.value = ''
-    drawIndex()
-    pop.hidden = false
-    switchButton.setAttribute('aria-expanded', 'true')
-    // A long list opens at the open thread.
-    const current = qs('.thread-item.current', index)
-    if (current instanceof HTMLElement && typeof current.scrollIntoView === 'function') {
-      current.scrollIntoView({ block: 'nearest' })
-    }
-    filter.focus()
-  }
-
-  /** @param {{ back?: boolean }} [opts] `back` returns the focus to the head */
-  const closePop = (opts = {}) => {
-    if (pop.hidden) {
-      return
-    }
-    pop.hidden = true
-    switchButton.setAttribute('aria-expanded', 'false')
-    if (opts.back === true) {
-      switchButton.focus()
-    }
-  }
-
-  /**
-   * The list's keys: the arrows move between the threads and back up to the filter, Enter in the
-   * filter opens the first thread it leaves, and Escape closes the list.
-   * @param {KeyboardEvent} event
-   */
-  const onPopKey = event => {
-    if (event.key === 'Escape') {
-      // The list closes, not the dialog the pane floats in.
-      event.preventDefault()
-      event.stopPropagation()
-      closePop({ back: true })
-      return
-    }
-    const items = shownItems()
-    if (event.key === 'Enter' && event.target === filter) {
-      event.preventDefault()
-      items[0]?.click()
-      return
-    }
-    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
-      return
-    }
-    event.preventDefault()
-    const at = items.indexOf(/** @type {HTMLElement} */ (document.activeElement))
-    if (event.key === 'ArrowUp' && at === 0) {
-      filter.focus()
-      return
-    }
-    const next = event.key === 'ArrowDown' ? (at + 1) % items.length : at < 0 ? items.length - 1 : at - 1
-    items[next]?.focus()
   }
 
   /**
@@ -1041,9 +934,14 @@ export function wireChat(options) {
       unsent.set(unsentKey(), box.value)
     }
   }
-  /** Puts back what the thread now on screen had in the box. */
-  const restoreUnsent = () => {
-    box.value = unsent.get(unsentKey()) ?? ''
+  /**
+   * Puts back what the thread now on screen had in the box, and below it any text the switch
+   * carried from the thread it left.
+   * @param {string | undefined} carry
+   */
+  const restoreUnsent = carry => {
+    const own = unsent.get(unsentKey()) ?? ''
+    box.value = carry === undefined ? own : own.trim() === '' ? carry : `${own}\n\n${carry}`
   }
 
   /** Puts the focus in the message box, or on the thread's name while the box waits. */
@@ -1052,28 +950,6 @@ export function wireChat(options) {
       switchButton.focus()
     } else {
       box.focus()
-    }
-  }
-
-  /**
-   * The focus leaving the list, by Tab or otherwise, closes it, as a press outside does.
-   * @param {FocusEvent} event
-   */
-  const onPopFocusOut = event => {
-    const to = event.relatedTarget
-    if (to instanceof Node && !pop.contains(to) && !switchButton.contains(to)) {
-      closePop()
-    }
-  }
-
-  /**
-   * A press outside the list and its head closes the list.
-   * @param {Event} event
-   */
-  const onOutside = event => {
-    const target = event.target instanceof Node ? event.target : null
-    if (!pop.hidden && target !== null && !pop.contains(target) && !switchButton.contains(target)) {
-      closePop()
     }
   }
 
@@ -1128,8 +1004,7 @@ export function wireChat(options) {
     chip.textContent = chatContextLabel(context, layerTitle, pointTitle)
     chip.title = chip.textContent
     clearButton.hidden = context.kind === 'pr'
-    // A file, like the whole PR, is too wide for the quick questions.
-    const menu = context.kind !== 'pr' && context.kind !== 'file'
+    const menu = quickQuestionsFor(context).length > 0
     chip.toggleAttribute('data-ask-menu', menu)
     if (!menu) {
       chip.removeAttribute('tabindex')
@@ -1384,13 +1259,19 @@ export function wireChat(options) {
    * Sends what the box holds, or has it wait for the answer coming in. It does not wait for the
    * answer itself: the reader may be on another thread by the time it ends.
    */
-  const send = () => {
-    const message = box.value.trim()
+  /**
+   * @param {string} [asked] a question asked for the reader, such as a quick one; the box, and
+   *   what the reader wrote in it, stay as they are
+   */
+  const send = asked => {
+    const message = (asked ?? box.value).trim()
     if (message === '' || box.disabled) {
       return
     }
-    box.value = ''
-    unsent.delete(unsentKey())
+    if (asked === undefined) {
+      box.value = ''
+      unsent.delete(unsentKey())
+    }
     /** @type {Question} */
     const question = { message, context, thread: activeThread, place: openPlace }
     const { turn } = appendTurn('user', renderMarkdown(message, { paths }), turnContext(context))
@@ -1652,8 +1533,9 @@ export function wireChat(options) {
   /**
    * Opens a saved thread, with its place as the context of what is asked in it.
    * @param {string} name
+   * @param {{ carry?: string }} [opts] `carry`: text the reader takes along from the thread left
    */
-  const openThread = async name => {
+  const openThread = async (name, opts = {}) => {
     keepUnsent()
     activeThread = name
     if (unseen.has(name)) setUnseen(name, 0)
@@ -1661,7 +1543,7 @@ export function wireChat(options) {
     openPlace = currentThread()?.anchor
     context = askedIn(openPlace)
     drawContext()
-    restoreUnsent()
+    restoreUnsent(opts.carry)
     showThread()
     drawIndex()
     void api.selectThread(prNumber, name).catch(() => undefined)
@@ -1675,7 +1557,7 @@ export function wireChat(options) {
    * An ask leaves the thread the reader was reading unasked for, so a draft an ask opened leads
    * back to it until its first question; new thread, clear, and the list are the reader's own move.
    * @param {ChatContext} anchor
-   * @param {{ fresh?: boolean, back?: boolean }} [opts]
+   * @param {{ fresh?: boolean, back?: boolean, carry?: string }} [opts]
    */
   const openDraft = (anchor, opts = {}) => {
     const left = currentThread()
@@ -1690,7 +1572,7 @@ export function wireChat(options) {
     openPlace = anchor.kind === 'pr' ? undefined : anchor
     context = anchor
     drawContext()
-    restoreUnsent()
+    restoreUnsent(opts.carry)
     proposed.clear()
     const back =
       opts.back !== true
@@ -1718,18 +1600,20 @@ export function wireChat(options) {
    * Shows the thread of a place: the one on screen, the one it has, or a new one. An answer coming
    * in elsewhere keeps arriving in its own thread.
    * @param {ChatContext} next
-   * @param {{ fromAsk?: boolean }} [opts] `fromAsk`: an ask opened it, so a new draft leads back
+   * @param {{ fromAsk?: boolean, carry?: string }} [opts] `fromAsk`: an ask opened it, so a new
+   *   draft leads back; `carry`: text the reader takes along
    */
   const goToThread = async (next, opts = {}) => {
     if (sameChatContext(openPlace ?? WHOLE_PR, next)) {
       showThread()
       return
     }
+    const carry = opts.carry === undefined ? {} : { carry: opts.carry }
     const placed = threadOfPlace(threads, agentName, next)
     if (placed === undefined) {
-      openDraft(next, { back: opts.fromAsk === true })
+      openDraft(next, { back: opts.fromAsk === true, ...carry })
     } else {
-      await openThread(placed.name)
+      await openThread(placed.name, carry)
     }
   }
 
@@ -1747,13 +1631,11 @@ export function wireChat(options) {
     }
     if (el.id === 'chat-clear') {
       // A thread keeps one place, so leaving a place's thread for the whole PR opens the whole
-      // PR's thread. What the box holds goes along.
+      // PR's thread. What the box holds goes along, under what that thread had of its own.
       if (threadPerPlace && openPlace !== undefined) {
         const carried = box.value
         box.value = ''
-        void goToThread(WHOLE_PR)
-        // goToThread has switched by the time it returns: its awaits are only for the history.
-        if (carried.trim() !== '') box.value = carried
+        void goToThread(WHOLE_PR, carried.trim() === '' ? {} : { carry: carried })
       } else {
         setContext(WHOLE_PR)
       }
@@ -1766,15 +1648,11 @@ export function wireChat(options) {
       return
     }
     if (el.id === 'thread-switch') {
-      if (pop.hidden) {
-        openPop()
-      } else {
-        closePop()
-      }
+      threadList.toggle()
       return
     }
     if (el.id === 'new-thread' || el.id === 'chat-new-thread') {
-      closePop()
+      threadList.close()
       openDraft(WHOLE_PR, { fresh: true })
       focusBox()
       return
@@ -1786,7 +1664,7 @@ export function wireChat(options) {
     if (el.hasAttribute('data-draft-open')) {
       // A thread whose first question is on its way: its draft, with that question. Once the
       // server has made it, the thread itself.
-      closePop()
+      threadList.close()
       const place = chatContextFromElement(el)
       const pending = [live, queued].some(
         q => q !== null && q.thread === null && sameChatContext(q.place ?? WHOLE_PR, place)
@@ -1801,7 +1679,7 @@ export function wireChat(options) {
     }
     const picked = el.getAttribute('data-thread-open')
     if (picked !== null) {
-      closePop()
+      threadList.close()
       if (picked === activeThread) {
         showThread()
       } else {
@@ -1962,10 +1840,6 @@ export function wireChat(options) {
   root.addEventListener('click', onClick)
   log.addEventListener('scroll', onScroll)
   pane.addEventListener('wheel', onPaneWheel, { passive: false })
-  pop.addEventListener('keydown', onPopKey)
-  pop.addEventListener('focusout', onPopFocusOut)
-  filter.addEventListener('input', applyFilter)
-  document.addEventListener('pointerdown', onOutside)
   box.addEventListener('keydown', /** @type {EventListener} */ (onKeyDown))
   drawContext()
   void restoreThread().catch(() => undefined)
@@ -2063,11 +1937,7 @@ export function wireChat(options) {
           )
           return
         }
-        // The quick question goes, and what the reader had written in this thread stays.
-        const kept = box.value
-        box.value = question
-        send()
-        box.value = kept
+        send(question)
       })()
     },
     /** Whether a question asked here waits to be sent, which a re-render would drop. */
@@ -2088,10 +1958,7 @@ export function wireChat(options) {
       root.removeEventListener('click', onClick)
       log.removeEventListener('scroll', onScroll)
       marks.remove()
-      pop.removeEventListener('keydown', onPopKey)
-      pop.removeEventListener('focusout', onPopFocusOut)
-      filter.removeEventListener('input', applyFilter)
-      document.removeEventListener('pointerdown', onOutside)
+      threadList.stop()
       box.removeEventListener('keydown', /** @type {EventListener} */ (onKeyDown))
       stopResize()
       panel.stop()

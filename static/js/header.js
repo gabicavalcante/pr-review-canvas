@@ -6,7 +6,7 @@ import { diffstatHtml, testChanges } from './diffstat.js'
 import { esc, fullDate, timeAgo } from './dom.js'
 import { generationMode } from './generate.js'
 import { authorProfileUrl, currentHost, hostLabel } from './host.js'
-import { canvasHiddenLines, getFoldLevel, refreshRail } from './layers.js'
+import { canvasHiddenLines, drawnCanvas, getFoldLevel, refreshRail } from './layers.js'
 import { draftsByCommit, pendingBarHtml, pendingCount } from './pending.js'
 import { progressSummary } from './progress.js'
 import { foldLevelControlHtml } from './reading-level.js'
@@ -97,9 +97,9 @@ export function bareHeaderHtml(opts) {
 
 /**
  * @param {PrBundle} bundle
- * @param {{ host: string, theme: import('./theme.js').Theme, skin: import('./skin.js').Skin, now: Date, project?: ProjectLink | undefined, viewStale?: boolean }} opts
+ * @param {{ host: string, theme: import('./theme.js').Theme, skin: import('./skin.js').Skin, now: Date, project?: ProjectLink | undefined, drawn?: ReturnType<typeof drawnCanvas> }} opts
  *   The wordmark links to the project list; the project, when the page has one, gets a link home.
- *   `viewStale`: the reader chose to read an outdated canvas, which the page then draws.
+ *   `drawn` is the canvas the page draws, as `drawnCanvas` says; the page passes it.
  * @returns {string}
  */
 export function renderHeader(bundle, opts) {
@@ -128,27 +128,26 @@ export function renderHeader(bundle, opts) {
     : `Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}`
   const progress = ready ? progressHtml(artifact, bundle.state, pr) : ''
   const level = getFoldLevel()
-  // An outdated canvas the reader opened is drawn too, from its own commit, so how much of its
-  // diff to hide is still the reader's choice.
-  const viewedStale = bundle.status === 'stale' && opts.viewStale === true && artifact !== undefined
-  const on = viewedStale ? artifact.pr : pr
+  // How much of the diff to hide is the reader's choice for any canvas on screen, an outdated one
+  // they opened too, counted over the diff the page draws.
+  const drawn = opts.drawn === undefined ? drawnCanvas(bundle, false) : opts.drawn
   const reading =
-    ready || viewedStale
-      ? foldLevelControlHtml(
+    drawn === null
+      ? ''
+      : foldLevelControlHtml(
           level,
           canvasHiddenLines(
             {
-              artifact,
-              files: viewedStale ? artifact.files : bundle.files,
+              artifact: drawn.artifact,
+              files: drawn.files,
               comments: bundle.comments.reviewComments,
               state: bundle.state,
-              headSha: on.headSha,
-              mergeBaseSha: on.mergeBaseSha,
+              headSha: drawn.on.headSha,
+              mergeBaseSha: drawn.on.mergeBaseSha,
             },
             level
           )
         )
-      : ''
   const risk = ready ? riskLineHtml(artifact.risk) : ''
   return (
     '<header class="hdr">' +

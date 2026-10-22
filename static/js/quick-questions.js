@@ -3,7 +3,6 @@
 // anything of its kind, plus a way to write your own. Picking one sets the context to that target
 // and sends, so the common questions cost one click. A file's ask has no menu.
 
-import { QUICK_QUESTIONS, quickQuestionsFor } from './chat.js'
 import { chatContextFromElement } from './chat-context.js'
 import { esc, qs } from './dom.js'
 
@@ -16,6 +15,43 @@ export const QQ_MENU_ID = 'qq-menu'
 export const MENU_GAP_PX = 4
 export const MENU_EDGE_PX = 8
 export const ASK_SOMETHING_ELSE = 'ask something else…'
+
+/** The questions the quick menu offers on a point or lines of code. */
+export const QUICK_QUESTIONS = [
+  'Suggestion to solve this?',
+  'Why this way, and what were the alternatives?',
+  'What could break?',
+  'Does this follow how the codebase already does it?',
+  'Is this covered by tests?',
+]
+
+/** What the quick menu offers on a layer, which asks about a whole step of the change. */
+export const LAYER_QUESTIONS = [
+  'Walk me through this layer.',
+  'What could this layer break?',
+  'Does this follow how the codebase already does it?',
+  'Are its tests enough?',
+]
+
+/**
+ * The quick questions for what a command asks about. A file and the whole PR get none: the
+ * questions are about one change, and an ask about either opens its thread at once. Every place
+ * that offers the menu asks this, so the rule lives here only.
+ * @param {import('./chat-context.js').ChatContext} context
+ * @returns {ReadonlyArray<string>}
+ */
+export function quickQuestionsFor(context) {
+  switch (context.kind) {
+    case 'layer':
+      return LAYER_QUESTIONS
+    case 'point':
+    case 'lines':
+      return QUICK_QUESTIONS
+    case 'file':
+    case 'pr':
+      return []
+  }
+}
 
 /**
  * @param {ReadonlyArray<string>} questions

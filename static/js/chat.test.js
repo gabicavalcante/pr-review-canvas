@@ -20,7 +20,6 @@ import {
   checkoutWarningHtml,
   clampWidth,
   proposedCommentHtml,
-  QUICK_QUESTIONS,
   readChatMinimized,
   readChatWidth,
   renderChatShell,
@@ -624,7 +623,7 @@ describe('threads', () => {
     root.remove()
   })
 
-  it('keeps each thread’s unsent text to itself, and clear carries it along', async () => {
+  it('keeps each thread’s unsent text to itself, and clear adds it under the whole PR’s', async () => {
     const { root, chat } = mount({ fetchThreads: async () => PLACED })
     await flush()
     const box = el(root, '#msg')
@@ -643,7 +642,8 @@ describe('threads', () => {
     el(root, '#chat-clear').click()
     await flush()
     expect(el(root, '#thread-title').textContent).toBe('overall')
-    expect(box.value).toBe('about the point')
+    // The whole PR's own unsent text stays, with the carried text under it.
+    expect(box.value).toBe('about the whole PR, half written\n\nabout the point')
   })
 
   it('opens the first thread the filter leaves on Enter, and closes the list', async () => {
@@ -2227,18 +2227,6 @@ describe('the tie a reader takes off', () => {
     expect(root.querySelector('.proposed-point')).toBeNull()
     el(root, '[data-act="proposed-queue"]').click()
     expect(seen).toEqual([undefined])
-  })
-})
-
-describe('QUICK_QUESTIONS', () => {
-  it('holds the fixed quick questions', () => {
-    expect(QUICK_QUESTIONS).toEqual([
-      'Suggestion to solve this?',
-      'Why this way, and what were the alternatives?',
-      'What could break?',
-      'Does this follow how the codebase already does it?',
-      'Is this covered by tests?',
-    ])
   })
 })
 

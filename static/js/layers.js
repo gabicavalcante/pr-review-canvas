@@ -59,6 +59,26 @@ export function getFoldLevel() {
 /** @type {RenderContext | null} */
 let renderContext = null
 
+/**
+ * The canvas the page draws, and the files and commits its diff comes from: the PR's own for a
+ * ready canvas, the canvas's own for an outdated one the reader chose to open, since it describes
+ * its own commit. Null when the page draws no canvas. The page and its header both ask this, so
+ * they agree on which diff is on screen.
+ * @param {import('./contract-types.js').PrBundle} bundle
+ * @param {boolean} viewStale whether the reader opened an outdated canvas
+ * @returns {{ artifact: ReviewArtifact, files: FileEntry[], on: { headSha: string, mergeBaseSha: string } } | null}
+ */
+export function drawnCanvas(bundle, viewStale) {
+  const { artifact } = bundle
+  if (artifact === undefined) {
+    return null
+  }
+  if (bundle.status === 'ready') {
+    return { artifact, files: bundle.files, on: bundle.pr }
+  }
+  return bundle.status === 'stale' && viewStale ? { artifact, files: artifact.files, on: artifact.pr } : null
+}
+
 /** @param {RenderContext | null} ctx */
 export function setRenderContext(ctx) {
   renderContext = ctx
@@ -449,7 +469,7 @@ export function renderFileCard(lf, entry, layer, ctx) {
     `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}" aria-labelledby="${esc(id)}-h">` +
     `<div class="file-h">${chevronHtml('Collapse file', !collapsed, { act: 'toggle-card' })}<h3 id="${esc(id)}-h" class="path" data-act="toggle-card">${path}${testTag}</h3>${status}${pills}` +
     `<label class="chk"><input type="checkbox" data-reviewed-id="${esc(cardReviewedId)}"${cardReviewed ? ' checked' : ''}> reviewed</label>` +
-    `<span class="tbtns">${askButtonHtml({ kind: 'file', path: lf.path }, { title: 'Ask AI Chat about this file', menu: false })}</span></div>` +
+    `<span class="tbtns">${askButtonHtml({ kind: 'file', path: lf.path }, { title: 'Ask AI Chat about this file' })}</span></div>` +
     `<div class="file-body"${collapsed ? ' hidden' : ''}>${note}<div class="diff-host" data-key="${esc(key)}" data-hunks="${esc(lf.hunks.join(','))}"><div class="loading">Loading diff…</div></div>${elsewhere}</div></article></pr-file>`
   )
 }
