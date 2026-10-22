@@ -32,14 +32,17 @@ for (const layerView of ['all', 'one', 'points'] as const) {
         .locator('#overview')
         .getByRole('link', { name: target === 'line' ? 'Later line' : 'Later hunk', exact: true })
         .click()
-      // A point's stop in the one-point view draws its chunk again; the link lands in the layer.
+      // A point's stop in the one-point view draws its chunk again. A line link followed on the
+      // page opens that stop; the URL, on forward and on a reload, lands in the layer.
       const destination = page.locator(
         `pr-layer ${target === 'line' ? '#L-src_app_ts-new-13' : '#hunk-src_app_ts-2'}`
       )
-      await expect(destination).toHaveClass(/is-target/)
-      await expect(destination).not.toHaveClass(/is-approx/)
-      await expect(destination).toBeInViewport()
-      await expect(page.locator('#layer-other')).toBeVisible()
+      const inStop = layerView === 'points' && target === 'line'
+      const clicked = inStop ? page.locator('#step-p-2 #L-src_app_ts-new-13') : destination
+      await expect(clicked).toHaveClass(/is-target/)
+      await expect(clicked).not.toHaveClass(/is-approx/)
+      await expect(clicked).toBeInViewport()
+      await expect(page.locator('#layer-other')).toBeVisible({ visible: !inStop })
       if (layerView !== 'all') await expect(page.locator('#layer-run-path')).toBeHidden()
       await page.goBack()
       await expect(page).toHaveURL(layerView === 'points' ? `${server.url}#overview` : server.url)
@@ -277,4 +280,130 @@ test('refresh stops regeneration polling before waiting for patches', async ({ p
   expect(polls).toBe(0)
   await page.locator('#refresh').click()
   await expect(page.locator('#overview .summary')).toHaveText(newer.summary)
+})
+
+test.describe('in the one-point view', () => {
+  const asPoints = async (t: {
+    ctx: { settings: { write: (input: { layerView: 'points' }) => Promise<unknown> } }
+  }) => {
+    await t.ctx.settings.write({ layerView: 'points' })
+  }
+
+  test('selecting lines in a stop marks them and opens the comment there', async ({ page, chatServer }) => {
+    const { url } = await chatServer({ setup: asPoints })
+    await page.goto(`${url}#step-p-1`)
+    const stop = page.locator('#step-p-1')
+    await expect(stop).toBeVisible()
+    await stop.locator('#L-src_app_ts-new-4 td.ln').nth(1).click()
+    await expect(stop.locator('tr.is-selected')).toHaveCount(1)
+    await expect(page.locator('pr-layer tr.is-selected')).toHaveCount(0)
+    await stop.locator('[data-act="comment-selection"]').click()
+    await expect(stop.locator('.composer-box')).toBeVisible()
+    await expect(page.locator('pr-layer .composer-box')).toHaveCount(0)
+  })
+
+  test('c with a point in focus opens the comment in its stop', async ({ page, chatServer }) => {
+    const { url } = await chatServer({ setup: asPoints })
+    await page.goto(`${url}#step-p-1`)
+    await expect(page.locator('#step-p-1')).toBeVisible()
+    await page.keyboard.press(']')
+    await expect(page.locator('#step-p-1-card')).toHaveClass(/is-focused/)
+    await page.keyboard.press('c')
+    await expect(page.locator('#step-p-1 .composer-box')).toBeVisible()
+    await expect(page.locator('pr-layer .composer-box')).toHaveCount(0)
+  })
+
+  test('go to code from a point’s thread opens the point’s stop', async ({ page, chatServer }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop')
+    const { url } = await chatServer({ setup: asPoints })
+    await page.goto(`${url}#step-p-1`)
+    await page.locator('#step-p-1-card [data-act="ask"]').first().click()
+    await page.getByText('ask something else…', { exact: true }).first().click()
+    await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
+    // Elsewhere in the sequence, then back by the thread.
+    await page.locator('#step-p-1 .step-nav a', { hasText: 'next layer' }).click()
+    await expect(page.locator('#step-p-1')).toBeHidden()
+    await page.locator('#thread-goto').click()
+    await expect(page.locator('#step-p-1')).toBeVisible()
+    await expect(page.locator('#step-p-1-card')).toHaveClass(/is-target/)
+    await expect(page.locator('section.layer:visible')).toHaveCount(0)
+  })
+
+  test('go to code from lines no stop draws moves to the layers', async ({ page, chatServer }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop')
+    const { url } = await chatServer()
+    await page.goto(url)
+    // A thread on lines of the test file, which has no attention point, asked in the layers. Its
+    // diff is drawn once its card comes on screen.
+    await page.locator('pr-layer article.file[data-path="src/app.test.ts"]').scrollIntoViewIfNeeded()
+    await page.locator('pr-layer #L-src_app_test_ts-new-2 td.ln').nth(1).click()
+    await page.locator('tr.sel-bar [data-act="ask"]').click()
+    await page.getByText('ask something else…', { exact: true }).first().click()
+    await expect(page.locator('#thread-title')).toContainText('src/app.test.ts')
+    // A thread is kept once it has a question, so it is still there after the page draws itself in
+    // the other view.
+    await page.locator('#msg').fill('Is this enough?')
+    await page.keyboard.press('Enter')
+    await expect(page.locator('#chat-log')).toContainText('covered at')
+    await page.locator('nav.rail .rail-view [data-view="points"]').click()
+    await expect(page.locator('section.point-step:visible')).toHaveCount(1)
+    await page.locator('#side-tab-threads').click()
+    await page.locator('#thread-index').getByText('src/app.test.ts', { exact: false }).first().click()
+    await page.locator('#thread-goto').click()
+    await expect(page.locator('section.point-step')).toHaveCount(0)
+    await expect(page.locator('nav.rail .rail-view [data-view="layers"]')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    await expect(page.locator('pr-layer #L-src_app_test_ts-new-2')).toHaveClass(/is-target/)
+    await expect(page.locator('pr-layer #L-src_app_test_ts-new-2')).toBeInViewport()
+  })
+
+  test('a comment the chat proposes about a point opens in the point’s stop', async ({
+    page,
+    chatServer,
+  }) => {
+    const narrow = (page.viewportSize()?.width ?? 1440) < 1200
+    const { url } = await chatServer({
+      setup: asPoints,
+      runner: {
+        script: [
+          {
+            type: 'chunk',
+            text:
+              '```comment\n' +
+              JSON.stringify({ path: 'src/app.ts', line: 13, body: 'Name it.', point: 'fp-2' }) +
+              '\n```',
+          },
+          { type: 'done', stopReason: 'end_turn' },
+        ],
+      },
+    })
+    await page.goto(`${url}#step-p-1`)
+    if (narrow) await page.getByRole('button', { name: 'AI Chat', exact: true }).click()
+    await page.locator('#msg').fill('Propose a comment')
+    await page.locator('#chat-send').click()
+    await page.locator('.proposed [data-act="proposed-edit"]').click()
+    await expect(page.locator('#step-p-2')).toBeVisible()
+    await expect(page.locator('#step-p-2 .composer-box textarea')).toHaveValue('Name it.')
+    await expect(page.locator('pr-layer .composer-box')).toHaveCount(0)
+  })
+})
+
+test('go to code from a point’s thread in the layers lands on its card in its layer', async ({
+  page,
+  chatServer,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop')
+  const { url } = await chatServer()
+  await page.goto(url)
+  const point = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
+  await point.locator('[data-act="ask"]').first().click()
+  await page.getByText('ask something else…', { exact: true }).first().click()
+  await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
+  await page.mouse.wheel(0, 2000)
+  await page.locator('#thread-goto').click()
+  await expect(point).toHaveClass(/is-target/)
+  await expect(point).toBeInViewport()
+  await expect(page.locator('section.point-step')).toHaveCount(0)
 })

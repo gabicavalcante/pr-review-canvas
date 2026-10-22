@@ -30,6 +30,7 @@ import {
   setRenderContext,
 } from './layers.js'
 import { initOneLayer } from './one-layer.js'
+import { renderPointSteps } from './point-view.js'
 import { renderOverview } from './overview.js'
 import { createReviewSession } from './review-session.js'
 import { setSelfReview } from './self-review.js'
@@ -91,8 +92,9 @@ function bundleFor(state, canvas = artifact) {
 
 /**
  * The whole review screen, hydrated and wired, with a fake API in place of the server.
- * @param {{ selfReview?: boolean, state?: import('./contract-types.js').PrState, api?: Partial<import('./review-session.js').SessionApi>, capabilities?: import('./contract-types.js').Capabilities, comments?: ReadonlyArray<import('./contract-types.js').ReviewComment>, fetchReviewBody?: (n: import('./contract-types.js').ReviewKey) => Promise<import('./contract-types.js').ReviewBodyResponse>, chat?: () => ReturnType<typeof import('./chat.js').wireChat>, openSettings?: (el: HTMLElement) => void, setLayerView?: (view: string, place?: string) => void, uncover?: () => void, artifact?: import('./contract-types.js').ReviewArtifact, drawn?: boolean }} [opts]
+ * @param {{ selfReview?: boolean, state?: import('./contract-types.js').PrState, api?: Partial<import('./review-session.js').SessionApi>, capabilities?: import('./contract-types.js').Capabilities, comments?: ReadonlyArray<import('./contract-types.js').ReviewComment>, fetchReviewBody?: (n: import('./contract-types.js').ReviewKey) => Promise<import('./contract-types.js').ReviewBodyResponse>, chat?: () => ReturnType<typeof import('./chat.js').wireChat>, openSettings?: (el: HTMLElement) => void, setLayerView?: (view: string, place?: string) => void, uncover?: () => void, artifact?: import('./contract-types.js').ReviewArtifact, drawn?: boolean, points?: boolean }} [opts]
  *   `drawn: false` leaves every diff waiting to be seen, as cards below the fold do in a browser.
+ *   `points: true` draws the one-point view's stops after the layers.
  */
 function setup(opts = {}) {
   const state = opts.state ?? BASE
@@ -125,8 +127,9 @@ function setup(opts = {}) {
   const paths = new Set(files.map(f => f.path))
   document.body.innerHTML =
     `<pr-app id="root">${renderHeader(bundle, { host: 'localhost:3010', theme: 'auto', skin: 'terminal', now: NOW })}` +
-    `<div class="layout">${renderRail(artifact, state)}<main id="main">${renderOverview(bundle, { paths, now: NOW })}` +
-    `${renderLayers(canvas, files, state, threadComments)}</main></div></pr-app>`
+    `<div class="layout">${renderRail(artifact, state, { points: opts.points === true })}<main id="main">${renderOverview(bundle, { paths, now: NOW })}` +
+    `${renderLayers(canvas, files, state, threadComments)}` +
+    `${opts.points === true ? renderPointSteps(canvas, files, state, threadComments) : ''}</main></div></pr-app>`
   const root = document.querySelector('#root')
   if (!(root instanceof HTMLElement)) {
     throw new Error('no root')
@@ -2422,6 +2425,134 @@ describe('the AI Chat commands', () => {
     expect(button.nextElementSibling?.textContent).toContain('not a file of this pull request')
     wiring.onProposedComment('edit', { path: 'src/app.ts', line: 900, side: 'new', body: 'x' }, button)
     expect(button.nextElementSibling?.textContent).toContain('not on screen')
+  })
+})
+
+describe('in the one-point view’s stops', () => {
+  /** @param {ParentNode} root @param {string} selector */
+  function pointerDown(root, selector) {
+    const cell = root.querySelector(selector)
+    if (!(cell instanceof HTMLElement)) throw new Error(`no cell for ${selector}`)
+    cell.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
+  }
+
+  /** @param {string} key */
+  const press = key => document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+
+  /**
+   * Records what the page is asked to show in its layers.
+   * @param {HTMLElement} root
+   * @returns {import('./anchors.js').ShowInLayers[]}
+   */
+  function layerRequests(root) {
+    /** @type {import('./anchors.js').ShowInLayers[]} */
+    const asked = []
+    root.addEventListener('show-in-layers', event => {
+      asked.push(/** @type {CustomEvent<import('./anchors.js').ShowInLayers>} */ (event).detail)
+    })
+    return asked
+  }
+
+  it('marks and comments on the lines selected in a stop, in that stop', () => {
+    const { root } = setup({ points: true })
+    pointerDown(root, '#step-p-1 #L-src_app_ts-new-4 td.ln:nth-child(2)')
+    document.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }))
+    expect(root.querySelectorAll('#step-p-1 tr.is-selected')).toHaveLength(1)
+    expect(root.querySelectorAll('pr-layer tr.is-selected')).toHaveLength(0)
+    click(root, '#step-p-1 [data-act="comment-selection"]')
+    expect(root.querySelector('#step-p-1 .composer-box')?.getAttribute('data-line')).toBe('4')
+    expect(root.querySelector('pr-layer .composer-box')).toBeNull()
+  })
+
+  it('opens the composer of a line number clicked in a stop in that stop', () => {
+    const { root } = setup({ points: true })
+    click(root, '#step-p-1 #L-src_app_ts-new-4 .plus')
+    expect(root.querySelector('#step-p-1 .composer-box')).not.toBeNull()
+    expect(root.querySelector('pr-layer .composer-box')).toBeNull()
+  })
+
+  it('comments with c on the line of the point in focus, in its stop', () => {
+    const { root } = setup({ points: true })
+    press(']')
+    expect(root.querySelector('.is-focused')?.id).toBe('step-p-1-card')
+    press('c')
+    expect(root.querySelector('#step-p-1 .composer-box')?.getAttribute('data-line')).toBe('4')
+    expect(root.querySelector('pr-layer .composer-box')).toBeNull()
+  })
+
+  it('opens a proposed comment about a point in that point’s stop', () => {
+    const { root, wiring } = setup({ points: true })
+    const button = document.createElement('button')
+    root.appendChild(button)
+    const p2 = artifact.points.find(p => p.id === 'p-2')
+    if (p2 === undefined) throw new Error('no p-2')
+    wiring.onProposedComment(
+      'edit',
+      {
+        path: p2.path,
+        line: p2.line,
+        side: 'new',
+        body: 'Rename.',
+        point: { fingerprint: p2.fingerprint, title: p2.title },
+      },
+      button
+    )
+    expect(root.querySelector('#step-p-2 .composer-box textarea')).not.toBeNull()
+    expect(root.querySelector('pr-layer .composer-box')).toBeNull()
+  })
+
+  it('asks the page for its layers for a line no stop draws, with the composer to open there', () => {
+    const { root, wiring } = setup({ points: true })
+    const asked = layerRequests(root)
+    const button = document.createElement('button')
+    root.appendChild(button)
+    // The test file has no attention point, so no stop draws it.
+    wiring.onProposedComment('edit', { path: 'src/app.test.ts', line: 1, side: 'new', body: 'x' }, button)
+    expect(root.querySelector('.composer-box')).toBeNull()
+    expect(asked).toEqual([
+      {
+        href: '#line:src/app.test.ts:1',
+        compose: { path: 'src/app.test.ts', side: 'new', line: 1, body: 'x' },
+      },
+    ])
+  })
+
+  it('opens the composer the page hands back once it shows its layers', () => {
+    const { root, wiring } = setup()
+    wiring.composeAt({ path: 'src/app.test.ts', side: 'new', line: 1, body: 'x' })
+    const box = root.querySelector('pr-layer .composer-box textarea')
+    if (!(box instanceof HTMLTextAreaElement)) throw new Error('no composer')
+    expect(box.value).toBe('x')
+  })
+
+  it('jumps to a line in the stop the command is in, and asks for the layers for one no stop draws', () => {
+    const { root } = setup({ points: true })
+    const asked = layerRequests(root)
+    const stop = root.querySelector('#step-p-1')
+    stop?.insertAdjacentHTML(
+      'beforeend',
+      '<button type="button" data-act="jump-line" data-key="src_app_ts" data-line="4" data-side="new">here</button>' +
+        '<button type="button" data-act="jump-line" data-key="src_app_test_ts" data-line="1" data-side="new">away</button>'
+    )
+    click(root, '#step-p-1 [data-act="jump-line"][data-line="4"]')
+    expect(root.querySelector('#step-p-1 #L-src_app_ts-new-4')?.classList.contains('is-target')).toBe(true)
+    expect(root.querySelector('pr-layer #L-src_app_ts-new-4')?.classList.contains('is-target')).toBe(false)
+    click(root, '#step-p-1 [data-act="jump-line"][data-key="src_app_test_ts"]')
+    expect(asked).toEqual([{ href: '#line:src/app.test.ts:1' }])
+  })
+
+  it('opens the reason box of a proposed resolution under the point in its stop', () => {
+    setSelfReview(true, {})
+    const { root, wiring } = setup({ points: true, selfReview: true })
+    const button = document.createElement('button')
+    root.appendChild(button)
+    wiring.onProposedResolution(
+      'edit',
+      { point: { fingerprint: 'fp-1', title: 'Sum' }, reason: 'Kept on purpose.' },
+      button
+    )
+    expect(root.querySelector('#step-p-1 .settle-box')).not.toBeNull()
+    expect(root.querySelector('pr-layer .settle-box')).toBeNull()
   })
 })
 

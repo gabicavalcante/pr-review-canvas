@@ -3,6 +3,7 @@
 // the bundle's status, and keep the page current: the empty screen polls until a canvas is
 // published, and the regenerate dialog polls until a newer canvas replaces the one on screen.
 /** @typedef {import('./contract-types.js').PrBundle} PrBundle */
+import { SHOW_IN_LAYERS } from './anchors.js'
 import {
   ApiError,
   fetchBundle,
@@ -147,7 +148,7 @@ export class PrAppElement extends HTMLElement {
   bootstrap = null
   /** @type {{ stop: () => void } | null} */
   diagrams = null
-  /** @type {{ stop: () => void } | null} */
+  /** @type {ReturnType<typeof initDeepLinks> | null} */
   deepLinks = null
   /** @type {{ stop: () => void } | null} */
   scrollSpy = null
@@ -181,7 +182,7 @@ export class PrAppElement extends HTMLElement {
    * @type {ReturnType<typeof createReviewSession> | null}
    */
   session = null
-  /** @type {{ stop: () => void } | null} */
+  /** @type {ReturnType<typeof wireReview> | null} */
   interactions = null
   /** @type {ReturnType<typeof wireChat>} */
   chat = null
@@ -203,6 +204,11 @@ export class PrAppElement extends HTMLElement {
     // Once per element: the content is re-rendered on every flip, the element itself is not.
     wireCopyCommands(this)
     wireEnvBadge(this)
+    // A line or point the one-point view's stops do not draw is shown in the layers.
+    this.addEventListener(SHOW_IN_LAYERS, event => {
+      const request = /** @type {CustomEvent<import('./anchors.js').ShowInLayers>} */ (event).detail
+      void this.switchLayerView('layers', request)
+    })
     void this.boot()
   }
 
@@ -417,7 +423,8 @@ export class PrAppElement extends HTMLElement {
         uncover: () => (this.chat ?? this.reviewPane)?.uncover(),
         openSettings: el =>
           void openSettingsDialog(this, el, { onSaved: data => void this.settingsSaved(data) }),
-        setLayerView: (view, place) => void this.switchLayerView(view, place),
+        setLayerView: (view, place) =>
+          void this.switchLayerView(view, place === undefined ? undefined : { href: place }),
       })
       this.interactions = interactions
       if (chatEnabled) {
@@ -585,15 +592,14 @@ export class PrAppElement extends HTMLElement {
 
   /**
    * The rail's switch between the one-point view and the layers, which come back in the layer view
-   * the reader read them in last: saved as the settings dialog saves it, then applied.
+   * the reader read them in last: saved as the settings dialog saves it, then applied. `request` is
+   * a target the stops do not draw: the layers open on its link, and on its composer when it has one.
    * @param {string} choice `points` or `layers`
-   * @param {string} [place] the place to open on, as `#id`; where the reader is, if omitted: out of
-   *   the one-point view the stop on screen, which the URL may not name, else the URL's
+   * @param {import('./anchors.js').ShowInLayers} [request] the place to open on, and what to do
+   *   there; without one, where the reader is: out of the one-point view the stop on screen, which
+   *   the URL may not name, else the URL's
    */
-  async switchLayerView(
-    choice,
-    place = (choice === 'layers' && this.layerView?.place()) || window.location.hash
-  ) {
+  async switchLayerView(choice, request) {
     if (choice !== 'points' && choice !== 'layers') {
       return
     }
@@ -603,11 +609,21 @@ export class PrAppElement extends HTMLElement {
       // The other view opens where the reader was, as far as it has that place.
       const artifact = this.shown?.artifact
       if (artifact !== undefined) {
-        const target = viewSwitchTarget(artifact, view, place)
+        const place = (choice === 'layers' && this.layerView?.place()) || window.location.hash
+        const target = request?.href ?? viewSwitchTarget(artifact, view, place)
         const url = `${window.location.pathname}${window.location.search}${target}`
         window.history.replaceState(null, '', url)
       }
       await this.settingsSaved(data)
+      if (request !== undefined) {
+        // The page drew itself in the new view under that link; it is followed again once every
+        // layer it shows is on the page, then the composer opens on it.
+        this.deepLinks?.followHash()
+        if (request.compose !== undefined) {
+          this.interactions?.composeAt(request.compose)
+        }
+        return
+      }
       // A view of one section at a time shows it under a page at its top, as a move between stops
       // does; all the layers at once open on the layer that was read.
       const target = view === 'all' ? document.getElementById(window.location.hash.slice(1)) : null

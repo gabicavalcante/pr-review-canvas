@@ -3,8 +3,18 @@
 // canvas scheme (#layer:, #file:, #hunk:, #line:), and the same string works as a URL fragment,
 // so `…/review/278#line:path/to/file.ts:40` opens the page on that line and a click on a link
 // leaves a URL the reader can share. The jump itself is `jumpTo` in anchors.js; this module
-// decides when it runs.
-import { drawCardsOf, jumpTo, keyFromPath, nearestRow } from './anchors.js'
+// decides when it runs. A link the reader follows on the page, in the one-point view, opens the
+// stop that draws its line, or the layers when no stop does; the URL the page opens with, and back
+// and forward, land in the layer.
+import {
+  drawCardsOf,
+  jumpTo,
+  keyFromPath,
+  nearestRow,
+  revealPreferringStop,
+  rowPreferringStop,
+  showsStops,
+} from './anchors.js'
 import { flash, scrollIntoViewSafe } from './dom.js'
 import { layerAnchorId } from './keys.js'
 import { parseLink } from './links.js'
@@ -34,14 +44,15 @@ export function decodeHash(hash) {
  * with its escapes resolved, which is how the same link comes back out of the URL bar.
  * @param {string} href
  * @param {ParentNode} [root]
+ * @param {{ preferStops?: boolean }} [opts] `preferStops` sends a line link to a stop that draws it
  * @returns {boolean}
  */
-export function followLink(href, root = document) {
-  if (jumpToTarget(href, root)) {
+export function followLink(href, root = document, opts = {}) {
+  if (jumpToTarget(href, root, opts.preferStops === true)) {
     return true
   }
   const decoded = decodeHash(href)
-  return decoded !== href && jumpToTarget(decoded, root)
+  return decoded !== href && jumpToTarget(decoded, root, opts.preferStops === true)
 }
 
 /**
@@ -59,21 +70,22 @@ export function navigateLink(href, root = document, view = window) {
   } catch {
     // A view without session history can still follow the link.
   }
-  return followLink(href, root)
+  return followLink(href, root, { preferStops: true })
 }
 
 /**
  * @param {string} target
  * @param {ParentNode} root
+ * @param {boolean} preferStops
  * @returns {boolean}
  */
-function jumpToTarget(target, root) {
+function jumpToTarget(target, root, preferStops) {
   const link = parseLink(target)
   if (link === null) {
     return false
   }
   if (link.kind === 'line') {
-    return jumpToLine(root, link)
+    return (preferStops && jumpToLineInStop(root, link, target)) || jumpToLine(root, link)
   }
   if (!jumpTo(target, root)) {
     return false
@@ -103,6 +115,34 @@ function jumpToLine(root, link) {
   }
   scrollIntoViewSafe(near.row)
   flash(near.row)
+  return true
+}
+
+/**
+ * In the one-point view, a line link the reader follows goes to the stop that draws the line, or
+ * asks the page for its layers when no stop does. False outside that view, and for a line on no
+ * row at all, which `jumpToLine` then lands near.
+ * @param {ParentNode} root
+ * @param {{ path: string, start: number, side: 'new' | 'old' }} link
+ * @param {string} href
+ * @returns {boolean}
+ */
+function jumpToLineInStop(root, link, href) {
+  if (!showsStops(root)) {
+    return false
+  }
+  drawCardsOf(root, link.path)
+  const key = keyFromPath(link.path)
+  const exact = rowPreferringStop(root, key, link.side, link.start)
+  const near = nearestRow(root, key, link.side, link.start)
+  const found =
+    exact !== null && exact.stop !== null ? exact : near === null ? null : { row: near.row, stop: null }
+  if (found === null) {
+    return false
+  }
+  if (revealPreferringStop({ el: found.row, stop: found.stop }, root, { href })) {
+    flash(found.row)
+  }
   return true
 }
 

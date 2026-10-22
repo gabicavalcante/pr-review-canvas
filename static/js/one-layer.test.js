@@ -12,6 +12,13 @@ import {
   showOnly,
   writeLayersView,
 } from './one-layer.js'
+import {
+  pointPreferringStop,
+  revealPreferringStop,
+  rowPreferringStop,
+  SHOW_IN_LAYERS,
+  showsStops,
+} from './anchors.js'
 
 /** @type {HTMLElement} */
 let root
@@ -358,5 +365,64 @@ describe('the layer view read in last', () => {
     expect(readLayersView(localStorage)).toBe('all')
     expect(readLayersView(null)).toBe('all')
     localStorage.removeItem(LAYERS_VIEW_KEY)
+  })
+})
+
+describe('finding a line or a point, a stop first', () => {
+  /** A layer and two stops that draw its file again, under the same ids. */
+  const STOPS_PAGE = `
+    <pr-layer><section class="layer" id="layer-run">
+      <article class="file" data-path="a.ts"><table class="diff" data-key="a_ts"><tbody>
+        <tr id="L-a_ts-new-4"><td class="ln"></td></tr><tr id="L-a_ts-new-9"><td class="ln"></td></tr>
+      </tbody></table><ol><li class="finding" id="p-1" data-point="p-1" data-fingerprint="fp-1"></li></ol></article>
+    </section></pr-layer>
+    <section class="point-step" id="step-p-1" hidden><ol><li class="finding" id="step-p-1-card" data-point="p-1" data-fingerprint="fp-1"></li></ol>
+      <article class="file" data-path="a.ts"><table class="diff" data-key="a_ts"><tbody><tr id="L-a_ts-new-4"><td class="ln"></td></tr></tbody></table></article>
+    </section>
+    <section class="point-step" id="step-p-2" hidden>
+      <article class="file" data-path="a.ts"><table class="diff" data-key="a_ts"><tbody><tr id="L-a_ts-new-4"><td class="ln"></td></tr></tbody></table></article>
+    </section>`
+
+  beforeEach(() => {
+    root.innerHTML = STOPS_PAGE
+  })
+
+  it('takes a line from the scope first, then from the first stop that draws it, then from its layer', () => {
+    const second = section('step-p-2')
+    expect(rowPreferringStop(root, 'a_ts', 'new', 4)?.stop?.id).toBe('step-p-1')
+    expect(rowPreferringStop(root, 'a_ts', 'new', 4, second)?.stop?.id).toBe('step-p-2')
+    const inLayer = rowPreferringStop(root, 'a_ts', 'new', 9)
+    expect(inLayer?.stop).toBeNull()
+    expect(inLayer?.row.closest('pr-layer')).not.toBeNull()
+    expect(rowPreferringStop(root, 'a_ts', 'new', 99)).toBeNull()
+  })
+
+  it('takes a point’s card in its stop before its card in its layer', () => {
+    expect(pointPreferringStop(root, 'fp-1')?.el.id).toBe('step-p-1-card')
+    root.querySelector('#step-p-1')?.remove()
+    expect(pointPreferringStop(root, 'fp-1')?.el.id).toBe('p-1')
+    expect(pointPreferringStop(root, 'fp-1')?.stop).toBeNull()
+  })
+
+  it('shows a target in a stop, and asks the page for its layers for one in no stop', () => {
+    /** @type {unknown[]} */
+    const asked = []
+    root.addEventListener(SHOW_IN_LAYERS, event => asked.push(/** @type {CustomEvent} */ (event).detail))
+    oneLayer = initOneLayer(root, { view: 'points' })
+    const inStop = rowPreferringStop(root, 'a_ts', 'new', 4)
+    if (inStop === null) throw new Error('no row')
+    expect(revealPreferringStop({ el: inStop.row, stop: inStop.stop }, root, { href: '#line:a.ts:4' })).toBe(
+      true
+    )
+    expect(section('step-p-1').hidden).toBe(false)
+    const inLayer = rowPreferringStop(root, 'a_ts', 'new', 9)
+    if (inLayer === null) throw new Error('no row')
+    expect(revealPreferringStop({ el: inLayer.row, stop: null }, root, { href: '#line:a.ts:9' })).toBe(false)
+    expect(asked).toEqual([{ href: '#line:a.ts:9' }])
+    // With no stop on the page, the layer is where the target shows.
+    root.querySelectorAll('section.point-step').forEach(stop => stop.remove())
+    expect(showsStops(root)).toBe(false)
+    expect(revealPreferringStop({ el: inLayer.row, stop: null }, root, { href: '#line:a.ts:9' })).toBe(true)
+    expect(asked).toHaveLength(1)
   })
 })

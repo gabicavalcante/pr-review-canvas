@@ -45,6 +45,91 @@ export function findRow(root, key, side, line) {
   return null
 }
 
+/** The one-point view's stops, each drawing a point's card and its file again, under the layers. */
+const STOP_SELECTOR = 'section.point-step'
+
+/**
+ * The event a target the stops do not draw sends up to the page, in the one-point view: the page
+ * moves to its layers and follows `href` there, then opens a composer on `compose` when it is given.
+ */
+export const SHOW_IN_LAYERS = 'show-in-layers'
+
+/**
+ * @typedef {{ path: string, side: 'new' | 'old', line: number, startLine?: number, body?: string, proposalFingerprint?: string, pointFingerprint?: string }} ComposeRequest
+ * @typedef {{ href: string, compose?: ComposeRequest }} ShowInLayers
+ */
+
+/**
+ * Whether the page shows the one-point view, the only one that draws stops.
+ * @param {ParentNode} root
+ */
+export function showsStops(root) {
+  return root.querySelector(STOP_SELECTOR) !== null
+}
+
+/**
+ * A line's row where the reader looks for it: inside `scope` first, such as the stop or card an
+ * action came from; else in the first stop of the one-point view that draws it; else on the page,
+ * which is its layer, since the stops come after the layers and a lookup takes the first match.
+ * `stop` is the stop that holds the row, or null for a row in a layer.
+ * @param {ParentNode} root
+ * @param {string} key
+ * @param {'new' | 'old'} side
+ * @param {number} line
+ * @param {ParentNode | null} [scope]
+ * @returns {{ row: HTMLTableRowElement, stop: HTMLElement | null } | null}
+ */
+export function rowPreferringStop(root, key, side, line, scope = null) {
+  const scopes = [...(scope === null ? [] : [scope]), ...root.querySelectorAll(STOP_SELECTOR)]
+  for (const place of scopes) {
+    const row = findRow(place, key, side, line)
+    if (row !== null && isRowVisible(row)) {
+      return { row, stop: stopOf(row) }
+    }
+  }
+  const row = findRow(root, key, side, line)
+  return row === null ? null : { row, stop: stopOf(row) }
+}
+
+/**
+ * An attention point where the reader looks for it: its card in its stop of the one-point view,
+ * else its card in its layer, or its row in the diff for a point of a layer with no list.
+ * @param {ParentNode} root
+ * @param {string} fingerprint
+ * @returns {{ el: HTMLElement, stop: HTMLElement | null } | null}
+ */
+export function pointPreferringStop(root, fingerprint) {
+  const holder = `[data-point][data-fingerprint="${cssEscape(fingerprint)}"]`
+  const el = root.querySelector(`${STOP_SELECTOR} ${holder}`) ?? root.querySelector(holder)
+  return el instanceof HTMLElement ? { el, stop: stopOf(el) } : null
+}
+
+/** @param {Element} el */
+function stopOf(el) {
+  const stop = el.closest(STOP_SELECTOR)
+  return stop instanceof HTMLElement ? stop : null
+}
+
+/**
+ * Leads the reader to a target the lookups above found. The one-point view keeps its stops: a
+ * target in one comes on screen in it, as the stop takes the place of the one shown. A target in
+ * no stop asks the page for its layers, with `request` saying where to go there; nothing scrolls
+ * now, since the page draws itself again. In the other views the target's layer shows around it.
+ * @param {{ el: HTMLElement, stop: HTMLElement | null }} found
+ * @param {ParentNode} root
+ * @param {ShowInLayers} request
+ * @param {ScrollLogicalPosition} [block]
+ * @returns {boolean} true when the target is on screen now
+ */
+export function revealPreferringStop(found, root, request, block = 'center') {
+  if (found.stop === null && showsStops(root)) {
+    found.el.dispatchEvent(new CustomEvent(SHOW_IN_LAYERS, { bubbles: true, detail: request }))
+    return false
+  }
+  scrollIntoViewSafe(found.el, block)
+  return true
+}
+
 /**
  * The closest visible row at or before `line` on `side`, for anchors that fall on a folded-away
  * line or in a gap between rows. Null when the table has no earlier row.

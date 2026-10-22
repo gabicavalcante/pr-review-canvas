@@ -11,6 +11,9 @@
   that stays at the top.
 - A switch at the head of the rail moves between **Attention points** and **Layers**, keeping your
   place, and the rail lists what the view shows. **Layers** goes back to the layer view read last.
+- In a stop, selecting lines, commenting and jumping between lines happen in that stop. A line or
+  point reached from elsewhere (a link, **go to code**, `c`, a proposed comment) opens the stop that
+  draws it, or moves to the layers when none does.
 
 ### Self-review
 

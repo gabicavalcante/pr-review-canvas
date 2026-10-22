@@ -28,8 +28,8 @@ import {
 } from './chat-scroll.js'
 import { runCommand, toast } from './commands.js'
 import { isQueuedComment, postedCommentUrl, sendCommandsHtml } from './comment-link.js'
-import { esc, flash, qs, scrollIntoViewSafe } from './dom.js'
-import { cssEscape } from './anchors.js'
+import { esc, flash, qs } from './dom.js'
+import { cssEscape, pointPreferringStop, revealPreferringStop } from './anchors.js'
 import { getRenderContext } from './layers.js'
 import { lineLink } from './links.js'
 import { renderMarkdown } from './markdown.js'
@@ -1617,10 +1617,17 @@ export function wireChat(options) {
     panel.uncover()
     switch (anchor.kind) {
       case 'point': {
-        const el = root.querySelector(`[data-point][data-fingerprint="${cssEscape(anchor.fingerprint)}"]`)
-        if (el instanceof HTMLElement) {
-          scrollIntoViewSafe(el)
-          flash(el)
+        // The one-point view opens the point's stop; the layers, its card in its layer.
+        const found = pointPreferringStop(root, anchor.fingerprint)
+        const point = session.artifact.points.find(p => p.fingerprint === anchor.fingerprint)
+        if (found !== null && point !== undefined) {
+          const href = lineLink({
+            path: point.path,
+            start: point.line,
+            end: point.endLine ?? point.line,
+            side: point.side ?? 'new',
+          })
+          if (revealPreferringStop(found, root, { href })) flash(found.el)
         }
         return
       }
