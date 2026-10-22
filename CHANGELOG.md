@@ -137,6 +137,13 @@
   changed words, red text, muted text, and some syntax colors are adjusted, in light and dark.
 - **Hide code** shows on an outdated canvas too, once **view stale canvas** opens it, and counts
   what it hides from that canvas's own diff.
+- The line under **Hide code** says **nothing else hidden** when the level hides nothing beyond
+  imports, whitespace, and moved blocks, which the diff folds at every level. It used to say
+  **nothing hidden yet** next to a diff that had folded them.
+- On a GitLab project the overview's description reads **PR description (from GitLab)**.
+- A toast shows left of the docked side pane instead of over its message box.
+- A draft's **back to** link names the thread by its title once the server gives it one, not as
+  **New thread**.
 - The header names the agent and model that generated the canvas, without the harness, which a
   canvas generated from the review app always gave as `other`. Hover **generated … ago** for the
   full date and time.

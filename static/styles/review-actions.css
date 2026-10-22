@@ -63,6 +63,12 @@ tr.composer .x {
   font-size: 12px;
   max-width: 340px;
 }
+/* Beside a docked side pane, a toast keeps off it, where it would cover the message box. */
+@media (width > 1360px) {
+  .layout:not(.no-chat) ~ .toast {
+    right: calc(var(--chat-w) + 16px);
+  }
+}
 .toast.failed {
   border-color: var(--bad);
   color: var(--bad);

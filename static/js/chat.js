@@ -1141,6 +1141,18 @@ export function wireChat(options) {
     drawIndex()
     drawHead()
     drawMarks()
+    drawBackLinks()
+  }
+
+  /**
+   * A draft's way back names its thread as the list now does, so a thread the server titled after
+   * the link was drawn reads by its title and not as a new thread.
+   */
+  const drawBackLinks = () => {
+    for (const el of Array.from(log.querySelectorAll('.empty [data-thread-open]'))) {
+      const thread = threads.find(t => t.name === el.getAttribute('data-thread-open'))
+      if (thread !== undefined) el.textContent = `back to “${runningName(thread, undefined)}”`
+    }
   }
 
   /**

@@ -7,6 +7,7 @@ import { mapReviewComment } from '../../src/github/comments.js'
 import { GH_ISSUE_COMMENTS, GH_REVIEW_COMMENTS, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { renderChatShell } from './chat.js'
 import { fullDate } from './dom.js'
+import { setHost } from './host.js'
 import { drawnCanvas } from './layers.js'
 import { renderEmptyState, renderStaleState, sharedCanvasCalloutHtml, staleBarHtml } from './empty-state.js'
 import {
@@ -533,6 +534,15 @@ describe('overview', () => {
     expect(panel?.querySelector('details.pr-desc summary .chev + span')?.textContent).toBe(
       'PR description (from GitHub)'
     )
+    setHost({ kind: 'gitlab', label: 'GitLab', webBase: 'https://gitlab.example.com' })
+    try {
+      document.body.innerHTML = renderOverview(bundle(), { paths, now: NOW })
+      expect(document.querySelector('details.pr-desc summary .chev + span')?.textContent).toBe(
+        'PR description (from GitLab)'
+      )
+    } finally {
+      setHost(undefined)
+    }
     expect(panel?.querySelector('details.pr-desc summary > .chev')?.getAttribute('aria-hidden')).toBe('true')
     expect(panel?.querySelector('details.pr-desc')?.hasAttribute('open')).toBe(false)
     expect(panel?.querySelector('details.pr-desc summary .cmd')).toBeNull()
@@ -696,7 +706,7 @@ describe('the reading level control', () => {
 
   it('names what each level adds and how much of the diff it hides', () => {
     // A level that hides nothing says so rather than showing 0.
-    expect(foldLevelHint('light', { total: 40, hidden: 0 })).toContain('nothing hidden yet')
+    expect(foldLevelHint('light', { total: 40, hidden: 0 })).toContain('nothing else hidden')
     expect(foldLevelHint('moderate', { total: 40, hidden: 12 })).toContain(
       'also test bodies, helpers, wiring, templates'
     )

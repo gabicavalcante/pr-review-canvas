@@ -77,7 +77,7 @@
   /* Added and deleted lines carry GitHub's light tints in both skins, so a diff reads the same
      here as it does on the pull request. */
   --add-bg: light-dark(#e6ffec, rgb(186 215 97 / 14%));
-  --add-w: light-dark(#c6f5d0, rgb(186 215 97 / 16%));
+  --add-w: light-dark(#c6f5d0, rgb(186 215 97 / 12%));
   --del-bg: light-dark(#ffebe9, rgb(255 101 122 / 14%));
   --del-w: light-dark(#ffd5d4, rgb(255 101 122 / 18%));
   --mv-bg: light-dark(rgb(139 77 255 / 7%), rgb(195 154 201 / 10%));

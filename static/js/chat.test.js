@@ -907,6 +907,22 @@ describe('a thread per place', () => {
     expect(root.querySelector('#chat-log [data-thread-open]')).toBe(null)
   })
 
+  it('renames the way back once the thread it leads to gets its title', async () => {
+    let list = PLACED
+    const { root, chat } = mount({ fetchThreads: async () => list })
+    await flush()
+    chat.ask(LAYER)
+    await flush()
+    expect(el(root, '#chat-log [data-thread-open]').textContent).toBe('back to “overall”')
+    list = {
+      ...PLACED,
+      threads: PLACED.threads.map(t => (t.anchor === undefined ? { ...t, title: 'why sum?' } : t)),
+    }
+    chat.followSettings({ ...DEFAULT_SETTINGS, chatThreadPerPlace: true })
+    await flush()
+    expect(el(root, '#chat-log [data-thread-open]').textContent).toBe('back to “why sum?”')
+  })
+
   it('leads no way back from a draft the reader opened, with new thread or clear', async () => {
     const { root, chat } = mount({ fetchThreads: async () => PLACED })
     await flush()
