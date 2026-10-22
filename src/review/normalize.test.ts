@@ -299,7 +299,7 @@ describe('normalize', () => {
       level: 'fyi',
       audience: 'author',
       side: 'new',
-      body: 'The author settled this in commit `ccccccc` on 2026-10-13.',
+      body: `Commit \`ccccccc\` decided this on 2026-10-13: ${long}`,
     })
     expect(artifact.settled).toEqual({
       [points[0]!.fingerprint]: { reason: long, at: '2026-10-13T10:00:00-03:00', commit },
@@ -331,12 +331,14 @@ describe('normalize', () => {
     const [short, cut] = artifact.points.filter(point => point.decisionCommit !== undefined)
     expect(short).toMatchObject({
       title: 'Should run() multiply?',
-      body: 'The author settled this in commit `ccccccc` on 2026-10-13.',
+      body: 'Commit `ccccccc` answered this on 2026-10-13: No: the spec says sum.',
     })
     expect(artifact.settled?.[short!.fingerprint]?.reason).toBe('No: the spec says sum.')
     expect(cut?.title.endsWith('…')).toBe(true)
     expect(cut?.fingerprint).not.toBe(short?.fingerprint)
-    expect(cut?.body).toBe(`${long}\n\nThe author settled this in commit \`ccccccc\` on 2026-10-13.`)
+    expect(cut?.body).toBe(
+      `${long}\n\nCommit \`ccccccc\` answered this on 2026-10-13: No: the spec says sum.`
+    )
   })
 
   it('keeps two decisions asking one question on one file apart, each with its own answer', () => {
@@ -363,6 +365,21 @@ describe('normalize', () => {
       ['Is this intended?', 4, 'No: a leftover.'],
     ])
     expect(new Set(points.map(point => point.fingerprint)).size).toBe(2)
+  })
+
+  it('adds no point for a question asked with no answer, and states a whole decision as decided', () => {
+    const commit = 'c'.repeat(40)
+    const at = { commit, date: '2026-10-13T10:00:00-03:00', path: 'src/app.ts', side: 'new' as const }
+    const artifact = normalize(artifactToModelOutput(syntheticArtifact()), {
+      ...input(),
+      decisions: [
+        { ...at, id: 'c-1', question: 'Is the sum right?', line: 2 },
+        { ...at, id: 'c-2', text: 'keep the sum', line: 4 },
+      ],
+    })
+    expect(
+      artifact.points.filter(point => point.decisionCommit !== undefined).map(p => [p.title, p.body])
+    ).toEqual([['keep the sum', 'Commit `ccccccc` decided this on 2026-10-13.']])
   })
 
   it('keeps the fingerprint stable across spacing and case, and distinct across kind or path', () => {
