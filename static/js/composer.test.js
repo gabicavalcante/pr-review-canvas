@@ -318,6 +318,21 @@ describe('applyCapabilityGating', () => {
     )
     applyCapabilityGating(document, { canComment: true, tokenKind: 'classic', login: 'octocat' })
     expect(document.querySelector('.capability-note')?.textContent).toBe('')
+    // On GitLab the line names GitLab.
+    setHost({ kind: 'gitlab', label: 'GitLab', webBase: 'https://gitlab.example.com' })
+    try {
+      applyCapabilityGating(document, {
+        canComment: false,
+        tokenKind: 'classic',
+        login: null,
+        reason: 'no api scope',
+      })
+      expect(document.querySelector('.capability-note')?.textContent).toBe(
+        'Posting to GitLab is off: no api scope'
+      )
+    } finally {
+      setHost(undefined)
+    }
   })
 
   it('keeps a command that is disabled for a reason of its own disabled', () => {

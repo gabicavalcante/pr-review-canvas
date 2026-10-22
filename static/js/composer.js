@@ -6,7 +6,7 @@
 import { cssEscape } from './anchors.js'
 import { renderMarkdown } from './markdown.js'
 import { esc, wideCellHtml } from './dom.js'
-import { noPostingTitle, postToLabel } from './host.js'
+import { hostLabel, noPostingTitle, postToLabel } from './host.js'
 
 /**
  * @typedef {{
@@ -293,7 +293,7 @@ export function applyCapabilityGating(root, capabilities) {
   const note = root.querySelector('.capability-note')
   if (note !== null) {
     // A disabled command cannot take focus, so the reason is also said in plain sight.
-    note.textContent = blocked ? `Posting to GitHub is off: ${reason}` : ''
+    note.textContent = blocked ? `Posting to ${hostLabel()} is off: ${reason}` : ''
   }
   return blocked
 }
