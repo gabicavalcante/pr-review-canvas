@@ -409,10 +409,25 @@ describe('renderPrompt', () => {
             side: 'new',
             line: null,
           },
+          {
+            id: 'abc1234-3',
+            commit: `abc1234${'0'.repeat(33)}`,
+            date: '2026-10-13T10:00:00-03:00',
+            question: 'Is the sum right?',
+            path: 'src/app.ts',
+            side: 'new',
+            line: null,
+          },
         ],
       })
       ctx.generation.mode = mode
       const prompt = renderPrompt(ctx, PATCHES, sources)
+      expect(renderPrompt(none, PATCHES, sources)).not.toContain('**Raised, not answered**')
+      // A question with no answer is listed apart, as open.
+      expect(prompt).toContain(
+        'not settled. Write a point for one when the code still raises it:\n\n- `abc1234-3` on `src/app.ts` (commit `abc1234`, 2026-10-13): Is the sum right?'
+      )
+      expect(prompt).not.toContain('it stays private\n- `abc1234-3`')
       expect(prompt).toContain('Do not raise any of them again, and write no point for them.')
       expect(prompt).toContain(
         '- `abc1234-1` on `src/app.ts` new-side line 4 (commit `abc1234`, 2026-10-13): keep the sum; the spec says sum\n\n**Not in this diff**'

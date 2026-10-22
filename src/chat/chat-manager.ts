@@ -88,6 +88,8 @@ export interface ChatManager {
   threads(key: ReviewKey): Promise<ChatThreadsResponse>
   createThread(key: ReviewKey): Promise<ChatThread>
   selectThread(key: ReviewKey, name: string): Promise<ChatThread | null>
+  /** Records how many of a thread's answers the reader has not seen; null for no such thread. */
+  markUnseen(key: ReviewKey, name: string, unseen: number): Promise<ChatThread | null>
   send(target: ChatTarget, input: ChatSendInput): AsyncIterable<ChatEvent>
   /** True when a turn was running and has been asked to stop. */
   cancel(key: ReviewKey): Promise<boolean>
@@ -515,6 +517,7 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
           createdAt: t.createdAt,
           turns: t.rev,
           ...(t.anchor === undefined ? {} : { anchor: t.anchor }),
+          ...(t.unseen === undefined || t.unseen === 0 ? {} : { unseen: t.unseen }),
         })),
         activeThread: state.chat.activeThread ?? null,
         agent: settings.chatAgent,
@@ -535,6 +538,24 @@ export function createChatManager(deps: ChatManagerDeps): ChatManager {
         chat: { ...current.chat, activeThread: name },
       }))
       return thread
+    },
+    async markUnseen(key, name, unseen) {
+      let marked: ChatThread | null = null
+      await deps.state.update(key, current => ({
+        ...current,
+        chat: {
+          ...current.chat,
+          threads: current.chat.threads.map(t => {
+            if (t.name !== name) {
+              return t
+            }
+            const { unseen: _old, ...rest } = t
+            marked = unseen === 0 ? rest : { ...rest, unseen }
+            return marked
+          }),
+        },
+      }))
+      return marked
     },
     send,
     async cancel(key) {
