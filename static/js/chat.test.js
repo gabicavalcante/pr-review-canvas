@@ -907,6 +907,19 @@ describe('a thread per place', () => {
     expect(root.querySelector('#chat-log [data-thread-open]')).toBe(null)
   })
 
+  it('leads no way back from a draft the reader opened, with new thread or clear', async () => {
+    const { root, chat } = mount({ fetchThreads: async () => PLACED })
+    await flush()
+    el(root, '#chat-new-thread').click()
+    expect(el(root, '#chat-log').textContent).toContain('A new thread about the whole PR.')
+    expect(root.querySelector('#chat-log [data-thread-open], #chat-log [data-draft-open]')).toBe(null)
+    chat.ask({ kind: 'file', path: 'src/app.ts' })
+    await flush()
+    el(root, '#chat-clear').click()
+    await flush()
+    expect(root.querySelector('#chat-log [data-thread-open], #chat-log [data-draft-open]')).toBe(null)
+  })
+
   it('opens a draft about the whole PR when there is no thread about it yet', async () => {
     const { root, chat } = mount({
       fetchThreads: async () => ({

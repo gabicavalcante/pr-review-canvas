@@ -1672,10 +1672,10 @@ export function wireChat(options) {
    * Opens a thread not made yet: a place's, or one about the whole PR. Nothing is saved until its
    * first message, which the server files under that place. A draft whose question is being
    * answered, or waits, comes back with that question, unless the reader asked for a fresh one.
-   * An ask leaves the thread the reader was reading, so the draft leads back to it until its
-   * first question.
+   * An ask leaves the thread the reader was reading unasked for, so a draft an ask opened leads
+   * back to it until its first question; new thread, clear, and the list are the reader's own move.
    * @param {ChatContext} anchor
-   * @param {{ fresh?: boolean }} [opts]
+   * @param {{ fresh?: boolean, back?: boolean }} [opts]
    */
   const openDraft = (anchor, opts = {}) => {
     const left = currentThread()
@@ -1693,11 +1693,13 @@ export function wireChat(options) {
     restoreUnsent()
     proposed.clear()
     const back =
-      left !== undefined
-        ? ` <button class="cmd" type="button" data-thread-open="${esc(left.name)}">back to “${esc(runningName(left, undefined))}”</button>`
-        : leftDraft !== undefined && !sameChatContext(leftDraft, anchor)
-          ? ` <button class="cmd" type="button" data-draft-open${chatContextAttrs(leftDraft)}>back to “${esc(runningName(undefined, leftDraft.kind === 'pr' ? undefined : leftDraft))}”</button>`
-          : ''
+      opts.back !== true
+        ? ''
+        : left !== undefined
+          ? ` <button class="cmd" type="button" data-thread-open="${esc(left.name)}">back to “${esc(runningName(left, undefined))}”</button>`
+          : leftDraft !== undefined && !sameChatContext(leftDraft, anchor)
+            ? ` <button class="cmd" type="button" data-draft-open${chatContextAttrs(leftDraft)}>back to “${esc(runningName(undefined, leftDraft.kind === 'pr' ? undefined : leftDraft))}”</button>`
+            : ''
     log.innerHTML =
       anchor.kind === 'pr'
         ? `<p class="empty">A new thread about the whole PR.${back}</p>`
@@ -1716,15 +1718,16 @@ export function wireChat(options) {
    * Shows the thread of a place: the one on screen, the one it has, or a new one. An answer coming
    * in elsewhere keeps arriving in its own thread.
    * @param {ChatContext} next
+   * @param {{ fromAsk?: boolean }} [opts] `fromAsk`: an ask opened it, so a new draft leads back
    */
-  const goToThread = async next => {
+  const goToThread = async (next, opts = {}) => {
     if (sameChatContext(openPlace ?? WHOLE_PR, next)) {
       showThread()
       return
     }
     const placed = threadOfPlace(threads, agentName, next)
     if (placed === undefined) {
-      openDraft(next)
+      openDraft(next, { back: opts.fromAsk === true })
     } else {
       await openThread(placed.name)
     }
@@ -1988,7 +1991,7 @@ export function wireChat(options) {
       // Off, an ask only says what the open thread's next question is about. The thread goes on
       // screen before the pane opens, so the answers seen are its own and not the one it replaces.
       if (threadPerPlace) {
-        void goToThread(next)
+        void goToThread(next, { fromAsk: true })
       } else {
         setContext(next)
       }
@@ -2047,7 +2050,7 @@ export function wireChat(options) {
     askQuestion(next, question) {
       void (async () => {
         // As for an ask, the thread goes on screen before the pane opens.
-        const going = threadPerPlace ? goToThread(next) : null
+        const going = threadPerPlace ? goToThread(next, { fromAsk: true }) : null
         if (!threadPerPlace) setContext(next)
         openChat()
         await going
