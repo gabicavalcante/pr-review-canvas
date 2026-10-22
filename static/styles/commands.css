@@ -78,6 +78,11 @@
 .cmd[data-copied='failed'] {
   color: var(--bad);
 }
+/* A filled command drops its fill while it says how the copy went, so the color reads. */
+.cmd.fill:is([data-copied='copied'], [data-copied='failed']) {
+  background: none;
+  box-shadow: inset 0 0 0 1px currentcolor;
+}
 .cmd-err {
   display: inline-block;
   margin-left: 8px;

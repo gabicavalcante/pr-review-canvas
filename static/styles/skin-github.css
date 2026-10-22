@@ -43,6 +43,7 @@
   --ok: light-dark(#1a7f37, #57ab5a);
   --bad: light-dark(#d1242f, #e5534b);
   --warn: light-dark(#9a6700, #c69026);
+  --on-warn: light-dark(#fff, #212830);
   --warn-bg: light-dark(#fff8c5, rgb(174 124 20 / 15%));
   --progress: light-dark(#1f883d, #57ab5a);
 

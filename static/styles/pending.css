@@ -81,7 +81,7 @@
 }
 
 .pill.pending {
-  color: var(--bg);
+  color: var(--on-warn);
   background: var(--warn);
 }
 

@@ -424,7 +424,7 @@ textarea {
   padding: 0 5px;
   border-radius: 9px;
   background: var(--warn);
-  color: var(--bg);
+  color: var(--on-warn);
   font-size: 11px;
   line-height: 18px;
   text-align: center;
