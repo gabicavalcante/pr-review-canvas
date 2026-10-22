@@ -559,6 +559,7 @@ The data directory's `settings.yml` accepts these keys and values:
 | `chatModel`            | `null`    | A model ID, or `null` for the agent's default (1) (2)                            |
 | `chatTimeoutSec`       | `600`     | Integer seconds, 30–3600                                                         |
 | `maxTurns`             | `null`    | Integer 1–100, or `null` for the agent's default                                 |
+| `chatThreadPerPlace`   | `true`    | `true` opens the thread of the place asked about; `false` uses the open one      |
 | `checkoutEnabled`      | `true`    | `true` reads a [review checkout](#review-checkouts); `false` reads your checkout |
 | `checkoutIdleDays`     | `7`       | Integer 1–365, or `-1` to never remove an idle checkout                          |
 | `checkoutSweepMinutes` | `60`      | Integer minutes, 5–1440, between `serve`'s idle sweeps                           |
@@ -850,6 +851,64 @@ Only the author can resolve: the server refuses anyone else with `NOT_AUTHOR`. A
 offers no **resolve**:
 regenerate it for the current head first.
 
+### Settled decisions
+
+A question the author already answered, before the canvas existed, can be recorded in the commit
+that carries the answer, so the canvas shows it as resolved instead of asking it again. Add one
+`Settled-decision` line per decision to the commit message, after the prose that explains it:
+
+```text
+fix(app): keep the sum in run()
+
+The spec says sum; a product would double-count retries.
+
+Settled-decision: src/app.ts:4 Should run() multiply instead? No: the spec says sum, not product
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+- `<path>:<line>` is the line the decision is about, in that commit's version of the file. Write
+  `<path>:<line>:old` for a line the change deleted, numbered as in the commit's parent. A colon
+  after the number and a leading `./` on the path are allowed. A line that does not read this way
+  is not a decision and is skipped.
+- The rest of the line is the question the decision answers, then the decision and its reason.
+  The question runs to the first `?` followed by a space, and titles the point; the answer after
+  it becomes the resolution's reason. Leave the question out and the whole text is both. Either
+  part longer than the reason limit is cut. Only a `?` followed by a space, outside backticks,
+  ends the question, so one inside a URL or quoted code such as `` `x ?? 0` `` does not, but a
+  reason with a `?` mid-sentence and no question in front is split there: start such a line with
+  its question.
+- The line counts wherever it sits in the message, at the start of a line, in any letter case. It
+  need not be in the block git reads as trailers, so a blank line before `Co-Authored-By` loses
+  nothing.
+- `prepare` reads the decisions of `merge-base..head` from the commits whose author email is the
+  one whoever runs it commits as (`GIT_AUTHOR_EMAIL`, else `user.email`), so a commit someone else
+  pushed to the branch cannot answer the author's questions. On a pull request it reads them only
+  when that person is the pull request's author, the same rule as **resolve**; a canvas anyone
+  else generates resolves no decision.
+- A new-side line is carried from its commit to the head, and an old-side line from the commit's
+  parent to the merge base, while it reads the same at both ends: a commit that changes the line
+  and a later one that changes it back leave the decision on it. An old-side decision also needs
+  the diff to still delete its line, so a later commit that restores the line ends it. When the
+  line no longer reads the same, is no longer deleted, or is outside the diff, the decision is
+  context: the generator does not raise its question again unless the code contradicts the answer,
+  and the canvas gets no point for it. A rebase rewrites the versions the numbers refer to while the lines keep their
+  text, so after one a decision can land on another line, or be lost; regenerate with care, or
+  write the decision again.
+- Two decisions on the same line: the later commit's stands, which is how a decision is revised.
+  Later means later in the history, parents before children, whatever the commit dates say.
+  There is no line that withdraws one. To ask its question again, change the line it is about, so
+  the decision becomes context, or rewrite the commit; reopening its point on the canvas lasts only
+  until the canvas is generated again, because the commit still says it.
+- Publish adds each decision in the diff to the canvas as a `decision` point for the author,
+  titled with its question (or with the decision when the line asks none), on its line, and
+  resolved with its reason as of its commit. These points are not the generator's to write and do
+  not count toward its attention points. A canvas holds at most 36 of them; past that, the oldest
+  are context. A reason the author wrote on the canvas for such a point stands over the commit's
+  when the canvas is generated again, while its `Settled-decision` line reads the same; a later
+  commit that changes its question or answer replaces it. A reason an earlier canvas took from a
+  commit gives way to the decisions read now.
+- The review loop skill in this repository writes these lines for the decisions its gate asks.
+
 ### Comments and sign-off
 
 You can post inline comments, replies, PR-level comments, and attention points. Inline comments
@@ -1035,15 +1094,42 @@ and keeps earlier threads. `--chat-agent` and `--chat-model` override saved pref
 that server run. Canvas generation models are configured separately in
 [`generation.models`](#project-config).
 
-**Ask** on a layer, file, attention point, or line selection chooses the context for your message.
-Choosing another target replaces it; **clear** returns to the whole PR. The `a` key asks about
-the focused target, and `/` focuses the message box.
+**Ask** on a layer, file, attention point, or line selection opens the thread of that place. The
+first ask about a place starts one, titled after it; a later ask about the same place comes back to
+it, history and all. A thread is made by its first question, so an ask you do not follow up leaves
+nothing behind. Lines match on their exact range: a different selection starts another thread. Each
+thread is a session of its own with the agent. The canvas goes with a thread's first question, and
+again when the PR's head, the folder the agent reads, or your right to resolve points changes. A
+place's thread belongs to the chat agent it was made with: after you switch agents, an ask about the
+place starts a new thread. The ask command of a place with a thread carries a dot, which fills with
+the accent when an answer arrived there while you were not reading it: you were reading another
+thread, the pane was minimized, or it showed another tab. The **Threads** tab carries the same dot,
+and the **AI Chat** tab and its launcher count those answers, up to 9, until you see each thread.
+**go to code** at the top of a thread leads back to its place. The `a` key asks about the focused target, and `/` focuses the message box.
+
+The **Threads** tab lists the review's threads by kind of place (attention points, lines, files,
+layers, whole PR) with the number of questions in each; pick one to open it in **AI Chat**. **new
+thread** starts one about the whole PR, and an ask about the whole PR comes back to the latest of
+those. Threads saved before threads had a place still appear in the Threads tab, under whole PR.
+When the canvas is generated again without a thread's place, the thread's head says the place is no
+longer on this canvas, and its questions are about the whole PR.
+
+To send every ask to the open thread instead, clear **A thread per place** under **AI Chat** in
+**settings**, or set `chatThreadPerPlace: false` in [`settings.yml`](#local-settings-and-storage).
+An ask then only chooses the context of your next message, which the line above the message box
+names; choosing another target replaces it, and **clear** returns to the whole PR.
 
 Chat can propose an inline comment. A valid proposal appears with controls to post, edit,
 or copy it. A proposal outside the current diff remains text with an explanation.
 
-Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time. A timeout or
-incomplete answer can be retried; increase `chatTimeoutSec` if replies need more time.
+Use **stop** to interrupt a reply. Only one chat turn can run per PR at a time. While an answer is
+coming in, ask, the Threads tab and **new thread** still open any thread, and the answer keeps
+arriving in its own. A question asked in another thread meanwhile waits, marked as waiting, and is
+sent once the answer ends; one question waits at a time. If the server cannot take it then, a
+message says so wherever you are, and its thread shows the question with the reason; for a question
+asked from **new thread**, the next new thread does. Updating the review while a question waits asks
+first, as it does for unsent text. A timeout or incomplete answer can be retried; increase
+`chatTimeoutSec` if replies need more time.
 
 ### Review checkouts
 
