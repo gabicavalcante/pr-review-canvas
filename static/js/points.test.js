@@ -20,6 +20,7 @@ import {
   postedUrls,
   refreshPoint,
   sevsumHtml,
+  pointCountText,
 } from './points.js'
 import { setSettled } from './self-review.js'
 
@@ -106,6 +107,13 @@ describe('points', () => {
     document.body.innerHTML = sevsumHtml([], syntheticArtifact().layers)
     expect(document.querySelector('.sevsum a')).toBeNull()
     expect(document.querySelector('.sevsum')?.textContent).toBe('000decidecheckfyi')
+  })
+})
+
+describe('pointCountText', () => {
+  it('counts the open points, and says none open in words, since handled ones can still show', () => {
+    expect(pointCountText(3)).toBe('3')
+    expect(pointCountText(0)).toBe('none open')
   })
 })
 
@@ -311,7 +319,8 @@ describe('where a point stands', () => {
       `<ol>${pointCardHtml(first, ctx)}</ol></section>` +
       pointStatusesHtml(artifact.points, BASE)
     applyPointStates(document, artifact.points, dismissed, ctx)
-    expect(document.querySelector('.point-count')?.textContent).toBe('0')
+    // The dismissed point is still on the page under the heading, so the heading says so in words.
+    expect(document.querySelector('.point-count')?.textContent).toBe('none open')
     const card = document.querySelector('li.finding')
     expect(card?.hasAttribute('hidden')).toBe(false)
     expect(card?.getAttribute('data-status')).toBe('dismissed')
