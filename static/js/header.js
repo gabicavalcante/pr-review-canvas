@@ -97,8 +97,9 @@ export function bareHeaderHtml(opts) {
 
 /**
  * @param {PrBundle} bundle
- * @param {{ host: string, theme: import('./theme.js').Theme, skin: import('./skin.js').Skin, now: Date, project?: ProjectLink | undefined }} opts
+ * @param {{ host: string, theme: import('./theme.js').Theme, skin: import('./skin.js').Skin, now: Date, project?: ProjectLink | undefined, viewStale?: boolean }} opts
  *   The wordmark links to the project list; the project, when the page has one, gets a link home.
+ *   `viewStale`: the reader chose to read an outdated canvas, which the page then draws.
  * @returns {string}
  */
 export function renderHeader(bundle, opts) {
@@ -127,22 +128,27 @@ export function renderHeader(bundle, opts) {
     : `Fetch the latest PR, comments, and shared canvas from ${esc(hostLabel())}`
   const progress = ready ? progressHtml(artifact, bundle.state, pr) : ''
   const level = getFoldLevel()
-  const reading = ready
-    ? foldLevelControlHtml(
-        level,
-        canvasHiddenLines(
-          {
-            artifact,
-            files: bundle.files,
-            comments: bundle.comments.reviewComments,
-            state: bundle.state,
-            headSha: pr.headSha,
-            mergeBaseSha: pr.mergeBaseSha,
-          },
-          level
+  // An outdated canvas the reader opened is drawn too, from its own commit, so how much of its
+  // diff to hide is still the reader's choice.
+  const viewedStale = bundle.status === 'stale' && opts.viewStale === true && artifact !== undefined
+  const on = viewedStale ? artifact.pr : pr
+  const reading =
+    ready || viewedStale
+      ? foldLevelControlHtml(
+          level,
+          canvasHiddenLines(
+            {
+              artifact,
+              files: viewedStale ? artifact.files : bundle.files,
+              comments: bundle.comments.reviewComments,
+              state: bundle.state,
+              headSha: on.headSha,
+              mergeBaseSha: on.mergeBaseSha,
+            },
+            level
+          )
         )
-      )
-    : ''
+      : ''
   const risk = ready ? riskLineHtml(artifact.risk) : ''
   return (
     '<header class="hdr">' +

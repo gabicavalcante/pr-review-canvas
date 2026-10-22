@@ -134,6 +134,8 @@
 - The terminal skin's text reads at WCAG AA contrast: a filled copy drops its fill while it says
   **copied** or **failed**, pending pills and the review count take dark text on their yellow, and
   changed words, red text, muted text, and some syntax colors are adjusted, in light and dark.
+- **Hide code** shows on an outdated canvas too, once **view stale canvas** opens it, and counts
+  what it hides from that canvas's own diff.
 - The header names the agent and model that generated the canvas, without the harness, which a
   canvas generated from the review app always gave as `other`. Hover **generated … ago** for the
   full date and time.

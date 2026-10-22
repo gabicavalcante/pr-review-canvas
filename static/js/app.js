@@ -308,6 +308,7 @@ export class PrAppElement extends HTMLElement {
       skin: readSkin(document.documentElement),
       now,
       project: this.bootstrap ? projectLinkOf(this.bootstrap) : undefined,
+      viewStale: this.viewStale,
     })
     const chatEnabled = bundle.chat.enabled
     const storage = typeof localStorage === 'undefined' ? null : localStorage

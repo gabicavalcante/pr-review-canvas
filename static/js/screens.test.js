@@ -415,6 +415,21 @@ describe('header', () => {
     expect(document.querySelector('#regenerate')?.textContent).toBe('update')
   })
 
+  it('offers the reading level on an outdated canvas once the reader opens it', () => {
+    const opts = {
+      host: 'localhost:3010',
+      theme: /** @type {const} */ ('auto'),
+      skin: /** @type {const} */ ('terminal'),
+      now: NOW,
+    }
+    document.body.innerHTML = renderHeader(bundle({ status: 'stale' }), opts)
+    expect(document.querySelector('#fold-level')).toBeNull()
+    document.body.innerHTML = renderHeader(bundle({ status: 'stale' }), { ...opts, viewStale: true })
+    expect(document.querySelector('#fold-level')).not.toBeNull()
+    // The review's progress belongs to the current head, so it stays off.
+    expect(document.querySelector('.ptext')).toBeNull()
+  })
+
   it('names the generate command for what it does, and falls back to regenerate without an agent', () => {
     const noAgent = { enabled: false, acpx: false }
     expect(generateCommand(bundle(), true)).toEqual({
