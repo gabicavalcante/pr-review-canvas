@@ -620,6 +620,10 @@ img.av {
 .point-step > .files {
   padding: 0 16px 12px;
 }
+/* The tests table ends a layer's opening stop; its way on keeps a gap from the table's box. */
+.layer-step > .step-nav {
+  margin-top: 12px;
+}
 /* A way on alone, as the overview's, sits on the right, where the stops have theirs. */
 .step-nav > :only-child {
   margin-left: auto;
