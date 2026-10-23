@@ -212,3 +212,23 @@ test('the rail’s switch goes back to the layers in the layer view the reader r
   await expect(page.locator('#layer-run-path')).toBeVisible()
   await expect(page.locator('#overview')).toBeHidden()
 })
+
+test('a mark made in the points view stays on the page when the view switches', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  const inStop = page.locator('#step-p-1 li.finding')
+  const fingerprint = await inStop.getAttribute('data-fingerprint')
+  await inStop.locator('[data-act="point-dismiss"]').click()
+  await expect(page.locator('.toast')).toHaveText('attention point dismissed')
+  // The page is drawn again for the layers, from the marks made since it loaded.
+  await page.locator('nav.rail .rail-view [data-view="layers"]').click()
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(page.locator(`section.layer li.finding[data-fingerprint="${fingerprint}"]`)).toHaveAttribute(
+    'data-status',
+    'dismissed'
+  )
+})

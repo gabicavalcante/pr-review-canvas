@@ -175,6 +175,12 @@ export class PrAppElement extends HTMLElement {
    * @type {'all' | 'one'}
    */
   layersView = 'all'
+  /**
+   * The review session of the canvas on screen: the reader's marks and the settled points as they
+   * are now, which the bundle it was drawn from no longer holds.
+   * @type {ReturnType<typeof createReviewSession> | null}
+   */
+  session = null
   /** @type {{ stop: () => void } | null} */
   interactions = null
   /** @type {ReturnType<typeof wireChat>} */
@@ -289,6 +295,7 @@ export class PrAppElement extends HTMLElement {
       return
     }
     this.shown = bundle
+    this.session = null
     this.stopPolling()
     this.settledPoller?.stop()
     this.settledPoller = null
@@ -402,6 +409,7 @@ export class PrAppElement extends HTMLElement {
         ...(bundle.canvas === undefined ? {} : { canvasSha: bundle.canvas.headSha }),
         ...(canvasManifest === null ? {} : { canvasMergeBaseSha: canvasManifest.mergeBaseSha }),
       })
+      this.session = session
       const interactions = wireReview(this, session, {
         chat: () => this.chat,
         openReview: () => (this.chat ?? this.reviewPane)?.openReview(),
@@ -624,7 +632,13 @@ export class PrAppElement extends HTMLElement {
       this.layersView = next
     }
     if (redraw && this.shown) {
-      await this.render(this.shown)
+      // Drawn from the marks made since the bundle came, not the bundle's own.
+      const { session, shown } = this
+      await this.render(
+        session === null || shown.artifact === undefined
+          ? shown
+          : { ...shown, state: session.state, artifact: { ...shown.artifact, settled: session.settled } }
+      )
     }
     this.layerView?.setView(next)
     this.chat?.followSettings(data.settings)
