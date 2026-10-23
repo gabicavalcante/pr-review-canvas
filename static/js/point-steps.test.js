@@ -38,32 +38,15 @@ describe('pointSteps', () => {
     expect(ids(pointSteps(artifact, points))).toEqual(['a1', 'b1'])
   })
 
-  it('puts a layer’s decide points first, then check, then fyi', () => {
+  it('keeps the canvas’s order inside a layer, which lists the most severe first', () => {
     const points = [
-      point('fyi', first.id, 'fyi'),
-      point('check', first.id, 'check'),
-      point('decide', first.id, 'decide'),
-    ]
-    expect(ids(pointSteps(artifact, points))).toEqual(['decide', 'check', 'fyi'])
-  })
-
-  it('orders decide points by impact, worst first, and those without one after', () => {
-    const points = [
-      point('none', first.id, 'decide'),
-      point('low', first.id, 'decide', 'low'),
       point('critical', first.id, 'decide', 'critical'),
+      point('other-layer', second.id, 'decide', 'critical'),
       point('high', first.id, 'decide', 'high'),
+      point('check', first.id, 'check'),
+      point('fyi', first.id, 'fyi'),
     ]
-    expect(ids(pointSteps(artifact, points))).toEqual(['critical', 'high', 'low', 'none'])
-  })
-
-  it('keeps the canvas’s order between points of the same severity', () => {
-    const points = [
-      point('x', first.id, 'check'),
-      point('y', first.id, 'check'),
-      point('z', first.id, 'check'),
-    ]
-    expect(ids(pointSteps(artifact, points))).toEqual(['x', 'y', 'z'])
+    expect(ids(pointSteps(artifact, points))).toEqual(['critical', 'high', 'check', 'fyi', 'other-layer'])
   })
 
   it('names each point’s layer, and puts points of no listed layer last, with none', () => {
