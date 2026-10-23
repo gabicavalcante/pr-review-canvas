@@ -120,6 +120,12 @@ describe('renderPointSteps', () => {
       ['← previous point', '#step-p-2'],
       ['the rest of the diff, by layer →', '#layer-run-path'],
     ])
+    // The last link switches to the layers, so the rail lists every layer again.
+    const rest = document.querySelector(`#${stepAnchorId('p-3')} .step-nav a[href="#layer-run-path"]`)
+    expect([rest?.getAttribute('data-act'), rest?.getAttribute('data-view')]).toEqual([
+      'layer-view',
+      'layers',
+    ])
   })
 
   it('keeps a point the reader acted on in its place, and draws nothing for a canvas without points', () => {

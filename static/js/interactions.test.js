@@ -91,7 +91,7 @@ function bundleFor(state, canvas = artifact) {
 
 /**
  * The whole review screen, hydrated and wired, with a fake API in place of the server.
- * @param {{ selfReview?: boolean, state?: import('./contract-types.js').PrState, api?: Partial<import('./review-session.js').SessionApi>, capabilities?: import('./contract-types.js').Capabilities, comments?: ReadonlyArray<import('./contract-types.js').ReviewComment>, fetchReviewBody?: (n: import('./contract-types.js').ReviewKey) => Promise<import('./contract-types.js').ReviewBodyResponse>, chat?: () => ReturnType<typeof import('./chat.js').wireChat>, openSettings?: (el: HTMLElement) => void, setLayerView?: (view: string) => void, uncover?: () => void, artifact?: import('./contract-types.js').ReviewArtifact, drawn?: boolean }} [opts]
+ * @param {{ selfReview?: boolean, state?: import('./contract-types.js').PrState, api?: Partial<import('./review-session.js').SessionApi>, capabilities?: import('./contract-types.js').Capabilities, comments?: ReadonlyArray<import('./contract-types.js').ReviewComment>, fetchReviewBody?: (n: import('./contract-types.js').ReviewKey) => Promise<import('./contract-types.js').ReviewBodyResponse>, chat?: () => ReturnType<typeof import('./chat.js').wireChat>, openSettings?: (el: HTMLElement) => void, setLayerView?: (view: string, place?: string) => void, uncover?: () => void, artifact?: import('./contract-types.js').ReviewArtifact, drawn?: boolean }} [opts]
  *   `drawn: false` leaves every diff waiting to be seen, as cards below the fold do in a browser.
  */
 function setup(opts = {}) {
@@ -2217,6 +2217,24 @@ describe('the AI Chat commands', () => {
     option('layers').click()
     option('points').click()
     expect(asked).toEqual(['points'])
+  })
+
+  it('a link that switches the view names the place to open on', () => {
+    /** @type {Array<[string, string | undefined]>} */
+    const asked = []
+    const { root } = setup({ setLayerView: (view, place) => asked.push([view, place]) })
+    root.insertAdjacentHTML(
+      'beforeend',
+      '<a id="rest" href="#layer-auth" data-act="layer-view" data-view="layers">the rest of the diff</a>'
+    )
+    root.querySelector('#rest')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    root
+      .querySelector('.rail-view [data-view="points"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    expect(asked).toEqual([
+      ['layers', '#layer-auth'],
+      ['points', undefined],
+    ])
   })
 
   /**

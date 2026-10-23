@@ -71,7 +71,8 @@ function layerPosition(artifact, layer) {
 
 /**
  * The way on from a stop: back to the one before, and on to the next, whose label says what it is.
- * After the last stop come the layers, for the rest of the diff.
+ * After the last stop come the layers, for the rest of the diff: the link switches to them as the
+ * rail's switch does, on the first layer, so the rail lists every layer again.
  * @param {ReadonlyArray<Stop>} stops
  * @param {number} index
  * @param {ReviewArtifact} artifact
@@ -90,7 +91,7 @@ function stopNavHtml(stops, index, artifact) {
     on =
       firstLayer === undefined
         ? ''
-        : `<a href="#${esc(layerAnchorId(firstLayer.key))}">the rest of the diff, by layer &rarr;</a>`
+        : `<a href="#${esc(layerAnchorId(firstLayer.key))}" data-act="layer-view" data-view="layers">the rest of the diff, by layer &rarr;</a>`
   } else if (stop?.kind === 'layer' && next.kind === 'point') {
     const count = stop.points.length
     on = `<a class="step-on" href="#${esc(next.id)}">go to its ${count} attention point${count === 1 ? '' : 's'} &rarr;</a>`

@@ -717,7 +717,8 @@ settings dialog, to read the canvas by its attention points, one section at a ti
 - A layer's points come from the most severe: decide, then check, then fyi, a decide point's impact
   worst first. A point you acted on keeps its stop, and dims in the rail.
 - Every stop ends with the way back and on; after the last point, **the rest of the diff, by layer**
-  leads to the layers, shown one at a time. The overview ends with **start with Layer 1**.
+  switches to **Layers**, as the rail's switch does, on the first layer. The overview ends with
+  **start with Layer 1**.
 
 The view opens on its first stop. The rail lists the points under their layers, each layer's title
 leading to its opening stop, and marks the stop that shows. A stop takes the place of the one before

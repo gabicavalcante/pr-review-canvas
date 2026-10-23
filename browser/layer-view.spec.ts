@@ -134,11 +134,19 @@ test('reads the canvas one attention point at a time once the setting is saved, 
   await expect(page.locator('#step-p-2')).toBeVisible()
   await expect(first).toBeHidden()
 
-  // After the last point come the layers, for the rest of the diff.
+  // After the last point come the layers, for the rest of the diff: the link switches to them, so
+  // the rail lists every layer, and the switch leads back to the points.
   await page.locator('#step-p-2 .step-nav a', { hasText: 'next point' }).click()
   await page.locator('#step-p-3 .step-nav a', { hasText: 'the rest of the diff' }).click()
   await expect(layer).toBeVisible()
-  await expect(page.locator('#step-p-3')).toBeHidden()
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(page.locator('nav.rail .rail-view [data-view="layers"]')).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await expect(page.locator('nav.rail a[href="#layer-run-path"]')).toBeVisible()
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await expect(page.locator('section.point-step').first()).toBeAttached()
 
   // The rail's switch goes back to the layers: every section returns, the stops are gone, and the
   // rail lists the layers in place of the points.

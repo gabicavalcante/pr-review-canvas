@@ -242,7 +242,7 @@ export function padUnderStickyBar(doc, bar) {
  *   chat?: () => ChatHandle | null,
  *   quickQuestions?: () => { openFor: (el: HTMLElement) => void } | null,
  *   openSettings?: (el: HTMLElement) => void,
- *   setLayerView?: (view: string) => void,
+ *   setLayerView?: (view: string, place?: string) => void,
  *   openReview?: () => void,
  *   uncover?: () => void,
  * }} [opts]
@@ -1195,8 +1195,9 @@ export function wireReview(root, session, opts = {}) {
       opts.openSettings?.(el)
     },
     'layer-view': el => {
+      // A link names the place to open on; the rail's switch keeps the reader's.
       if (el.getAttribute('aria-pressed') !== 'true') {
-        opts.setLayerView?.(el.getAttribute('data-view') ?? '')
+        opts.setLayerView?.(el.getAttribute('data-view') ?? '', el.getAttribute('href') ?? undefined)
       }
     },
     help: () => {
