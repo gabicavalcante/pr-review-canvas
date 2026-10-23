@@ -362,7 +362,10 @@ export function wireReview(root, session, opts = {}) {
       const parts = cardOf(input)
       if (parts !== null && parts.card.classList.contains('is-reviewed') !== reviewed) {
         parts.card.classList.toggle('is-reviewed', reviewed)
-        setCardCollapsed(parts.card, reviewed)
+        // A card drawn open, such as a stop's, keeps its code in sight whatever its mark.
+        if (!parts.card.hasAttribute('data-open')) {
+          setCardCollapsed(parts.card, reviewed)
+        }
       }
     }
     refreshPendingBar(root, state, session)

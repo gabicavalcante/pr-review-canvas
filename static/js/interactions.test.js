@@ -546,6 +546,32 @@ describe('reviewed state', () => {
     expect(card?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
   })
 
+  it('keeps a card drawn open in sight when its file is marked reviewed', async () => {
+    const { root } = setup({
+      api: {
+        putReviewed: async () => ({
+          prNumber: 42,
+          state: {
+            ...BASE,
+            reviewedCanvasSha: artifact.pr.headSha,
+            reviewed: { 'layer:run-path/file:src_app_ts': true },
+          },
+        }),
+      },
+    })
+    // A stop's copy of the file: the same reviewed mark, drawn open.
+    root.insertAdjacentHTML(
+      'beforeend',
+      '<article class="file" id="stop-file" data-open><div class="file-h"><input type="checkbox" data-reviewed-id="layer:run-path/file:src_app_ts"></div><div class="file-body"></div></article>'
+    )
+    click(root, 'article.file#file-src_app_ts input[data-reviewed-id]')
+    await flush()
+    const stop = root.querySelector('#stop-file')
+    expect(stop?.classList.contains('is-reviewed')).toBe(true)
+    expect(stop?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
+    expect(root.querySelector('article.file#file-src_app_ts .file-body')?.hasAttribute('hidden')).toBe(true)
+  })
+
   it('leaves a layer that is reviewed through its files alone when something else changes', async () => {
     const byFiles = {
       ...BASE,

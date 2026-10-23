@@ -479,7 +479,8 @@ export function wireCardReveal(root) {
 
 /**
  * `id` names a card drawn outside its layer, such as in the one-point view, which leaves the file's
- * anchors to the layers; `open` draws its body at once rather than under its title; `onlyPoint`
+ * anchors to the layers; `open` draws its body at once rather than under its title, and keeps it
+ * open when it is marked reviewed (`data-open`); `onlyPoint`
  * puts that one attention point on the card's lines, and no other.
  * @param {LayerFile} lf
  * @param {FileEntry | undefined} entry
@@ -514,7 +515,7 @@ export function renderFileCard(lf, entry, layer, ctx, opts = {}) {
     : ''
   const elsewhere = elsewhereHtml(lf, entry, layer, ctx.hunkIndex)
   return (
-    `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}"${opts.onlyPoint === undefined ? '' : ` data-only-point="${esc(opts.onlyPoint)}"`} aria-labelledby="${esc(id)}-h">` +
+    `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}"${opts.open === true ? ' data-open' : ''}${opts.onlyPoint === undefined ? '' : ` data-only-point="${esc(opts.onlyPoint)}"`} aria-labelledby="${esc(id)}-h">` +
     `<div class="file-h">${chevronHtml('Collapse file', !collapsed, { act: 'toggle-card' })}<h3 id="${esc(id)}-h" class="path" data-act="toggle-card">${path}${testTag}</h3>${status}${pills}` +
     `<label class="chk"><input type="checkbox" data-reviewed-id="${esc(cardReviewedId)}"${cardReviewed ? ' checked' : ''}> reviewed</label>` +
     `<span class="tbtns">${askButtonHtml({ kind: 'file', path: lf.path }, { title: 'Ask AI Chat about this file' })}</span></div>` +
