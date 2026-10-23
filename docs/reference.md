@@ -719,6 +719,8 @@ settings dialog, to read the canvas by its attention points, one section at a ti
 - Every stop ends with the way back and on; after the last point, **the rest of the diff, by layer**
   switches to **Layers**, as the rail's switch does, on the first layer. The overview ends with
   **start with Layer 1**.
+- The step keys walk the stops: `j` and `k` the layers' opening stops, `n` and `p` every stop, and
+  `]` and `[` the stops of the open points.
 
 The view opens on its first stop. The rail lists the points under their layers, each layer's title
 leading to its opening stop, and marks the stop that shows. A stop takes the place of the one before

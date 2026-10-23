@@ -232,3 +232,23 @@ test('a mark made in the points view stays on the page when the view switches', 
     'dismissed'
   )
 })
+
+test('the step keys walk the stops in the points view', async ({ page, reviewUrl }) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await expect(page.locator('#step-layer-run-path')).toBeVisible()
+  const lands = async (key: string, id: string) => {
+    await page.keyboard.press(key)
+    await expect(page.locator(`#${id}`)).toBeVisible()
+    await expect(page.locator('section.point-step:not([hidden])')).toHaveCount(1)
+    await expect(page).toHaveURL(new RegExp(`#${id}$`))
+  }
+  // n and p take every stop; j and k the layers' openings; ] and [ the open points.
+  await lands('n', 'step-p-1')
+  await lands('j', 'step-layer-other')
+  await lands(']', 'step-p-2')
+  await lands('k', 'step-layer-other')
+  await lands('k', 'step-layer-run-path')
+  await lands(']', 'step-p-1')
+  await lands('p', 'step-layer-run-path')
+})

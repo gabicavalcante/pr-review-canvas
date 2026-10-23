@@ -33,7 +33,7 @@ import { hostLabel } from './host.js'
 import { isFoldLevel, nextFoldLevel } from './fold-levels.js'
 import { refreshProgress } from './header.js'
 import { keyAction, openHelpDialog } from './keyboard.js'
-import { pointAnchorId, reviewedId } from './keys.js'
+import { pointAnchorId, reviewedId, stepAnchorId } from './keys.js'
 import {
   canvasHiddenLines,
   cardOf,
@@ -546,6 +546,34 @@ export function wireReview(root, session, opts = {}) {
     if (found !== undefined) {
       focusItem(found.el, 'center')
     }
+  }
+
+  /**
+   * The step keys in the one-point view, which walk its stops rather than the layers' cards: `j`
+   * and `k` the layers' opening stops, `n` and `p` every stop, `]` and `[` the open points' stops.
+   * False on a page without stops, whose keys walk the layers.
+   * @param {'layer' | 'file' | 'point'} kind
+   * @param {1 | -1} direction
+   * @param {ReadonlyArray<Point>} points the open points
+   */
+  const stepStop = (kind, direction, points) => {
+    const stops = Array.from(root.querySelectorAll('section.point-step'))
+    if (stops.length === 0) {
+      return false
+    }
+    const open = new Set(points.map(p => stepAnchorId(p.id)))
+    const at = stops.findIndex(stop => stop instanceof HTMLElement && !stop.hidden)
+    const fits = (/** @type {Element} */ stop) =>
+      kind === 'file' || (kind === 'layer' ? stop.classList.contains('layer-step') : open.has(stop.id))
+    const next =
+      direction === 1
+        ? stops.find((stop, index) => index > at && fits(stop))
+        : stops.findLast((stop, index) => at >= 0 && index < at && fits(stop))
+    if (next !== undefined) {
+      focusItem(next)
+      window.history.pushState(null, '', `#${next.id}`)
+    }
+    return true
   }
 
   /** @param {Selection | null} next */
@@ -1295,6 +1323,9 @@ export function wireReview(root, session, opts = {}) {
       case 'next-file':
       case 'prev-file': {
         const [kind, direction] = STEPS[decided.action]
+        if (stepStop(kind, direction, points)) {
+          break
+        }
         const item = step(order, itemAround(order, here(order)), kind, direction, isCardShown)
         if (item !== null) {
           if (kind === 'layer') window.history.pushState(null, '', `#${item.id}`)
@@ -1304,7 +1335,9 @@ export function wireReview(root, session, opts = {}) {
       }
       case 'next-point':
       case 'prev-point':
-        stepPoint(order, points, decided.action === 'next-point' ? 1 : -1)
+        if (!stepStop('point', decided.action === 'next-point' ? 1 : -1, points)) {
+          stepPoint(order, points, decided.action === 'next-point' ? 1 : -1)
+        }
         break
       case 'toggle': {
         // A point already acted on opens or collapses itself.
