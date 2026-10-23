@@ -21,19 +21,12 @@ import { diffstatHtml, layerChanges } from './diffstat.js'
 import { chevronHtml, detailsSummaryHtml, esc } from './dom.js'
 import { collapsesAt, DEFAULT_FOLD_LEVEL, hiddenLines } from './fold-levels.js'
 import { hunkForLine } from './hunks.js'
-import {
-  fileAnchorId,
-  layerAnchorId,
-  layerStepAnchorId,
-  reviewedId,
-  sanitizeKey,
-  stepAnchorId,
-} from './keys.js'
+import { fileAnchorId, layerAnchorId, layerStepAnchorId, reviewedId, sanitizeKey } from './keys.js'
 import { renderMarkdown } from './markdown.js'
 import { writtenOn } from './diff-identity.js'
 import { pendingForPath } from './pending.js'
 import { levelIconHtml } from './point-level.js'
-import { pointSteps } from './point-steps.js'
+import { pointSteps, stopsOf } from './point-steps.js'
 import { openPoints, pointCardHtml, pointStatus, postedUrls } from './points.js'
 import { filesReviewed, layerProgress } from './progress.js'
 import { foldCountText } from './reading-level.js'
@@ -162,15 +155,20 @@ function railViewSwitchHtml(points) {
  * @param {(id: string) => string} current
  */
 function railPointsHtml(artifact, state, current) {
-  const steps = pointSteps(artifact, artifact.points)
-  let shownLayer = /** @type {string | null | undefined} */ (undefined)
-  const items = steps
-    .map(({ point, layer }) => {
-      const heading = (layer?.id ?? null) === shownLayer ? '' : railPointsLayerHtml(layer)
-      shownLayer = layer?.id ?? null
-      const id = stepAnchorId(point.id)
+  // The rail lists the view's stops, so a layer that opens with a stop has its title here, points
+  // or none.
+  let unlayered = false
+  const items = stopsOf(artifact, pointSteps(artifact, artifact.points))
+    .map(stop => {
+      if (stop.kind === 'layer') {
+        return railPointsLayerHtml(stop.layer)
+      }
+      const { point, layer } = stop.step
+      // Points of no listed layer have no opening stop; they come last, under one heading.
+      const heading = layer === null && !unlayered ? railPointsLayerHtml(null) : ''
+      unlayered ||= layer === null
       const handled = pointStatus(point, state) === 'open' ? '' : ' class="is-handled"'
-      return `${heading}<li${handled}><a href="#${esc(id)}"${current(id)}>${levelIconHtml(point.level, null)}<span class="t">${esc(point.title)}</span></a></li>`
+      return `${heading}<li${handled}><a href="#${esc(stop.id)}"${current(stop.id)}>${levelIconHtml(point.level, null)}<span class="t">${esc(point.title)}</span></a></li>`
     })
     .join('')
   return `<li class="grp">${railViewSwitchHtml(true)}<ul class="rail-points">${items}</ul></li>`

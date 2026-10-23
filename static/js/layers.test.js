@@ -179,6 +179,29 @@ describe('rail', () => {
     ).toBe(false)
   })
 
+  it('lists a layer that opens with a stop though it has no points, and points of no layer last', () => {
+    const [first] = artifact.layers
+    if (first === undefined) throw new Error('the synthetic canvas has a layer')
+    const testsOnly = {
+      ...artifact,
+      points: artifact.points.map(p => (p.layerId === first.id ? { ...p, layerId: 'gone' } : p)),
+    }
+    document.body.innerHTML = renderRail(testsOnly, state, { points: true })
+    const group = [...document.querySelectorAll('.rail-points li')].map(li =>
+      li.classList.contains('pt-layer')
+        ? `[${li.querySelector('.t')?.textContent}]`
+        : li.querySelector('a')?.getAttribute('href')
+    )
+    expect(group).toEqual([
+      '[Run path]',
+      '[Other changes]',
+      '#step-p-2',
+      '#step-p-3',
+      '[No layer]',
+      '#step-p-1',
+    ])
+  })
+
   it('has no points group in the other views', () => {
     document.body.innerHTML = renderRail(artifact, state)
     expect(document.querySelector('.rail-points')).toBeNull()

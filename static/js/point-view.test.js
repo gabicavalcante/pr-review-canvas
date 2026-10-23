@@ -5,14 +5,8 @@ import { toFileEntry } from '../../src/git/diff-collector.js'
 import { emptyState } from '../../src/contract/state.js'
 import { SYNTHETIC_FILES, syntheticArtifact } from '../../src/testing/synthetic.js'
 import { stepAnchorId } from './keys.js'
-import {
-  overviewWayOnHtml,
-  POINT_STEPS_ID,
-  renderPointSteps,
-  stopsOf,
-  viewSwitchTarget,
-} from './point-view.js'
-import { pointSteps } from './point-steps.js'
+import { overviewWayOnHtml, POINT_STEPS_ID, renderPointSteps, viewSwitchTarget } from './point-view.js'
+import { pointSteps, stopsOf } from './point-steps.js'
 import { pointCollapses } from './points.js'
 
 const artifact = syntheticArtifact()

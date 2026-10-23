@@ -13,51 +13,17 @@
 /** @typedef {import('./contract-types.js').ReviewComment} ReviewComment */
 /** @typedef {ReviewArtifact['layers'][number]} Layer */
 /** @typedef {import('./point-steps.js').PointStep} PointStep */
+/** @typedef {import('./point-steps.js').Stop} Stop */
 import { askButtonHtml } from './ask.js'
 import { esc } from './dom.js'
 import { layerAnchorId, layerStepAnchorId, reviewedId, stepAnchorId } from './keys.js'
 import { hunkIdForPoint, hunkLayerIndex, pathSet, renderFileCard, testMapHtml } from './layers.js'
 import { renderMarkdown } from './markdown.js'
-import { pointSteps } from './point-steps.js'
+import { pointSteps, stopsOf } from './point-steps.js'
 import { pointCardHtml, postedUrls } from './points.js'
 import { layerProgress } from './progress.js'
 
 export const POINT_STEPS_ID = 'point-steps'
-
-/**
- * One stop of the view: a layer's opening, with the points that follow it, or a point, with its
- * number among all the points.
- * @typedef {{ kind: 'layer', id: string, layer: Layer, points: PointStep[] }
- *   | { kind: 'point', id: string, step: PointStep, number: number }} Stop
- */
-
-/**
- * The stops in reading order: each layer that has points or tests opens with its stop, followed by
- * its points from the most severe. Points of no listed layer come last, with no opening.
- * @param {ReviewArtifact} artifact
- * @param {ReadonlyArray<PointStep>} steps
- * @returns {Stop[]}
- */
-export function stopsOf(artifact, steps) {
-  /** @type {Stop[]} */
-  const stops = []
-  let number = 0
-  /** @param {PointStep} step */
-  const pointStop = step => {
-    number += 1
-    stops.push({ kind: 'point', id: stepAnchorId(step.point.id), step, number })
-  }
-  for (const layer of artifact.layers) {
-    const points = steps.filter(step => step.layer?.id === layer.id)
-    if (points.length === 0 && layer.tests.length === 0) {
-      continue
-    }
-    stops.push({ kind: 'layer', id: layerStepAnchorId(layer.key), layer, points })
-    points.forEach(pointStop)
-  }
-  steps.filter(step => step.layer === null).forEach(pointStop)
-  return stops
-}
 
 /**
  * The position of a layer of the change, its number of how many, or null for Other, which has none.
