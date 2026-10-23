@@ -578,9 +578,13 @@ export class PrAppElement extends HTMLElement {
    * The rail's switch between the one-point view and the layers, which come back in the layer view
    * the reader read them in last: saved as the settings dialog saves it, then applied.
    * @param {string} choice `points` or `layers`
-   * @param {string} [place] the place to open on, as `#id`; the URL's, where the reader is, if omitted
+   * @param {string} [place] the place to open on, as `#id`; where the reader is, if omitted: out of
+   *   the one-point view the stop on screen, which the URL may not name, else the URL's
    */
-  async switchLayerView(choice, place = window.location.hash) {
+  async switchLayerView(
+    choice,
+    place = (choice === 'layers' && this.layerView?.place()) || window.location.hash
+  ) {
     if (choice !== 'points' && choice !== 'layers') {
       return
     }

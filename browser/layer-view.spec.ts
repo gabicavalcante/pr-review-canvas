@@ -206,8 +206,9 @@ test('the rail’s switch goes back to the layers in the layer view the reader r
   await page.locator('nav.rail .rail-view [data-view="points"]').click()
   await expect(page.locator('#step-layer-run-path')).toBeVisible()
   await page.locator('nav.rail .rail-view [data-view="layers"]').click()
-  // One section at a time again, not every layer at once.
+  // One section at a time again, not every layer at once, on the layer of the stop that showed
+  // though the URL never named it.
   await expect(page.locator('section.point-step')).toHaveCount(0)
-  await expect(page.locator('#overview')).toBeVisible()
-  await expect(page.locator('#layer-run-path')).toBeHidden()
+  await expect(page.locator('#layer-run-path')).toBeVisible()
+  await expect(page.locator('#overview')).toBeHidden()
 })

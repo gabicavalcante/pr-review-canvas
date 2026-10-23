@@ -92,7 +92,7 @@ export function elementForHash(root, hash) {
  * the section on the first draw; after that the section last shown is the reader's place.
  * @param {HTMLElement} root
  * @param {{ view: LayerView, win?: Window }} opts
- * @returns {{ stop: () => void, setView: (view: LayerView) => void, redraw: () => void }}
+ * @returns {{ stop: () => void, setView: (view: LayerView) => void, redraw: () => void, place: () => string }}
  */
 export function initOneLayer(root, opts) {
   const win = opts.win ?? window
@@ -221,5 +221,10 @@ export function initOneLayer(root, opts) {
       }
     },
     redraw,
+    /**
+     * The section on screen, as `#id`, while one shows at a time; empty while all show. The URL
+     * does not always name it: opening a view on its first section writes nothing there.
+     */
+    place: () => (view === 'all' ? '' : shownHash),
   }
 }

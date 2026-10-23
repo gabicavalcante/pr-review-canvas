@@ -304,4 +304,15 @@ describe('the one-point view', () => {
     oneLayer.setView('points')
     expect(shownIds()).toEqual(['step-p-1'])
   })
+
+  it('names the reader’s place, which the URL does not when a view opens on its first section', () => {
+    oneLayer = initOneLayer(root, { view: 'points' })
+    expect(window.location.hash).toBe('')
+    expect(oneLayer.place()).toBe('#step-p-1')
+    click(root.querySelector('#step-p-1 .step-nav a'))
+    expect(oneLayer.place()).toBe('#step-p-2')
+    // While every section shows, none is on screen alone.
+    oneLayer.setView('all')
+    expect(oneLayer.place()).toBe('')
+  })
 })
