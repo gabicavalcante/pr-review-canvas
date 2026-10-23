@@ -60,13 +60,14 @@ export function stopsOf(artifact, steps) {
 }
 
 /**
- * The position of a layer of the change, `2 of 5`, or '' for Other, which has none.
+ * The position of a layer of the change, its number of how many, or null for Other, which has none.
  * @param {ReviewArtifact} artifact
  * @param {Layer} layer
+ * @returns {{ number: number, total: number } | null}
  */
 function layerPosition(artifact, layer) {
   const semantic = artifact.layers.filter(l => l.kind !== 'other')
-  return layer.kind === 'other' ? '' : `${semantic.indexOf(layer) + 1} of ${semantic.length}`
+  return layer.kind === 'other' ? null : { number: semantic.indexOf(layer) + 1, total: semantic.length }
 }
 
 /**
@@ -113,13 +114,13 @@ export function overviewWayOnHtml(artifact) {
   if (first === undefined) {
     return ''
   }
-  const position = first.kind === 'layer' ? layerPosition(artifact, first.layer) : ''
+  const position = first.kind === 'layer' ? layerPosition(artifact, first.layer) : null
   const label =
     first.kind === 'point'
       ? 'the first attention point'
-      : position === ''
+      : position === null
         ? first.layer.title
-        : `Layer ${position.split(' ')[0]}: ${first.layer.title}`
+        : `Layer ${position.number}: ${first.layer.title}`
   return `<nav class="step-nav" aria-label="Attention points"><a class="step-on" href="#${esc(first.id)}">start with ${esc(label)} &rarr;</a></nav>`
 }
 
@@ -170,7 +171,7 @@ function layerStopHtml(stop, artifact, state, paths) {
         `${askButtonHtml({ kind: 'layer', layerId: layer.id }, { label: 'ask about this layer' })}</div>`
   return (
     `<section class="point-step layer-step" id="${esc(stop.id)}" data-layer="${esc(layer.id)}" aria-label="${esc(layer.title)}">` +
-    `<div class="panel-h layer-h"><h2>${position === '' ? '' : `<span class="lbl">Layer ${position}</span>`}${esc(layer.title)}</h2>${controls}</div>` +
+    `<div class="panel-h layer-h"><h2>${position === null ? '' : `<span class="lbl">Layer ${position.number} of ${position.total}</span>`}${esc(layer.title)}</h2>${controls}</div>` +
     `<div class="body"><div class="rationale prose">${renderMarkdown(layer.rationale, { paths, diagrams: true })}</div></div>` +
     testMapHtml(layer, paths)
   )
@@ -218,11 +219,11 @@ export function renderPointSteps(artifact, files, state, comments = []) {
             ctx,
             { id: `${stop.id}-file`, open: true, onlyPoint: point.fingerprint }
           )
-    const position = layer === null ? '' : layerPosition(artifact, layer)
+    const position = layer === null ? null : layerPosition(artifact, layer)
     const where =
       layer === null
         ? ''
-        : ` · <a href="#${esc(layerStepAnchorId(layer.key))}">${esc(position === '' ? layer.title : `Layer ${position.split(' ')[0]} · ${layer.title}`)}</a>`
+        : ` · <a href="#${esc(layerStepAnchorId(layer.key))}">${esc(position === null ? layer.title : `Layer ${position.number} · ${layer.title}`)}</a>`
     return (
       `<section class="point-step" id="${esc(stop.id)}" aria-label="Attention point ${stop.number} of ${steps.length}">` +
       `<p class="step-h"><span class="step-n">Point ${stop.number} of ${steps.length}</span>${where}</p>` +
