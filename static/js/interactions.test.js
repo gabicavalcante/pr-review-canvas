@@ -1491,6 +1491,33 @@ describe('keyboard', () => {
     expect(card?.hasAttribute('data-expanded')).toBe(false)
   })
 
+  it('steps to a point’s stop with its card in focus, and acts on the copy in that stop', async () => {
+    const { root } = setup({
+      api: {
+        putDismissed: async () => {
+          throw new Error('offline')
+        },
+      },
+    })
+    const card = root.querySelector('#point-p-1')
+    if (card === null) throw new Error('no card for p-1')
+    root.insertAdjacentHTML(
+      'beforeend',
+      '<section class="point-step layer-step" id="step-layer-run-path"></section>' +
+        `<section class="point-step" id="step-p-1" hidden><ol class="findings">${card.outerHTML.replace('id="point-p-1"', 'id="step-p-1-card"')}</ol></section>`
+    )
+    key(']')
+    expect(root.querySelector('.is-focused')?.id).toBe('step-p-1-card')
+    // The one-point view shows the stop and hides the rest; the layer's copy is out of sight.
+    root.querySelector('#step-layer-run-path')?.setAttribute('hidden', '')
+    root.querySelector('#step-p-1')?.removeAttribute('hidden')
+    key('d')
+    await flush()
+    // A refused dismissal says so next to the copy the reader is on.
+    const error = (/** @type {string} */ id) => root.querySelector(`#${id} .cmd-err`)?.textContent ?? null
+    expect([error('step-p-1-card'), error('point-p-1')]).toEqual(['offline', null])
+  })
+
   it('moves the keyboard focus with the ring', () => {
     setup()
     key('j')

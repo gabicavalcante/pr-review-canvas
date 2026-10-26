@@ -570,11 +570,21 @@ export function wireReview(root, session, opts = {}) {
         ? stops.find((stop, index) => index > at && fits(stop))
         : stops.findLast((stop, index) => at >= 0 && index < at && fits(stop))
     if (next !== undefined) {
-      focusItem(next)
+      // A point's stop puts its card in focus, so the point keys act on that point.
+      const card = next.querySelector('li.finding[data-point]')
+      focusItem(card ?? next, card === null ? 'start' : 'center')
       window.history.pushState(null, '', `#${next.id}`)
     }
     return true
   }
+
+  /**
+   * What `selector` finds of a point: in the stop on screen while the one-point view shows one,
+   * since the layer's copy of the point is hidden there, else the first on the page.
+   * @param {string} selector
+   */
+  const pointCopy = selector =>
+    root.querySelector(`section.point-step:not([hidden]) ${selector}`) ?? root.querySelector(selector)
 
   /** @param {Selection | null} next */
   const setSelection = next => {
@@ -1398,7 +1408,7 @@ export function wireReview(root, session, opts = {}) {
         const button =
           point === undefined
             ? null
-            : root.querySelector(`[data-point="${cssEscape(point.id)}"] [data-act="point-dismiss"]`)
+            : pointCopy(`[data-point="${cssEscape(point.id)}"] [data-act="point-dismiss"]`)
         if (button instanceof HTMLElement && point !== undefined) {
           setDismissed(button, point.fingerprint, true)
         }
@@ -1470,8 +1480,8 @@ export function wireReview(root, session, opts = {}) {
         drawCardOf(root, point.path, point.layerId)
       }
       const command =
-        root.querySelector(`li.finding[data-fingerprint="${fp}"] [data-act="point-settle"]`) ??
-        root.querySelector(`tr.ifind[data-fingerprint="${fp}"] [data-act="point-settle"]`)
+        pointCopy(`li.finding[data-fingerprint="${fp}"] [data-act="point-settle"]`) ??
+        pointCopy(`tr.ifind[data-fingerprint="${fp}"] [data-act="point-settle"]`)
       if (command === null || point === undefined) {
         showCommandError(el, 'that point is not on this page')
         return
