@@ -252,3 +252,22 @@ test('the step keys walk the stops in the points view', async ({ page, reviewUrl
   await lands(']', 'step-p-1')
   await lands('p', 'step-layer-run-path')
 })
+
+test('a switch whose save fails leaves the view and the URL as they were', async ({ page, reviewUrl }) => {
+  // On a layer, so a URL written before the save would name its opening stop.
+  await page.goto(`${reviewUrl}#layer-run-path`)
+  await page.route('**/api/settings', route =>
+    route.request().method() === 'PUT'
+      ? route.fulfill({ status: 400, json: { error: { code: 'BAD_REQUEST', message: 'settings rejected' } } })
+      : route.continue()
+  )
+  const before = page.url()
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await expect(page.locator('.toast')).toContainText('could not switch the view')
+  await expect(page.locator('nav.rail .rail-view [data-view="layers"]')).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  expect(page.url()).toBe(before)
+})
