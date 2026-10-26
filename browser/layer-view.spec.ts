@@ -271,3 +271,21 @@ test('a switch whose save fails leaves the view and the URL as they were', async
   await expect(page.locator('section.point-step')).toHaveCount(0)
   expect(page.url()).toBe(before)
 })
+
+test('back after a switch out of the points view lands on what stands for the stop', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  await page.locator('#step-p-1 .step-nav a', { hasText: 'next layer' }).click()
+  await expect(page.locator('#step-layer-other')).toBeVisible()
+  // The switch takes the place of the stop it leaves in the history, not of the one before it.
+  await page.locator('nav.rail .rail-view [data-view="layers"]').click()
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  // Back brings a stop's fragment, which the layers have no element for: its point's card shows.
+  await page.goBack()
+  await expect(page).toHaveURL(/#step-p-1$/)
+  await expect(page.locator('#point-p-1')).toBeInViewport()
+})

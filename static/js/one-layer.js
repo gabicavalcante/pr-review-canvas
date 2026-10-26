@@ -10,6 +10,7 @@
 import { cssEscape } from './anchors.js'
 import { decodeHash, plainClick } from './deep-link.js'
 import { scrollIntoViewSafe } from './dom.js'
+import { layerAnchorId, layerStepAnchorId, pointAnchorId, stepAnchorId } from './keys.js'
 import { setCardCollapsed } from './layers.js'
 
 /** @typedef {import('./layer-views.js').LayerView} LayerView */
@@ -86,6 +87,21 @@ export function elementForHash(root, hash) {
 }
 
 /**
+ * Where a stop's fragment points outside the one-point view, which draws no stops: a layer's
+ * opening stop to the layer's section, a point's stop to the point's card. Empty for any other
+ * fragment. Back and forward after a switch of view bring these fragments back.
+ * @param {string} fragment
+ */
+export function stopOutside(fragment) {
+  const layerStep = `#${layerStepAnchorId('')}`
+  const pointStep = `#${stepAnchorId('')}`
+  if (fragment.startsWith(layerStep)) {
+    return `#${layerAnchorId(fragment.slice(layerStep.length))}`
+  }
+  return fragment.startsWith(pointStep) ? `#${pointAnchorId(fragment.slice(pointStep.length))}` : ''
+}
+
+/**
  * Keeps one section on screen at a time while the view is `one` or `points`, and gets out of the
  * way while it is `all`. Made once for the app element; `redraw` runs after every render, before the deep
  * links follow the URL, so a link into a layer lands on a layer that is showing. The URL names
@@ -123,6 +139,22 @@ export function initOneLayer(root, opts) {
   /** @param {string} fragment */
   const sectionFor = fragment => sectionOf(root, elementForHash(root, fragment))
 
+  /**
+   * What stands for a stop's fragment out of the one-point view (`stopOutside`); a point of the
+   * Other layer, which has no card, by its row in the diff.
+   * @param {string} fragment
+   */
+  const standIn = fragment => {
+    const target = stopOutside(fragment)
+    const el = elementForHash(root, target)
+    const pointPrefix = `#${pointAnchorId('')}`
+    if (el !== null || !target.startsWith(pointPrefix)) {
+      return el
+    }
+    const row = root.querySelector(`[data-point="${cssEscape(target.slice(pointPrefix.length))}"]`)
+    return row instanceof HTMLElement ? row : null
+  }
+
   const redraw = () => {
     if (view === 'all') {
       for (const section of pageSections(root)) {
@@ -135,6 +167,7 @@ export function initOneLayer(root, opts) {
     const section =
       sectionFor(shownHash) ??
       sectionFor(win.location.hash) ??
+      sectionOf(root, standIn(win.location.hash)) ??
       (firstStop instanceof HTMLElement ? firstStop : null) ??
       pageSections(root)[0] ??
       null
@@ -192,12 +225,15 @@ export function initOneLayer(root, opts) {
   win.addEventListener(
     'hashchange',
     () => {
-      if (swapInPlace(win.location.hash || '#overview')) {
+      const fragment = win.location.hash || '#overview'
+      if (swapInPlace(fragment)) {
         return
       }
-      const el = elementForHash(root, win.location.hash || '#overview')
+      // A stop's fragment, out of the one-point view, lands on what stands for the stop here.
+      const direct = elementForHash(root, fragment)
+      const el = direct ?? standIn(fragment)
       const section = sectionOf(root, el)
-      if (el !== null && section?.hidden === true) {
+      if (el !== null && (direct === null || section?.hidden === true)) {
         scrollIntoViewSafe(el, 'start')
       }
     },

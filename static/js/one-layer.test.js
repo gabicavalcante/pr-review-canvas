@@ -175,6 +175,28 @@ describe('initOneLayer', () => {
     expect(shownIds()).toEqual(['overview'])
   })
 
+  it('lands a stop’s fragment, which back can bring after a switch of view, on what stands for it', () => {
+    section('layer-storage').insertAdjacentHTML('beforeend', '<li class="finding" id="point-p-9"></li>')
+    window.location.hash = '#step-layer-storage'
+    oneLayer = initOneLayer(root, { view: 'one' })
+    expect(shownIds()).toEqual(['layer-storage'])
+    window.location.hash = '#step-layer-auth'
+    window.dispatchEvent(new Event('hashchange'))
+    expect(shownIds()).toEqual(['layer-auth'])
+    // A point's stop lands on the point's card, in its layer.
+    window.location.hash = '#step-p-9'
+    window.dispatchEvent(new Event('hashchange'))
+    expect(shownIds()).toEqual(['layer-storage'])
+    // A point of the Other layer has no card: its row in the diff stands for it.
+    section('layer-other').insertAdjacentHTML(
+      'beforeend',
+      '<table><tr data-point="p-8"><td></td></tr></table>'
+    )
+    window.location.hash = '#step-p-8'
+    window.dispatchEvent(new Event('hashchange'))
+    expect(shownIds()).toEqual(['layer-other'])
+  })
+
   it('switches views on the open page, keeping the section the rail marks as being read', () => {
     oneLayer = initOneLayer(root, { view: 'one' })
     // The URL still names where the reader was sent, not where they scrolled to since.
