@@ -289,3 +289,24 @@ test('back after a switch out of the points view lands on what stands for the st
   await expect(page).toHaveURL(/#step-p-1$/)
   await expect(page.locator('#point-p-1')).toBeInViewport()
 })
+
+test('the rail’s switch goes back to one at a time after a reload in the points view', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  await page.locator('#settings').click()
+  await page.locator('#set-layer-view').selectOption('one')
+  await page.locator('[data-act="settings-save"]').click()
+  await expect(page.locator('#settings-dialog')).toBeHidden()
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await expect(page.locator('section.point-step:not([hidden])')).toHaveCount(1)
+  // The setting now says points; the page comes back from it.
+  await page.reload()
+  await expect(page.locator('section.point-step:not([hidden])')).toHaveCount(1)
+  await page.locator('nav.rail .rail-view [data-view="layers"]').click()
+  // One section at a time, as the reader read the layers before, not every layer at once.
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(page.locator('#layer-run-path')).toBeVisible()
+  await expect(page.locator('#layer-other')).toBeHidden()
+})

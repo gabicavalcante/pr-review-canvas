@@ -46,7 +46,7 @@ import {
   setRenderContext,
 } from './layers.js'
 import { renderOverview } from './overview.js'
-import { initOneLayer } from './one-layer.js'
+import { initOneLayer, readLayersView, writeLayersView } from './one-layer.js'
 import { wireQuickQuestions } from './quick-questions.js'
 import { createGeneration } from './generate.js'
 import { overviewWayOnHtml, renderPointSteps, viewSwitchTarget } from './point-view.js'
@@ -171,7 +171,7 @@ export class PrAppElement extends HTMLElement {
   view = 'all'
   /**
    * The layer view the rail's switch goes back to from the one-point view: the last of all at once
-   * and one at a time the reader read in.
+   * and one at a time the reader read in, which this browser keeps across reloads.
    * @type {'all' | 'one'}
    */
   layersView = 'all'
@@ -248,9 +248,10 @@ export class PrAppElement extends HTMLElement {
     applyPointColors(this.bootstrap.pointColors, document.documentElement)
     this.layerView?.stop()
     this.view = this.bootstrap.layerView
-    if (this.view !== 'points') {
-      this.layersView = this.view
-    }
+    const storage = typeof localStorage === 'undefined' ? null : localStorage
+    // While the setting says `points`, the layer view read in last is this browser's to recall.
+    this.layersView = this.view === 'points' ? readLayersView(storage) : this.view
+    writeLayersView(storage, this.layersView)
     this.layerView = initOneLayer(this, { view: this.bootstrap.layerView })
     const patchesPromise = fetchPatches(this.bootstrap.prNumber).then(
       r => r.patches,
@@ -630,6 +631,7 @@ export class PrAppElement extends HTMLElement {
     this.view = next
     if (next !== 'points') {
       this.layersView = next
+      writeLayersView(typeof localStorage === 'undefined' ? null : localStorage, next)
     }
     if (redraw && this.shown) {
       // Drawn from the marks made since the bundle came, not the bundle's own.

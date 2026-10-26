@@ -2,7 +2,16 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_LAYER_VIEW, isLayerView, LAYER_VIEW_LABELS, LAYER_VIEWS } from './layer-views.js'
-import { elementForHash, initOneLayer, pageSections, sectionOf, showOnly } from './one-layer.js'
+import {
+  elementForHash,
+  initOneLayer,
+  LAYERS_VIEW_KEY,
+  pageSections,
+  readLayersView,
+  sectionOf,
+  showOnly,
+  writeLayersView,
+} from './one-layer.js'
 
 /** @type {HTMLElement} */
 let root
@@ -336,5 +345,18 @@ describe('the one-point view', () => {
     // While every section shows, none is on screen alone.
     oneLayer.setView('all')
     expect(oneLayer.place()).toBe('')
+  })
+})
+
+describe('the layer view read in last', () => {
+  it('is kept by the browser, all at once when it has none or something else', () => {
+    localStorage.removeItem(LAYERS_VIEW_KEY)
+    expect(readLayersView(localStorage)).toBe('all')
+    writeLayersView(localStorage, 'one')
+    expect(readLayersView(localStorage)).toBe('one')
+    localStorage.setItem(LAYERS_VIEW_KEY, 'points')
+    expect(readLayersView(localStorage)).toBe('all')
+    expect(readLayersView(null)).toBe('all')
+    localStorage.removeItem(LAYERS_VIEW_KEY)
   })
 })

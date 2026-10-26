@@ -730,7 +730,7 @@ overview and the layers, one at a time.
 
 On a canvas with points, a switch at the head of the rail moves between **Attention points** and
 **Layers**, and the rail lists what the view shows. **Layers** goes back to the layer view you read
-in last, all at once or one at a time. The switch keeps your place: from a layer, or a point of it,
+in last, all at once or one at a time, which the browser remembers across a reload. The switch keeps your place: from a layer, or a point of it,
 to the layer's opening stop, and from a stop to its layer's section. It saves `layerView` as the
 settings dialog does.
 

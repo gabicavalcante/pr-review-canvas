@@ -86,6 +86,28 @@ export function elementForHash(root, hash) {
   return el instanceof HTMLElement ? el : null
 }
 
+/** Where this browser keeps the layer view the rail's switch goes back to from the one-point view. */
+export const LAYERS_VIEW_KEY = 'pr-review.layers-view'
+
+/**
+ * The layer view the reader read in last, all at once or one at a time; all at once when this
+ * browser has none. The setting cannot hold it while it says `points`, and a reload starts from
+ * the setting.
+ * @param {Storage | null} storage
+ * @returns {'all' | 'one'}
+ */
+export function readLayersView(storage) {
+  return storage?.getItem(LAYERS_VIEW_KEY) === 'one' ? 'one' : 'all'
+}
+
+/**
+ * @param {Storage | null} storage
+ * @param {'all' | 'one'} view
+ */
+export function writeLayersView(storage, view) {
+  storage?.setItem(LAYERS_VIEW_KEY, view)
+}
+
 /**
  * Where a stop's fragment points outside the one-point view, which draws no stops: a layer's
  * opening stop to the layer's section, a point's stop to the point's card. Empty for any other
