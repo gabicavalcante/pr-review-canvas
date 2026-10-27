@@ -310,3 +310,68 @@ test('the rail’s switch goes back to one at a time after a reload in the point
   await expect(page.locator('#layer-run-path')).toBeVisible()
   await expect(page.locator('#layer-other')).toBeHidden()
 })
+
+test('a switch the reader cancels over unfinished text changes nothing, and the next one works', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  const saves: unknown[] = []
+  page.on('request', request => {
+    if (request.method() === 'PUT' && new URL(request.url()).pathname.endsWith('/api/settings')) {
+      saves.push(request.postDataJSON())
+    }
+  })
+  const file = page.locator('article.file[data-path="src/app.ts"]').first()
+  await file.scrollIntoViewIfNeeded()
+  await file.locator('#L-src_app_ts-new-4 td.ln').nth(1).click()
+  await file.locator('tr.sel-bar [data-act="comment-selection"]').click()
+  const draft = file.locator('tr.composer .composer-box textarea')
+  await draft.fill('not sent yet')
+
+  // Keeping the text keeps the page, its view, and the saved setting as they were.
+  page.once('dialog', dialog => void dialog.dismiss())
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await expect(page.locator('nav.rail .rail-view [data-view="layers"]')).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(draft).toHaveValue('not sent yet')
+  expect(saves).toEqual([])
+
+  // Discarding it switches.
+  page.once('dialog', dialog => void dialog.accept())
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await expect(page.locator('section.point-step:not([hidden])')).toHaveCount(1)
+  await expect(page.locator('nav.rail .rail-view [data-view="points"]')).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  )
+  expect(saves).toEqual([{ layerView: 'points' }])
+})
+
+test('the settings dialog keeps the view on screen when the reader keeps unfinished text', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  const file = page.locator('article.file[data-path="src/app.ts"]').first()
+  await file.scrollIntoViewIfNeeded()
+  await file.locator('#L-src_app_ts-new-4 td.ln').nth(1).click()
+  await file.locator('tr.sel-bar [data-act="comment-selection"]').click()
+  const draft = file.locator('tr.composer .composer-box textarea')
+  await draft.fill('not sent yet')
+  await page.locator('#settings').click()
+  await page.locator('#set-layer-view').selectOption('points')
+  page.once('dialog', dialog => void dialog.dismiss())
+  await page.locator('[data-act="settings-save"]').click()
+  // The setting is saved, but the page stays as drawn, and says when the view changes.
+  await expect(page.locator('.toast')).toContainText(
+    'the view changes to one point at a time on the next load'
+  )
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(draft).toHaveValue('not sent yet')
+  await page.reload()
+  await expect(page.locator('section.point-step:not([hidden])')).toHaveCount(1)
+})

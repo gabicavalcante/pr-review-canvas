@@ -47,6 +47,7 @@ import {
   setRenderContext,
 } from './layers.js'
 import { renderOverview } from './overview.js'
+import { LAYER_VIEW_LABELS } from './layer-views.js'
 import { initOneLayer, readLayersView, writeLayersView } from './one-layer.js'
 import { wireQuickQuestions } from './quick-questions.js'
 import { createGeneration } from './generate.js'
@@ -135,6 +136,9 @@ async function settlePatches(prNumber, started, headSha) {
     () => null
   )
 }
+
+/** What the page asks before a redraw would throw away text the reader has not sent. */
+const DISCARD_QUESTION = 'Discard unfinished text and update the review?'
 
 export class PrAppElement extends HTMLElement {
   /** @type {{ stop: () => void } | null} */
@@ -295,14 +299,13 @@ export class PrAppElement extends HTMLElement {
   /**
    * @param {PrBundle} bundle
    * @param {Promise<Record<string, string> | null>} [patchesPromise]
+   * @param {{ asked?: boolean }} [opts] `asked`: the reader already agreed to discard unfinished text
    */
-  async render(bundle, patchesPromise) {
+  async render(bundle, patchesPromise, opts = {}) {
     const boot = this.bootstrap
     if (!boot) {
       return
     }
-    this.shown = bundle
-    this.session = null
     this.stopPolling()
     this.settledPoller?.stop()
     this.settledPoller = null
@@ -321,14 +324,11 @@ export class PrAppElement extends HTMLElement {
       : {}
     // Check after the requests finish, before tearing down the current screen: the reader may
     // have kept typing while the refresh was loading.
-    const hasUnfinishedText =
-      this.chat?.holdsUnsent() === true ||
-      [...this.querySelectorAll('.composer-box textarea, #msg, #signoff-dialog[open] textarea')].some(
-        el => el instanceof HTMLTextAreaElement && el.value !== el.defaultValue
-      )
-    if (hasUnfinishedText && !window.confirm('Discard unfinished text and update the review?')) {
+    if (opts.asked !== true && this.holdsUnfinishedText() && !window.confirm(DISCARD_QUESTION)) {
       return
     }
+    this.shown = bundle
+    this.session = null
     this.diagrams?.stop()
     this.diagrams = null
     this.deepLinks?.stop()
@@ -590,6 +590,16 @@ export class PrAppElement extends HTMLElement {
     }
   }
 
+  /** Whether a composer, the review message, the sign-off or AI Chat holds text not sent yet. */
+  holdsUnfinishedText() {
+    return (
+      this.chat?.holdsUnsent() === true ||
+      [...this.querySelectorAll('.composer-box textarea, #msg, #signoff-dialog[open] textarea')].some(
+        el => el instanceof HTMLTextAreaElement && el.value !== el.defaultValue
+      )
+    )
+  }
+
   /**
    * The rail's switch between the one-point view and the layers, which come back in the layer view
    * the reader read them in last: saved as the settings dialog saves it, then applied. `request` is
@@ -604,6 +614,11 @@ export class PrAppElement extends HTMLElement {
       return
     }
     const view = choice === 'points' ? 'points' : this.layersView
+    // The switch draws the page again, so it asks before saving anything: a reader who keeps the
+    // text keeps the page, its view and the setting as they were.
+    if (this.holdsUnfinishedText() && !window.confirm(DISCARD_QUESTION)) {
+      return
+    }
     try {
       const data = await saveSettings({ layerView: view })
       // The other view opens where the reader was, as far as it has that place.
@@ -614,7 +629,7 @@ export class PrAppElement extends HTMLElement {
         const url = `${window.location.pathname}${window.location.search}${target}`
         window.history.replaceState(null, '', url)
       }
-      await this.settingsSaved(data)
+      await this.settingsSaved(data, { asked: true })
       if (request !== undefined) {
         // The page drew itself in the new view under that link; it is followed again once every
         // layer it shows is on the page, then the composer opens on it.
@@ -638,24 +653,35 @@ export class PrAppElement extends HTMLElement {
   }
 
   /**
-   * The settings the dialog saved, applied to the open page without a reload.
+   * The settings the dialog saved, applied to the open page without a reload. A move into or out of
+   * the one-point view draws the page again; a reader who keeps unfinished text keeps the view on
+   * screen, which the saved setting then gives on the next load.
    * @param {import('./contract-types.js').SettingsResponse} data
+   * @param {{ asked?: boolean }} [opts] `asked`: the reader already agreed to discard unfinished text
    */
-  async settingsSaved(data) {
-    const next = data.settings.layerView
-    const redraw = (this.view === 'points') !== (next === 'points')
+  async settingsSaved(data, opts = {}) {
+    const saved = data.settings.layerView
+    const redraw = (this.view === 'points') !== (saved === 'points')
+    const kept =
+      redraw && opts.asked !== true && this.holdsUnfinishedText() && !window.confirm(DISCARD_QUESTION)
+    if (kept) {
+      toast(this, `the view changes to ${LAYER_VIEW_LABELS[saved]} on the next load`)
+    }
+    const next = kept ? this.view : saved
     this.view = next
     if (next !== 'points') {
       this.layersView = next
       writeLayersView(typeof localStorage === 'undefined' ? null : localStorage, next)
     }
-    if (redraw && this.shown) {
+    if (redraw && !kept && this.shown) {
       // Drawn from the marks made since the bundle came, not the bundle's own.
       const { session, shown } = this
       await this.render(
         session === null || shown.artifact === undefined
           ? shown
-          : { ...shown, state: session.state, artifact: { ...shown.artifact, settled: session.settled } }
+          : { ...shown, state: session.state, artifact: { ...shown.artifact, settled: session.settled } },
+        undefined,
+        { asked: true }
       )
     }
     this.layerView?.setView(next)
