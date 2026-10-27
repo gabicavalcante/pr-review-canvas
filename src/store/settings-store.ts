@@ -145,7 +145,7 @@ export function parseSettings(text: string): Settings {
   if (typeof raw !== 'object' || raw === null) {
     return DEFAULT_SETTINGS
   }
-  const merged = { ...DEFAULT_SETTINGS, ...withLayerView(withChatKeys(raw)), version: 1 }
+  const merged = { ...DEFAULT_SETTINGS, ...withChatKeys(raw), version: 1 }
   const parsed = SettingsSchema.safeParse(merged)
   return parsed.success ? parsed.data : DEFAULT_SETTINGS
 }
@@ -163,20 +163,6 @@ function withChatKeys(raw: object): object {
       out[key] = out[legacy]
     }
     delete out[legacy]
-  }
-  return out
-}
-
-/**
- * `layerView: points` from a build that offered the attention points as a layer view: they are
- * `readByPoints` now, so the file reads as the layers all at once with the points first, unless it
- * says otherwise. Without this the value fails the schema and every setting falls back to its default.
- */
-function withLayerView(raw: object): object {
-  const out: Record<string, unknown> = { ...raw }
-  if (out['layerView'] === 'points') {
-    out['layerView'] = DEFAULT_SETTINGS.layerView
-    out['readByPoints'] ??= true
   }
   return out
 }
