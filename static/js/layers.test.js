@@ -599,19 +599,6 @@ describe('hydration', () => {
     expect(card.querySelector('tr.ifind')?.getAttribute('data-point')).toBe('p-2')
   })
 
-  it('puts only the point a card names on its lines, when it names one', () => {
-    const card = document.querySelector('article.file#file-src_app_ts')
-    if (!(card instanceof HTMLElement)) {
-      throw new Error('no card')
-    }
-    card.setAttribute('data-only-point', 'fp-other')
-    hydrateFileCard(card, ctx())
-    expect(card.querySelector('tr.ifind')).toBeNull()
-    card.setAttribute('data-only-point', 'fp-1')
-    hydrateFileCard(card, ctx())
-    expect([...card.querySelectorAll('tr.ifind')].map(row => row.getAttribute('data-point'))).toEqual(['p-1'])
-  })
-
   it('places an old-side point on a deleted line', () => {
     const card = document.querySelector('article.file#file-src_gone_ts')
     if (!(card instanceof HTMLElement)) {

@@ -216,11 +216,7 @@ export function postedUrls(state, comments) {
   return out
 }
 
-/**
- * `inStop`: the point's row is in a stop of the one-point view, where the card above shows it
- * whole, so the row collapses to its title line while it is open too.
- * @typedef {{ paths: ReadonlySet<string>, state?: PrState, posted?: ReadonlyMap<string, string>, now?: Date, inStop?: boolean }} PointContext
- */
+/** @typedef {{ paths: ReadonlySet<string>, state?: PrState, posted?: ReadonlyMap<string, string>, now?: Date }} PointContext */
 
 /**
  * Where one of a point's drafts came from: a comment AI Chat proposed about it, the point's own
@@ -366,8 +362,10 @@ function pointPartsHtml(p, ctx, opts) {
   const status = pointStatus(p, ctx.state)
   const parts =
     status === 'open' ? { pill: '', summary: '', outcome: '' } : statusPartsHtml(p, status, ctx, opts)
+  // An open point's row carries the command too, for a stop of the one-point view, where the row
+  // collapses to its title under the card that shows the point whole; elsewhere CSS hides it.
   const toggle =
-    status === 'open' && (opts.card || ctx.inStop !== true)
+    status === 'open' && opts.card
       ? ''
       : `<button class="cmd p-toggle" type="button" data-act="point-expand" aria-expanded="false" aria-label="Show the point: ${esc(p.title)}">show</button>`
   const loc = opts.card ? `<a class="loc" href="${esc(pointLink(p))}">${esc(pointLocation(p))}</a>` : ''
@@ -527,9 +525,7 @@ export function refreshPoint(el, p, ctx) {
   }
   const row = el.tagName === 'TR'
   const template = document.createElement('template')
-  template.innerHTML = row
-    ? `<table><tbody>${pointRowHtml(p, { ...ctx, inStop: el.closest('.point-step') !== null })}</tbody></table>`
-    : pointCardHtml(p, ctx)
+  template.innerHTML = row ? `<table><tbody>${pointRowHtml(p, ctx)}</tbody></table>` : pointCardHtml(p, ctx)
   const next = row ? template.content.querySelector('tr') : template.content.firstElementChild
   if (next === null) {
     return false

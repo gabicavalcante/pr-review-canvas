@@ -11,7 +11,7 @@ import { cssEscape } from './anchors.js'
 import { decodeHash, plainClick } from './deep-link.js'
 import { scrollIntoViewSafe } from './dom.js'
 import { layerAnchorId, layerStepAnchorId, pointAnchorId, stepAnchorId } from './keys.js'
-import { setCardCollapsed } from './layers.js'
+import { refoldCard, setCardCollapsed } from './layers.js'
 
 /** @typedef {import('./layer-views.js').LayerView} LayerView */
 
@@ -108,6 +108,104 @@ export function writeLayersView(storage, view) {
   storage?.setItem(LAYERS_VIEW_KEY, view)
 }
 
+/** The style sheet that shows, in the stop on screen, only its point's chunk and its point's row. */
+const LENS_ID = 'stop-lens'
+
+/**
+ * A value quoted for a CSS attribute selector.
+ * @param {string} value
+ */
+function cssString(value) {
+  return `"${value.replace(/["\\]/g, '\\$&')}"`
+}
+
+/** How many nodes were moved into a stop, so each move's way home has a name of its own. */
+let moves = 0
+
+/**
+ * Moves `node` into `slot`, leaving a hidden mark of the same kind where it was, so it goes back
+ * to that place whatever else moved meanwhile.
+ * @param {Element} node
+ * @param {Element} slot
+ */
+function moveAway(node, slot) {
+  moves += 1
+  const home = node.ownerDocument.createElement(node.tagName === 'LI' ? 'li' : 'span')
+  home.hidden = true
+  home.setAttribute('data-home', String(moves))
+  node.setAttribute('data-away', String(moves))
+  node.before(home)
+  slot.append(node)
+}
+
+/**
+ * Puts the layer's own cards a point's stop shows into its slots: the point's card, and the file
+ * card that holds the point's chunk, held open whatever its reviewed mark or the reading level
+ * say. A style sheet then shows, inside the stop, only that chunk and that point's row. Nothing is
+ * drawn again: the card, its lines, threads and composers are the ones the layer had.
+ * @param {ParentNode} root
+ * @param {HTMLElement} stop
+ */
+export function placeStopCards(root, stop) {
+  const pointId = stop.getAttribute('data-stop-point')
+  if (pointId === null) {
+    return
+  }
+  const cardSlot = stop.querySelector(':scope > [data-slot="card"]')
+  const point = root.querySelector(`li.finding#${cssEscape(pointAnchorId(pointId))}`)
+  if (cardSlot !== null && point !== null && !stop.contains(point)) {
+    moveAway(point, cardSlot)
+  }
+  const path = stop.getAttribute('data-stop-path')
+  const layer = stop.getAttribute('data-stop-layer')
+  const hunk = stop.getAttribute('data-stop-hunk')
+  const fileSlot = stop.querySelector(':scope > [data-slot="file"]')
+  const card =
+    path === null || layer === null
+      ? null
+      : root.querySelector(`article.file[data-layer=${cssString(layer)}][data-path=${cssString(path)}]`)
+  if (!(card instanceof HTMLElement) || fileSlot === null || hunk === null) {
+    return
+  }
+  if (!stop.contains(card)) {
+    moveAway(card.closest('pr-file') ?? card, fileSlot)
+  }
+  card.setAttribute('data-open', '')
+  setCardCollapsed(card, false)
+  const fingerprint = stop.getAttribute('data-stop-fingerprint') ?? ''
+  let lens = root.querySelector(`#${LENS_ID}`)
+  if (lens === null) {
+    lens = card.ownerDocument.createElement('style')
+    lens.id = LENS_ID
+    root.append(lens)
+  }
+  lens.textContent =
+    `.point-step article.file table.diff:not([data-hunk=${cssString(hunk)}]) { display: none; }\n` +
+    `.point-step article.file tr.ifind:not([data-fingerprint=${cssString(fingerprint)}]) { display: none; }`
+}
+
+/**
+ * Puts every card a stop holds back where it came from in its layer, at the reading level and with
+ * the reviewed mark it has now.
+ * @param {ParentNode} root
+ */
+export function returnStopCards(root) {
+  for (const node of Array.from(root.querySelectorAll('[data-away]'))) {
+    const home = root.querySelector(`[data-home=${cssString(node.getAttribute('data-away') ?? '')}]`)
+    node.removeAttribute('data-away')
+    home?.replaceWith(node)
+    const card = node.matches('article.file') ? node : node.querySelector('article.file')
+    if (card instanceof HTMLElement) {
+      card.removeAttribute('data-open')
+      refoldCard(card)
+    }
+  }
+  const lens = root.querySelector(`#${LENS_ID}`)
+  if (lens !== null) {
+    lens.textContent = ''
+  }
+}
+
 /**
  * Where a stop's fragment points outside the one-point view, which draws no stops: a layer's
  * opening stop to the layer's section, a point's stop to the point's card. Empty for any other
@@ -133,7 +231,7 @@ export function stopOutside(fragment) {
  * rail's switch goes back to from the one-point view and this browser keeps across a reload.
  * @param {HTMLElement} root
  * @param {{ view: LayerView, win?: Window, storage?: Storage | null }} opts
- * @returns {{ stop: () => void, setView: (view: LayerView) => void, redraw: () => void, place: () => string, readonly view: LayerView, readonly layersView: 'all' | 'one' }}
+ * @returns {{ stop: () => void, setView: (view: LayerView) => void, redraw: () => void, place: () => string, returnCards: () => void, readonly view: LayerView, readonly layersView: 'all' | 'one' }}
  */
 export function initOneLayer(root, opts) {
   const win = opts.win ?? window
@@ -152,7 +250,10 @@ export function initOneLayer(root, opts) {
 
   /** @param {HTMLElement} section */
   const showSection = section => {
+    // Cards a stop holds go home first, so a section shown next has its own.
+    returnStopCards(root)
     showOnly(root, section)
+    if (section.matches('section.point-step')) placeStopCards(root, section)
     if (section.matches('section.layer')) setCardCollapsed(section, false)
     const details = section.querySelector(':scope > details')
     if (details instanceof HTMLDetailsElement) details.open = true
@@ -187,6 +288,7 @@ export function initOneLayer(root, opts) {
 
   const redraw = () => {
     if (view === 'all') {
+      returnStopCards(root)
       for (const section of pageSections(root)) {
         section.hidden = false
       }
@@ -291,6 +393,8 @@ export function initOneLayer(root, opts) {
       }
     },
     redraw,
+    /** Puts the cards the stop on screen holds back in their layers, before the stops go away. */
+    returnCards: () => returnStopCards(root),
     get view() {
       return view
     },

@@ -240,15 +240,17 @@ describe('where a point stands', () => {
     if (card === null) throw new Error('no card')
     expect(pointCollapses(card)).toBe(false)
     // Its row in the diff is drawn whole too, except in a stop of the one-point view, where the row
-    // collapses under the card above it and carries the toggle that opens it.
+    // collapses under the card above it. The row carries the toggle that opens it there wherever it
+    // is drawn, since its card moves into a stop and back; CSS shows it only inside one.
     document.body.innerHTML = `<table><tbody>${pointRowHtml(first, ctx)}</tbody></table>`
-    expect(document.querySelector('.is-handled, [data-act="point-expand"], .p-summary')).toBeNull()
+    expect(document.querySelector('.is-handled, .p-summary')).toBeNull()
+    expect(document.querySelector('[data-act="point-expand"]')).not.toBeNull()
     const row = document.querySelector('tr[data-point]')
     if (row === null) throw new Error('no row')
     expect(pointCollapses(row)).toBe(false)
     setPointExpanded(row)
     expect(row.hasAttribute('data-expanded')).toBe(false)
-    document.body.innerHTML = `<section class="point-step"><table><tbody>${pointRowHtml(first, { ...ctx, inStop: true })}</tbody></table></section>`
+    document.body.innerHTML = `<section class="point-step"><table><tbody>${pointRowHtml(first, ctx)}</tbody></table></section>`
     const inStop = document.querySelector('tr[data-point]')
     if (inStop === null) throw new Error('no row')
     expect(pointCollapses(inStop)).toBe(true)

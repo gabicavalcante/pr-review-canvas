@@ -8,6 +8,8 @@ import { stepAnchorId } from './keys.js'
 import { overviewWayOnHtml, POINT_STEPS_ID, renderPointSteps, viewSwitchTarget } from './point-view.js'
 import { pointSteps, stopsOf } from './point-steps.js'
 import { pointCollapses } from './points.js'
+import { hunkIdForPoint, renderLayers } from './layers.js'
+import { placeStopCards, returnStopCards } from './one-layer.js'
 
 const artifact = syntheticArtifact()
 const files = SYNTHETIC_FILES.map(toFileEntry)
@@ -57,37 +59,26 @@ describe('renderPointSteps', () => {
     expect(link?.getAttribute('href')).toBe('#step-layer-run-path')
   })
 
-  it('draws the point’s card under an id of its own, so the layer’s card keeps the point’s anchor', () => {
+  it('draws no copy of a point’s card or file: slots, and what goes in them', () => {
     draw(renderPointSteps(artifact, files, state))
-    const card = document.querySelector('#step-p-1 li.finding')
-    expect(card?.id).toBe('step-p-1-card')
-    expect(card?.getAttribute('data-fingerprint')).toBe('fp-1')
+    const stop = document.querySelector('#step-p-1')
+    expect(stop?.querySelector('li.finding, article.file')).toBeNull()
+    expect(stop?.querySelector(':scope > [data-slot="card"]')).not.toBeNull()
+    expect(stop?.querySelector(':scope > [data-slot="file"]')).not.toBeNull()
+    const point = artifact.points.find(p => p.id === 'p-1')
+    const entry = files.find(f => f.path === point?.path)
+    if (point === undefined || entry === undefined) throw new Error('fixture changed')
+    expect(
+      ['data-stop-point', 'data-stop-fingerprint', 'data-stop-path', 'data-stop-layer', 'data-stop-hunk'].map(
+        name => stop?.getAttribute(name)
+      )
+    ).toEqual(['p-1', 'fp-1', 'src/app.ts', 'run-path', hunkIdForPoint(point, entry)])
   })
 
-  it('draws the point’s card whole, whatever the list density', () => {
-    document.documentElement.removeAttribute('data-points')
+  it('draws the only card of a point the layers list no card for, under the point’s own anchor', () => {
     draw(renderPointSteps(artifact, files, state))
-    const card = document.querySelector('#step-p-1-card')
-    if (!(card instanceof HTMLElement)) throw new Error('no card')
-    expect(card.parentElement?.classList.contains('step-card')).toBe(true)
-    expect(pointCollapses(card)).toBe(false)
-  })
-
-  it('names its point on the file card, so only that point marks the lines', () => {
-    draw(renderPointSteps(artifact, files, state))
-    expect(document.querySelector('#step-p-1-file')?.getAttribute('data-only-point')).toBe('fp-1')
-  })
-
-  it('draws the point’s file open, with only the chunk that holds its lines', () => {
-    draw(renderPointSteps(artifact, files, state))
-    const file = document.querySelector('#step-p-1 article.file')
-    expect(file?.id).toBe('step-p-1-file')
-    expect(file?.getAttribute('data-path')).toBe('src/app.ts')
-    expect(file?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
-    // Its chevron says so, as the toggle reads it.
-    expect(file?.querySelector('.file-h > .chev')?.getAttribute('aria-expanded')).toBe('true')
-    const hunks = file?.querySelector('.diff-host')?.getAttribute('data-hunks')?.split(',')
-    expect(hunks).toHaveLength(1)
+    // The Other layer lists no point cards; its points’ cards are their stops’.
+    expect(document.querySelector('#step-p-2 [data-slot="card"] li.finding')?.id).toBe('point-p-2')
   })
 
   it('leads from each stop to the one before and after, and from the last to the layers', () => {
@@ -132,7 +123,7 @@ describe('renderPointSteps', () => {
       'step-p-2',
       'step-p-3',
     ])
-    expect(document.querySelector('#step-p-2-card')?.classList.contains('is-handled')).toBe(true)
+    expect(document.querySelector('#step-p-2 #point-p-2')?.classList.contains('is-handled')).toBe(true)
     expect(renderPointSteps({ ...artifact, points: [] }, files, state)).toBe('')
   })
 
@@ -186,5 +177,43 @@ describe('viewSwitchTarget', () => {
     expect(viewSwitchTarget(artifact, 'all', '#step-p-1')).toBe('#layer-run-path')
     expect(viewSwitchTarget(artifact, 'all', '#overview')).toBe('#overview')
     expect(viewSwitchTarget(artifact, 'all', '')).toBe('')
+  })
+})
+
+describe('a stop on screen holds the layer’s own cards', () => {
+  /** The layers, then the stops, as the page draws them in the one-point view. */
+  function page() {
+    return draw(
+      `<main>${renderLayers(artifact, files, state)}${renderPointSteps(artifact, files, state)}</main>`
+    )
+  }
+
+  it('moves the point’s card and its file card into the stop, open, and back to their places', () => {
+    const root = page()
+    const stop = document.querySelector('#step-p-1')
+    if (!(stop instanceof HTMLElement)) throw new Error('no stop')
+    const layerList = document.querySelector('#point-p-1')?.parentElement
+    placeStopCards(root, stop)
+    const card = document.querySelector('#point-p-1')
+    const file = document.querySelector('article.file[data-layer="run-path"][data-path="src/app.ts"]')
+    expect(card?.closest('[data-slot="card"]')).not.toBeNull()
+    expect(file?.closest('[data-slot="file"]')).not.toBeNull()
+    expect(all('#point-p-1')).toHaveLength(1)
+    // Whole in the stop, whatever the list density; its file held open there.
+    if (!(card instanceof HTMLElement)) throw new Error('no card')
+    expect(pointCollapses(card)).toBe(false)
+    expect(file?.hasAttribute('data-open')).toBe(true)
+    expect(file?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
+    // Only the point’s chunk and its own row show in the stop.
+    const lens = document.querySelector('#stop-lens')?.textContent ?? ''
+    expect(lens).toContain(`data-hunk="${stop.getAttribute('data-stop-hunk')}"`)
+    expect(lens).toContain('data-fingerprint="fp-1"')
+
+    returnStopCards(root)
+    expect(document.querySelector('#point-p-1')?.parentElement).toBe(layerList)
+    expect(file?.closest('pr-layer')).not.toBeNull()
+    expect(file?.hasAttribute('data-open')).toBe(false)
+    expect(all('[data-home], [data-away]')).toHaveLength(0)
+    expect(document.querySelector('#stop-lens')?.textContent).toBe('')
   })
 })

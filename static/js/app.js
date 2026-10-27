@@ -606,6 +606,8 @@ export class PrAppElement extends HTMLElement {
     const main = qs('#main', this)
     if ((this.layerView?.view === 'points') !== points && ctx !== null && session !== null && main !== null) {
       const artifact = { ...ctx.artifact, settled: session.settled }
+      // The cards a stop holds are the layers' own: they go home before the stops go away.
+      this.layerView?.returnCards()
       this.querySelector(`#${POINT_STEPS_ID}`)?.remove()
       this.querySelector('#overview > nav.step-nav')?.remove()
       if (points) {

@@ -90,11 +90,16 @@ function bundleFor(state, canvas = artifact) {
   })
 }
 
+/** The one-layer controller of a page set up in the one-point view, stopped after each test. */
+/** @type {ReturnType<typeof initOneLayer> | null} */
+let pointsView = null
+
 /**
  * The whole review screen, hydrated and wired, with a fake API in place of the server.
  * @param {{ selfReview?: boolean, state?: import('./contract-types.js').PrState, api?: Partial<import('./review-session.js').SessionApi>, capabilities?: import('./contract-types.js').Capabilities, comments?: ReadonlyArray<import('./contract-types.js').ReviewComment>, fetchReviewBody?: (n: import('./contract-types.js').ReviewKey) => Promise<import('./contract-types.js').ReviewBodyResponse>, chat?: () => ReturnType<typeof import('./chat.js').wireChat>, openSettings?: (el: HTMLElement) => void, setLayerView?: (view: string, place?: string) => void, uncover?: () => void, artifact?: import('./contract-types.js').ReviewArtifact, drawn?: boolean, points?: boolean }} [opts]
  *   `drawn: false` leaves every diff waiting to be seen, as cards below the fold do in a browser.
- *   `points: true` draws the one-point view's stops after the layers.
+ *   `points: true` draws the one-point view's stops after the layers, and shows the first point's
+ *   stop, which holds that point's card and file card while it shows.
  */
 function setup(opts = {}) {
   const state = opts.state ?? BASE
@@ -133,6 +138,11 @@ function setup(opts = {}) {
   const root = document.querySelector('#root')
   if (!(root instanceof HTMLElement)) {
     throw new Error('no root')
+  }
+  if (opts.points === true) {
+    window.location.hash = '#step-p-1'
+    pointsView?.stop()
+    pointsView = initOneLayer(root, { view: 'points', storage: null })
   }
   if (opts.drawn !== false) {
     hydrateAll(root, ctx)
@@ -2451,6 +2461,12 @@ describe('the AI Chat commands', () => {
 })
 
 describe('in the one-point view’s stops', () => {
+  afterEach(() => {
+    pointsView?.stop()
+    pointsView = null
+    window.location.hash = ''
+  })
+
   /** @param {ParentNode} root @param {string} selector */
   function pointerDown(root, selector) {
     const cell = root.querySelector(selector)
@@ -2496,7 +2512,7 @@ describe('in the one-point view’s stops', () => {
   it('comments with c on the line of the point in focus, in its stop', () => {
     const { root } = setup({ points: true })
     press(']')
-    expect(root.querySelector('.is-focused')?.id).toBe('step-p-1-card')
+    expect(root.querySelector('#step-p-1 .is-focused')?.id).toBe('point-p-1')
     press('c')
     expect(root.querySelector('#step-p-1 .composer-box')?.getAttribute('data-line')).toBe('4')
     expect(root.querySelector('pr-layer .composer-box')).toBeNull()
@@ -2557,8 +2573,9 @@ describe('in the one-point view’s stops', () => {
         '<button type="button" data-act="jump-line" data-key="src_app_test_ts" data-line="1" data-side="new">away</button>'
     )
     click(root, '#step-p-1 [data-act="jump-line"][data-line="4"]')
+    // The stop holds the layer's own card while it shows, so the line is on the page once.
     expect(root.querySelector('#step-p-1 #L-src_app_ts-new-4')?.classList.contains('is-target')).toBe(true)
-    expect(root.querySelector('pr-layer #L-src_app_ts-new-4')?.classList.contains('is-target')).toBe(false)
+    expect(root.querySelectorAll('#L-src_app_ts-new-4')).toHaveLength(1)
     click(root, '#step-p-1 [data-act="jump-line"][data-key="src_app_test_ts"]')
     expect(asked).toEqual([{ href: '#line:src/app.test.ts:1' }])
   })

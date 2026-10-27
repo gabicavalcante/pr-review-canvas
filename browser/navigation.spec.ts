@@ -307,7 +307,7 @@ test.describe('in the one-point view', () => {
     await page.goto(`${url}#step-p-1`)
     await expect(page.locator('#step-p-1')).toBeVisible()
     await page.keyboard.press(']')
-    await expect(page.locator('#step-p-1-card')).toHaveClass(/is-focused/)
+    await expect(page.locator('#step-p-1 #point-p-1')).toHaveClass(/is-focused/)
     await page.keyboard.press('c')
     await expect(page.locator('#step-p-1 .composer-box')).toBeVisible()
     await expect(page.locator('pr-layer .composer-box')).toHaveCount(0)
@@ -317,7 +317,7 @@ test.describe('in the one-point view', () => {
     test.skip(testInfo.project.name !== 'desktop')
     const { url } = await chatServer({ setup: asPoints })
     await page.goto(`${url}#step-p-1`)
-    await page.locator('#step-p-1-card [data-act="ask"]').first().click()
+    await page.locator('#step-p-1 #point-p-1 [data-act="ask"]').first().click()
     await page.getByText('ask something else…', { exact: true }).first().click()
     await expect(page.locator('#thread-title')).toHaveText('Sum instead of product')
     // Elsewhere in the sequence, then back by the thread.
@@ -325,7 +325,7 @@ test.describe('in the one-point view', () => {
     await expect(page.locator('#step-p-1')).toBeHidden()
     await page.locator('#thread-goto').click()
     await expect(page.locator('#step-p-1')).toBeVisible()
-    await expect(page.locator('#step-p-1-card')).toHaveClass(/is-target/)
+    await expect(page.locator('#step-p-1 #point-p-1')).toHaveClass(/is-target/)
     await expect(page.locator('section.layer:visible')).toHaveCount(0)
   })
 

@@ -45,7 +45,10 @@ export function findRow(root, key, side, line) {
   return null
 }
 
-/** The one-point view's stops, each drawing a point's card and its file again, under the layers. */
+/**
+ * The one-point view's stops. A stop draws no code of its own: the layer's card for its point's
+ * file moves into it while it shows, so every row and point is on the page once.
+ */
 const STOP_SELECTOR = 'section.point-step'
 
 /**
@@ -68,53 +71,74 @@ export function showsStops(root) {
 }
 
 /**
- * A line's row where the reader looks for it: inside `scope` first, such as the stop or card an
- * action came from; else in the first stop of the one-point view that draws it; else on the page,
- * which is its layer, since the stops come after the layers and a lookup takes the first match.
- * `stop` is the stop that holds the row, or null for a row in a layer.
+ * A value quoted for a CSS attribute selector.
+ * @param {string} value
+ */
+function cssString(value) {
+  return `"${value.replace(/["\\]/g, '\\$&')}"`
+}
+
+/**
+ * The stop of the one-point view that shows a line's row: the stop of a point on the row's chunk
+ * of the row's file card, the one on screen when it is one of them. Null for a row no stop shows.
+ * @param {ParentNode} root
+ * @param {Element} row
+ * @param {HTMLElement | null} prefer a stop to take when it shows the row, such as its point's own
+ * @returns {HTMLElement | null}
+ */
+function stopShowingRow(root, row, prefer) {
+  const card = row.closest('article.file')
+  const hunk = row.closest('table.diff')?.getAttribute('data-hunk') ?? null
+  const layer = card?.getAttribute('data-layer') ?? null
+  const path = card?.getAttribute('data-path') ?? null
+  if (hunk === null || layer === null || path === null) {
+    return null
+  }
+  const showing = `${STOP_SELECTOR}[data-stop-layer=${cssString(layer)}][data-stop-path=${cssString(path)}][data-stop-hunk=${cssString(hunk)}]`
+  if (prefer?.matches(showing) === true) {
+    return prefer
+  }
+  const stop = root.querySelector(`${showing}:not([hidden])`) ?? root.querySelector(showing)
+  return stop instanceof HTMLElement ? stop : null
+}
+
+/**
+ * A line's row, and the stop of the one-point view that shows it, or null for a row in a layer
+ * only. The row is the page's one row for that line, wherever its card is now. Of two stops on the
+ * same chunk, `prefer` is taken when it is one of them, such as the stop of the point at hand.
  * @param {ParentNode} root
  * @param {string} key
  * @param {'new' | 'old'} side
  * @param {number} line
- * @param {ParentNode | null} [scope]
+ * @param {HTMLElement | null} [prefer]
  * @returns {{ row: HTMLTableRowElement, stop: HTMLElement | null } | null}
  */
-export function rowPreferringStop(root, key, side, line, scope = null) {
-  const scopes = [...(scope === null ? [] : [scope]), ...root.querySelectorAll(STOP_SELECTOR)]
-  for (const place of scopes) {
-    const row = findRow(place, key, side, line)
-    if (row !== null && isRowVisible(row)) {
-      return { row, stop: stopOf(row) }
-    }
-  }
+export function rowPreferringStop(root, key, side, line, prefer = null) {
   const row = findRow(root, key, side, line)
-  return row === null ? null : { row, stop: stopOf(row) }
+  return row === null ? null : { row, stop: stopShowingRow(root, row, prefer) }
 }
 
 /**
- * An attention point where the reader looks for it: its card in its stop of the one-point view,
- * else its card in its layer, or its row in the diff for a point of a layer with no list.
+ * An attention point, and the stop of the one-point view that shows it: its card, or its row in
+ * the diff for a point of a layer with no list.
  * @param {ParentNode} root
  * @param {string} fingerprint
  * @returns {{ el: HTMLElement, stop: HTMLElement | null } | null}
  */
 export function pointPreferringStop(root, fingerprint) {
-  const holder = `[data-point][data-fingerprint="${cssEscape(fingerprint)}"]`
-  const el = root.querySelector(`${STOP_SELECTOR} ${holder}`) ?? root.querySelector(holder)
-  return el instanceof HTMLElement ? { el, stop: stopOf(el) } : null
-}
-
-/** @param {Element} el */
-function stopOf(el) {
-  const stop = el.closest(STOP_SELECTOR)
-  return stop instanceof HTMLElement ? stop : null
+  const fp = cssString(fingerprint)
+  const el =
+    root.querySelector(`li.finding[data-fingerprint=${fp}]`) ??
+    root.querySelector(`[data-point][data-fingerprint=${fp}]`)
+  const stop = root.querySelector(`${STOP_SELECTOR}[data-stop-fingerprint=${fp}]`)
+  return el instanceof HTMLElement ? { el, stop: stop instanceof HTMLElement ? stop : null } : null
 }
 
 /**
- * Leads the reader to a target the lookups above found. The one-point view keeps its stops: a
- * target in one comes on screen in it, as the stop takes the place of the one shown. A target in
- * no stop asks the page for its layers, with `request` saying where to go there; nothing scrolls
- * now, since the page draws itself again. In the other views the target's layer shows around it.
+ * Leads the reader to a target the lookups above found. In the one-point view the target's stop
+ * comes on screen first, which brings the target into it; a target no stop shows asks the page for
+ * its layers, with `request` saying where to go there, and nothing scrolls now. In the other views
+ * the target's layer shows around it.
  * @param {{ el: HTMLElement, stop: HTMLElement | null }} found
  * @param {ParentNode} root
  * @param {ShowInLayers} request
@@ -122,9 +146,13 @@ function stopOf(el) {
  * @returns {boolean} true when the target is on screen now
  */
 export function revealPreferringStop(found, root, request, block = 'center') {
-  if (found.stop === null && showsStops(root)) {
-    found.el.dispatchEvent(new CustomEvent(SHOW_IN_LAYERS, { bubbles: true, detail: request }))
-    return false
+  if (showsStops(root)) {
+    if (found.stop === null) {
+      found.el.dispatchEvent(new CustomEvent(SHOW_IN_LAYERS, { bubbles: true, detail: request }))
+      return false
+    }
+    // Showing the stop moves the layer's card, and the target with it, into the stop.
+    found.stop.dispatchEvent(new Event('reveal-code', { bubbles: true }))
   }
   scrollIntoViewSafe(found.el, block)
   return true

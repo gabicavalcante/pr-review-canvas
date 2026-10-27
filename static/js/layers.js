@@ -476,28 +476,20 @@ export function wireCardReveal(root) {
 }
 
 /**
- * `id` names a card drawn outside its layer, such as in the one-point view, which leaves the file's
- * anchors to the layers; `open` draws its body at once rather than under its title, and keeps it
- * open when it is marked reviewed (`data-open`); `onlyPoint`
- * puts that one attention point on the card's lines, and no other.
  * @param {LayerFile} lf
  * @param {FileEntry | undefined} entry
  * @param {Layer} layer
  * @param {{ hunkIndex: Map<string, { layer: Layer, index: number }>, paths: ReadonlySet<string>, firstCardFor: Set<string>, state?: PrState, keepOpen?: boolean }} ctx
- * @param {{ id?: string, open?: boolean, onlyPoint?: string }} [opts]
  * @returns {string}
  */
-export function renderFileCard(lf, entry, layer, ctx, opts = {}) {
+export function renderFileCard(lf, entry, layer, ctx) {
   const key = entry?.key ?? sanitizeKey(lf.path)
   const cardReviewedId = reviewedId(layer.key, lf.path)
   const cardReviewed = ctx.state?.reviewed[cardReviewedId] === true
-  const collapsed =
-    opts.open !== true && (cardReviewed || (collapsesAt(lf, foldLevel) && ctx.keepOpen !== true))
-  const isFirst = opts.id === undefined && !ctx.firstCardFor.has(key)
-  if (opts.id === undefined) {
-    ctx.firstCardFor.add(key)
-  }
-  const id = opts.id ?? (isFirst ? fileAnchorId(key) : `${fileAnchorId(key)}-${layer.key}`)
+  const collapsed = cardReviewed || (collapsesAt(lf, foldLevel) && ctx.keepOpen !== true)
+  const isFirst = !ctx.firstCardFor.has(key)
+  ctx.firstCardFor.add(key)
+  const id = isFirst ? fileAnchorId(key) : `${fileAnchorId(key)}-${layer.key}`
   const pills = entry
     ? `<span class="pill add">+${entry.additions}</span><span class="pill del">&minus;${entry.deletions}</span>`
     : ''
@@ -513,7 +505,7 @@ export function renderFileCard(lf, entry, layer, ctx, opts = {}) {
     : ''
   const elsewhere = elsewhereHtml(lf, entry, layer, ctx.hunkIndex)
   return (
-    `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}"${opts.open === true ? ' data-open' : ''}${opts.onlyPoint === undefined ? '' : ` data-only-point="${esc(opts.onlyPoint)}"`} aria-labelledby="${esc(id)}-h">` +
+    `<pr-file><article class="file${lf.isTest ? ' test' : ''}${cardReviewed ? ' is-reviewed' : ''}" id="${esc(id)}" data-key="${esc(key)}" data-path="${esc(lf.path)}" data-layer="${esc(layer.id)}" aria-labelledby="${esc(id)}-h">` +
     `<div class="file-h">${chevronHtml('Collapse file', !collapsed, { act: 'toggle-card' })}<h3 id="${esc(id)}-h" class="path" data-act="toggle-card">${path}${testTag}</h3>${status}${pills}` +
     `<label class="chk"><input type="checkbox" data-reviewed-id="${esc(cardReviewedId)}"${cardReviewed ? ' checked' : ''}> reviewed</label>` +
     `<span class="tbtns">${askButtonHtml({ kind: 'file', path: lf.path }, { title: 'Ask AI Chat about this file' })}</span></div>` +
@@ -727,14 +719,10 @@ function layerFileOf(ctx, layerId, path) {
  * @param {{ key: string, layerId: string, entry: FileEntry, hunkIds: ReadonlySet<string> }} at
  */
 function decorateCard(card, ctx, at) {
-  const only = card.getAttribute('data-only-point')
   return applyDecorations(card, at.key, {
     annotations: layerFileOf(ctx, at.layerId, at.entry.path)?.annotations ?? [],
     points: ctx.artifact.points.filter(
-      p =>
-        (only === null || p.fingerprint === only) &&
-        p.path === at.entry.path &&
-        at.hunkIds.has(hunkIdForPoint(p, at.entry))
+      p => p.path === at.entry.path && at.hunkIds.has(hunkIdForPoint(p, at.entry))
     ),
     threads: threadsForHunks(ctx.comments, at.entry, at.hunkIds),
     pending: draftsForCard(ctx, at.entry, at.hunkIds),
@@ -915,9 +903,31 @@ export function hydrateAll(root, ctx) {
 }
 
 /**
+ * Whether a file card is collapsed at `level`: when it is marked reviewed, or when its file
+ * collapses at that level and nothing on it keeps it open.
+ * @param {HTMLElement} card
+ * @param {RenderContext} ctx
+ * @param {import('./contract-types.js').FoldLevel} level
+ * @param {ReadonlySet<string>} commentPaths
+ * @returns {boolean | undefined} undefined for a card of no layer file the canvas lists
+ */
+function collapsedAt(card, ctx, level, commentPaths) {
+  const layerId = card.getAttribute('data-layer') ?? ''
+  const lf = layerFileOf(ctx, layerId, card.getAttribute('data-path') ?? '')
+  if (lf === undefined) {
+    return undefined
+  }
+  return (
+    card.classList.contains('is-reviewed') ||
+    (collapsesAt(lf, level) && !cardKeepsOpen(lf, layerId, ctx.artifact, commentPaths))
+  )
+}
+
+/**
  * Switches how much code the page hides. A card the reader opened or closed by hand follows the
- * new level too: changing the level is a request to change exactly that. The folds and counters
- * then follow as refreshFolds says.
+ * new level too: changing the level is a request to change exactly that. A card a stop of the
+ * one-point view holds (`data-open`) stays open. The folds and counters then follow as
+ * refreshFolds says.
  * @param {ParentNode} root
  * @param {import('./contract-types.js').FoldLevel} level
  */
@@ -929,21 +939,26 @@ export function setFoldLevel(root, level) {
   }
 
   const commentPaths = commentPathsOf(ctx)
-  for (const card of Array.from(root.querySelectorAll('article.file'))) {
-    const lf =
-      card instanceof HTMLElement
-        ? layerFileOf(ctx, card.getAttribute('data-layer') ?? '', card.getAttribute('data-path') ?? '')
-        : undefined
-    if (card instanceof HTMLElement && lf !== undefined) {
-      setCardCollapsed(
-        card,
-        card.classList.contains('is-reviewed') ||
-          (collapsesAt(lf, level) &&
-            !cardKeepsOpen(lf, card.getAttribute('data-layer') ?? '', ctx.artifact, commentPaths))
-      )
+  for (const card of Array.from(root.querySelectorAll('article.file:not([data-open])'))) {
+    const collapsed = card instanceof HTMLElement ? collapsedAt(card, ctx, level, commentPaths) : undefined
+    if (card instanceof HTMLElement && collapsed !== undefined) {
+      setCardCollapsed(card, collapsed)
     }
   }
   refreshFolds(root)
+}
+
+/**
+ * Puts a file card back as the page's reading level and its reviewed mark say, as it comes back
+ * to its layer from a stop of the one-point view, which held it open.
+ * @param {HTMLElement} card
+ */
+export function refoldCard(card) {
+  const ctx = renderContext
+  const collapsed = ctx === null ? undefined : collapsedAt(card, ctx, foldLevel, commentPathsOf(ctx))
+  if (collapsed !== undefined) {
+    setCardCollapsed(card, collapsed)
+  }
 }
 
 /**

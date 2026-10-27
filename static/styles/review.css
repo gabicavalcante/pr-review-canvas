@@ -649,3 +649,10 @@ img.av {
   margin: 0;
   font-size: 13px;
 }
+/* Outside a stop an open point's row shows it whole, so its show command has nothing to open. */
+tr.ifind[data-status='open'] .p-toggle {
+  display: none;
+}
+.point-step tr.ifind[data-status='open'] .p-toggle {
+  display: inline-block;
+}

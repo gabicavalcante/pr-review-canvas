@@ -410,3 +410,32 @@ test('a comment posted in the points view is still on the page after switching t
   )
   await expect(page.locator('section.layer tr.thread[data-thread="5001"]')).toHaveCount(1)
 })
+
+test('the points view has every card, line and thread on the page once', async ({ page, reviewUrl }) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  for (const stop of ['#step-p-1', '#step-p-2', '#step-p-3']) {
+    await page.locator(`nav.rail a[href="${stop}"]`).click()
+    await expect(page.locator(stop)).toBeVisible()
+    const repeated = await page.evaluate(() => {
+      const seen = new Map()
+      for (const el of document.querySelectorAll('[id]')) seen.set(el.id, (seen.get(el.id) ?? 0) + 1)
+      return [...seen].filter(([, n]) => n > 1).map(([id]) => id)
+    })
+    expect(repeated).toEqual([])
+  }
+})
+
+test('a stop keeps its code open when the reading level changes, a reviewed file’s too', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  const file = page.locator('#step-p-1 article.file')
+  await file.locator('input[data-reviewed-id]').check()
+  await expect(file.locator('.file-body')).toBeVisible()
+  await page.locator('#fold-level').selectOption('aggressive')
+  await expect(file.locator('.file-body')).toBeVisible()
+})

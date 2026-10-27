@@ -1,12 +1,12 @@
 // @ts-check
 // The one-point-at-a-time view's stops, layer by layer. Each layer opens with a stop of its own:
 // its heading, its description, and its tests shown at once, leading on to its attention points.
-// Each point's stop is the point's card, whole, then the file it is on, drawn with the one chunk
-// that holds its lines and a mark on them where the point is. Every stop leads to the one before
-// and after; the last leads to the layers, for the rest of the diff. Only that view draws the
-// stops, and `one-layer.js` shows them one at a time. They come after the layers on the page: a
-// point's code is the layer's drawn again, under the same ids, so a link to a line or a chunk
-// lands in its layer, the first on the page.
+// Each point's stop is the point's card, whole, then the file it is on, showing only the chunk
+// that holds its lines and the point's mark in it. A stop draws no copy of either: it has a slot
+// for each, which takes the layer's own card while the stop shows (`one-layer.js` moves it there
+// and back), so every card, line and thread is on the page once. Every stop leads to the one
+// before and after; the last leads to the layers, for the rest of the diff. Only that view draws
+// the stops, and `one-layer.js` shows them one at a time.
 /** @typedef {import('./contract-types.js').FileEntry} FileEntry */
 /** @typedef {import('./contract-types.js').PrState} PrState */
 /** @typedef {import('./contract-types.js').ReviewArtifact} ReviewArtifact */
@@ -17,7 +17,7 @@
 import { askButtonHtml } from './ask.js'
 import { esc } from './dom.js'
 import { layerAnchorId, layerStepAnchorId, reviewedId, stepAnchorId } from './keys.js'
-import { hunkIdForPoint, hunkLayerIndex, pathSet, renderFileCard, testMapHtml } from './layers.js'
+import { hunkIdForPoint, hunkLayerIndex, pathSet, testMapHtml } from './layers.js'
 import { renderMarkdown } from './markdown.js'
 import { pointSteps, stopsOf } from './point-steps.js'
 import { pointCardHtml, postedUrls } from './points.js'
@@ -161,7 +161,6 @@ export function renderPointSteps(artifact, files, state, comments = []) {
   const ctx = {
     hunkIndex: hunkLayerIndex(artifact),
     paths: pathSet(files),
-    firstCardFor: new Set(),
     state,
     posted: postedUrls(state, comments),
   }
@@ -174,27 +173,29 @@ export function renderPointSteps(artifact, files, state, comments = []) {
     const { point, layer } = stop.step
     const entry = files.find(f => f.path === point.path)
     const hunk = entry === undefined ? '' : hunkIdForPoint(point, entry)
-    const layerFile = layer?.files.find(f => f.path === point.path)
+    const owner = hunk === '' ? undefined : ctx.hunkIndex.get(hunk)?.layer
+    // The stop draws no copy of the code: its slot takes the layer's own file card while the stop
+    // shows (one-layer.js). Its attributes say which card, and which chunk and point in it.
     const code =
-      layer === null || entry === undefined || hunk === ''
+      layer === null || owner === undefined
         ? '<p class="muted small">The code this point is about is not in the diff.</p>'
-        : renderFileCard(
-            { ...(layerFile ?? { path: point.path, isTest: false, annotations: [] }), hunks: [hunk] },
-            entry,
-            layer,
-            ctx,
-            { id: `${stop.id}-file`, open: true, onlyPoint: point.fingerprint }
-          )
+        : ''
+    const slotFor =
+      owner === undefined
+        ? ''
+        : ` data-stop-path="${esc(point.path)}" data-stop-layer="${esc(owner.id)}" data-stop-hunk="${esc(hunk)}"`
+    // A point the layers draw no card for, as the Other layer's, has its only card here.
+    const card = layer === null || layer.kind === 'other' ? pointCardHtml(point, ctx) : ''
     const position = layer === null ? null : layerPosition(artifact, layer)
     const where =
       layer === null
         ? ''
         : ` · <a href="#${esc(layerStepAnchorId(layer.key))}">${esc(position === null ? layer.title : `Layer ${position.number} · ${layer.title}`)}</a>`
     return (
-      `<section class="point-step" id="${esc(stop.id)}" aria-label="Attention point ${stop.number} of ${steps.length}">` +
+      `<section class="point-step" id="${esc(stop.id)}" data-stop-point="${esc(point.id)}" data-stop-fingerprint="${esc(point.fingerprint)}"${slotFor} aria-label="Attention point ${stop.number} of ${steps.length}">` +
       `<p class="step-h"><span class="step-n">Point ${stop.number} of ${steps.length}</span>${where}</p>` +
-      `<ol class="findings step-card">${pointCardHtml(point, ctx, { id: `${stop.id}-card` })}</ol>` +
-      `<div class="files">${code}</div>${nav}</section>`
+      `<ol class="findings step-card" data-slot="card">${card}</ol>` +
+      `<div class="files" data-slot="file">${code}</div>${nav}</section>`
     )
   })
   return `<div class="point-steps" id="${POINT_STEPS_ID}">${html.join('')}</div>`
