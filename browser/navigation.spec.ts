@@ -347,7 +347,7 @@ test.describe('in the one-point view', () => {
     await expect(page.locator('#chat-log')).toContainText('covered at')
     await page.locator('nav.rail .rail-view [data-view="points"]').click()
     await expect(page.locator('section.point-step:visible')).toHaveCount(1)
-    await page.locator('#side-tab-threads').click()
+    await page.locator('#thread-switch').click()
     await page.locator('#thread-index').getByText('src/app.test.ts', { exact: false }).first().click()
     await page.locator('#thread-goto').click()
     await expect(page.locator('section.point-step')).toHaveCount(0)

@@ -246,6 +246,8 @@ describe('createGit (real adapter)', () => {
         'first',
         'This is not a Settled-decision: line, it only names one.',
         'Settled-decision: a.ts:1 one\nsettled-decision:   b.ts:2 two  \nReviewed-by: Someone',
+        // Indented, as under a list item.
+        '- the list\n  Settled-decision: e.ts:5 five',
       ]
       await inRepo(dir, 'commit', '-q', '--allow-empty', ...message.flatMap(paragraph => ['-m', paragraph]))
       const first = await inRepo(dir, 'rev-parse', 'HEAD')
@@ -268,7 +270,7 @@ describe('createGit (real adapter)', () => {
           sha: first,
           authorEmail: 'test@example.com',
           date: expect.stringMatching(/^\d{4}-\d\d-\d\dT/),
-          values: ['a.ts:1 one', 'b.ts:2 two'],
+          values: ['a.ts:1 one', 'b.ts:2 two', 'e.ts:5 five'],
         },
         {
           sha: second,

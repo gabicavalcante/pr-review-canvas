@@ -39,7 +39,14 @@ const REASON = 'No: the callers compare it raw'
 const REVISED = 'Not until the callers move to the enum'
 const KEEP_TWO = 'Should two stay for old readers?'
 const DROPPED = 'No: nothing reads it since the reader moved'
+// Two questions about one line, each with its answer, and one asked and left open.
+const WHY_B = 'Why uppercase B?'
+const B_REASON = 'The callers expect it'
+const B_FINAL = 'Is B final?'
+const B_YES = 'Yes: the spec names it'
+const UNANSWERED = 'Is H right?'
 const MOVED = Array.from({ length: 10 }, (_, i) => `line ${i + 1}\n`).join('')
+const PAIR = Array.from({ length: 10 }, (_, i) => `pair ${i + 1}\n`).join('')
 
 describe('settled decisions against a real repository', () => {
   let dir: string
@@ -47,7 +54,8 @@ describe('settled decisions against a real repository', () => {
   // it; another person's commit with a decision of their own; lines added above the decided one;
   // the same line decided again; a deleted line decided as numbered in its parent; the decided line
   // edited; the deleted line restored, with the line under it changed; a file renamed, then a line of
-  // it deleted and decided under its new name.
+  // it deleted and decided under its new name; another file renamed with a line deleted in one
+  // commit, whose message also asks two questions about one line and one it does not answer.
   const heads = {
     decided: '',
     other: '',
@@ -57,6 +65,7 @@ describe('settled decisions against a real repository', () => {
     edited: '',
     restored: '',
     renamed: '',
+    paired: '',
   }
   let harness: TestContext
 
@@ -68,6 +77,7 @@ describe('settled decisions against a real repository', () => {
     await write(dir, 'src/app.ts', 'a\nb\nc\nd\ne\nf\ng\nh\n')
     await write(dir, 'src/old.ts', 'one\ntwo\nthree\n')
     await write(dir, 'src/moved.ts', MOVED)
+    await write(dir, 'src/pair.ts', PAIR)
     await runGit(dir, 'add', '.')
     await runGit(dir, 'commit', '-q', '-m', 'base')
     await runGit(dir, 'checkout', '-q', '-b', 'feature')
@@ -114,6 +124,17 @@ describe('settled decisions against a real repository', () => {
     heads.renamed = await commit(dir, [
       'refactor(renamed): drop line 3',
       `Settled-decision: src/renamed.ts:3:old ${DROPPED}`,
+    ])
+    await runGit(dir, 'mv', 'src/pair.ts', 'src/paired.ts')
+    await write(dir, 'src/paired.ts', PAIR.replace('pair 2\n', ''))
+    heads.paired = await commit(dir, [
+      'refactor(paired): rename pair and drop line 2',
+      [
+        `Settled-decision: src/paired.ts:2:old ${KEEP_TWO} ${DROPPED}`,
+        `Settled-decision: src/app.ts:4 ${WHY_B} ${B_REASON}`,
+        `Settled-decision: src/app.ts:4 ${B_FINAL} ${B_YES}`,
+        `Settled-decision: src/app.ts:10 ${UNANSWERED}`,
+      ].join('\n'),
     ])
   })
   afterAll(async () => rm(dir, { recursive: true, force: true }))
@@ -303,5 +324,46 @@ describe('settled decisions against a real repository', () => {
     await published(heads.shifted)
     const { artifact: revised } = await published(heads.revised)
     expect(Object.values(revised.settled ?? {}).map(settlement => settlement.reason)).toEqual([REVISED])
+  })
+
+  it("places a deleted line's decision in a file renamed by the same commit, read in its parent under the old name", async () => {
+    const { context } = await prepared(heads.paired)
+    expect(
+      context.decisions
+        .filter(decision => decision.path === 'src/paired.ts')
+        .map(decision => [decision.side, decision.line])
+    ).toEqual([['old', 2]])
+  })
+
+  it('makes two questions on one line two resolved points, and keeps a question with no answer as context', async () => {
+    const { context, artifact } = await published(heads.paired)
+    const onB = artifact.points.filter(point => point.decisionCommit !== undefined && point.line === 4)
+    expect(onB.map(point => point.title)).toEqual([WHY_B, B_FINAL])
+    expect(onB.map(point => artifact.settled?.[point.fingerprint]?.reason)).toEqual([B_REASON, B_YES])
+    // Each point's body carries its answer, so a copy of it does too.
+    expect(onB[0]?.body).toMatch(
+      new RegExp(
+        `^Commit \`${heads.paired.slice(0, 7)}\` answered this on \\d{4}-\\d\\d-\\d\\d: ${B_REASON}$`
+      )
+    )
+    expect(context.decisions.find(decision => decision.question === UNANSWERED)).toMatchObject({
+      line: null,
+    })
+    expect(artifact.points.map(point => point.title)).not.toContain(UNANSWERED)
+  })
+
+  it('leaves a decision the author reopened open on later canvases, until a later commit answers it again', async () => {
+    const { artifact } = await published(heads.decided)
+    const at = '2026-10-13T12:00:00.000Z'
+    await harness.ctx.canvases.revise(heads.decided, withSettlement(artifact, decidedFp, undefined, at))
+    const shifted = await published(heads.shifted)
+    expect(shifted.artifact.points.map(point => point.fingerprint)).toContain(decidedFp)
+    expect(shifted.artifact.settled?.[decidedFp]).toBeUndefined()
+    expect(shifted.artifact.reopened).toEqual({ [decidedFp]: { commit: heads.decided, at } })
+
+    // The same question answered again by a later commit resolves its point once more.
+    const { artifact: revised } = await published(heads.revised)
+    expect(revised.reopened).toBeUndefined()
+    expect(Object.values(revised.settled ?? {}).map(settlement => settlement.commit)).toEqual([heads.revised])
   })
 })

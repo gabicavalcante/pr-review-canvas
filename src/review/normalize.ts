@@ -194,12 +194,23 @@ function decisionPoints(
   const points: Unassigned[] = []
   const settled: Record<string, Settlement> = {}
   for (const decision of decisions) {
-    if (decision.line === null) {
+    // A question raised without an answer is only ever context.
+    if (decision.line === null || decision.text === undefined) {
       continue
     }
     const asked = decision.question ?? decision.text
     const title = shortTitle(asked, titleCap, 'Settled decision')
-    const settledIn = `The author settled this in commit \`${decision.commit.slice(0, 7)}\` on ${decision.date.slice(0, 10)}.`
+    const commit = `Commit \`${decision.commit.slice(0, 7)}\``
+    const on = decision.date.slice(0, 10)
+    // The body states what the commit said, true whether the point is resolved or the author
+    // reopened it, so a copy of the point or what AI Chat is told about it keeps the answer. A
+    // question or a decision cut to fit the title is given whole.
+    const said =
+      decision.question === undefined
+        ? title === asked
+          ? `${commit} decided this on ${on}.`
+          : `${commit} decided this on ${on}: ${decision.text}`
+        : `${title === asked ? '' : `${asked}\n\n`}${commit} answered this on ${on}: ${decision.text}`
     const point: Unassigned = {
       kind: 'decision',
       level: 'fyi',
@@ -207,8 +218,7 @@ function decisionPoints(
       path: decision.path,
       line: decision.line,
       side: decision.side,
-      // A question cut to fit the title is given whole in the body.
-      body: decision.question !== undefined && title !== asked ? `${asked}\n\n${settledIn}` : settledIn,
+      body: said,
       audience: 'author',
       // The whole line, not the title, names the decision: two decisions asking one question are
       // two points, and a revised answer is a new one, so a reason written on the canvas for the

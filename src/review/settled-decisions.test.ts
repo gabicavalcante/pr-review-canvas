@@ -42,14 +42,13 @@ describe('parseSettledDecision', () => {
       question: 'Keep it?',
       text: 'Yes? Mostly.',
     })
-    // A `?` inside a word or a URL, or one that ends the line, starts no answer.
+    // A `?` inside a word or a URL starts no answer.
     expect(parseSettledDecision('src/a.ts:3 keep it; see https://x.test/?q=1 for why')).toEqual({
       path: 'src/a.ts',
       line: 3,
       side: 'new',
       text: 'keep it; see https://x.test/?q=1 for why',
     })
-    expect(parseSettledDecision('src/a.ts:3 Keep it?')).not.toHaveProperty('question')
     // Nor does one inside quoted code, while a code span inside the question stays in it.
     expect(parseSettledDecision('src/a.ts:3 Should `x ?? 0` stay? Yes: x may be null')).toMatchObject({
       question: 'Should `x ?? 0` stay?',
@@ -60,6 +59,16 @@ describe('parseSettledDecision', () => {
       question: 'Keep it?',
       text: 'Yes, see `x',
     })
+  })
+
+  it('reads a line that ends with its question as a question with no answer', () => {
+    expect(parseSettledDecision('src/app.ts:9 Is this the answer?')).toEqual({
+      path: 'src/app.ts',
+      line: 9,
+      side: 'new',
+      question: 'Is this the answer?',
+    })
+    expect(parseSettledDecision('src/a.ts:3 Should `x ?? 0` stay?')).not.toHaveProperty('text')
   })
 
   it('reads a colon after the line number and a leading `./` as part of the anchor', () => {
@@ -85,6 +94,8 @@ describe('parseSettledDecision', () => {
 })
 
 describe('readSettledDecisions', () => {
+  // The head's version, and the same version at an earlier commit.
+  const BOTH = { [`${EARLIER}:src/app.ts`]: APP_AT_HEAD, [`${HEAD_SHA}:src/app.ts`]: APP_AT_HEAD }
   const commit = (sha: string, values: string[], authorEmail = 'Author@Example.com'): CommitKeyedLines => ({
     sha,
     authorEmail,
@@ -203,6 +214,38 @@ describe('readSettledDecisions', () => {
     ])
   })
 
+  it('keeps two questions on one line, and lets a later answer to the same question stand', async () => {
+    const { decisions } = read(
+      [
+        commit(EARLIER, ['src/app.ts:2 Keep a? Yes: run needs it', 'src/app.ts:2 Keep b? Yes: run sums it']),
+        commit(HEAD_SHA, ['src/app.ts:2 keep  B? No: drop it next']),
+      ],
+      { blobs: BOTH }
+    )
+    expect((await decisions).map(decision => [decision.question, decision.text, decision.line])).toEqual([
+      ['Keep a?', 'Yes: run needs it', 2],
+      ['keep  B?', 'No: drop it next', 2],
+    ])
+  })
+
+  it('keeps a question with no answer as context, until a later line answers it', async () => {
+    const asked = read([commit(HEAD_SHA, ['src/app.ts:2 Is this the answer?'])])
+    expect(await asked.decisions).toEqual([
+      expect.objectContaining({ question: 'Is this the answer?', line: null }),
+    ])
+    expect((await asked.decisions)[0]).not.toHaveProperty('text')
+    const answered = read(
+      [
+        commit(EARLIER, ['src/app.ts:2 Is this the answer?']),
+        commit(HEAD_SHA, ['src/app.ts:2 Is this the answer? Yes: it sums']),
+      ],
+      { blobs: BOTH }
+    )
+    expect((await answered.decisions).map(decision => [decision.text, decision.line])).toEqual([
+      ['Yes: it sums', 2],
+    ])
+  })
+
   it('keeps the question apart from the answer, and cuts either one longer than a settlement may be', async () => {
     const long = 'x'.repeat(SETTLEMENT_REASON_MAX + 50)
     const { decisions } = read([
@@ -210,7 +253,7 @@ describe('readSettledDecisions', () => {
     ])
     const [plain, asked] = await decisions
     expect(plain?.text).toHaveLength(SETTLEMENT_REASON_MAX)
-    expect(plain?.text.endsWith('…')).toBe(true)
+    expect(plain?.text?.endsWith('…')).toBe(true)
     expect(plain).not.toHaveProperty('question')
     expect(asked?.question).toHaveLength(SETTLEMENT_REASON_MAX)
     expect(asked?.text).toBe('Because.')

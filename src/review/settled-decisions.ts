@@ -12,6 +12,7 @@ import {
 } from '../contract/review-artifact.js'
 import type { Git } from '../git/git.js'
 import { hunkForLine } from '../git/patch-lines.js'
+import { normalizeTitle } from './normalize.js'
 import { rowsOnSide, unchangedLines } from './point-carry.js'
 
 export const SETTLED_DECISION_KEY = 'Settled-decision'
@@ -28,8 +29,11 @@ export interface ParsedDecision {
   side: Side
   /** The question the decision answers, up to its first ending `?`; absent when the line states none. */
   question?: string
-  /** The decision and its reason: the answer, after the question when there is one. */
-  text: string
+  /**
+   * The decision and its reason: the answer, after the question when there is one. Absent when the
+   * line asks a question and stops there: the question was raised, not answered.
+   */
+  text?: string
 }
 
 // A colon after the line number, as in `src/app.ts:4: keep it`, is read as part of the anchor.
@@ -37,6 +41,8 @@ const DECISION_VALUE = /^(\S+):(\d+)(:old)?:?\s+(\S.*)$/
 // The question runs to the first `?` that a space follows outside a code span, so a `?` inside a
 // URL or quoted code such as `x ?? 0` stays in place. A backtick with no closing one ends nothing.
 const QUESTION = /^((?:[^`?]|`[^`]*`|\?(?!\s))*\?)\s+(\S.*)$/
+// A line that is all question, with no answer after it.
+const QUESTION_ONLY = /^(?:[^`?]|`[^`]*`|\?(?!\s))*\?$/
 
 /** One value, or null when it does not read as `<path>:<line>[:old] [<question>? ]<text>`. */
 export function parseSettledDecision(value: string): ParsedDecision | null {
@@ -55,10 +61,14 @@ export function parseSettledDecision(value: string): ParsedDecision | null {
     return null
   }
   const side = old === undefined ? 'new' : 'old'
-  const asked = QUESTION.exec(rest.trim())
+  const said = rest.trim()
+  if (QUESTION_ONLY.test(said)) {
+    return { path, line, side, question: said }
+  }
+  const asked = QUESTION.exec(said)
   const [, question = '', answer = ''] = asked ?? []
   return asked === null
-    ? { path, line, side, text: rest.trim() }
+    ? { path, line, side, text: said }
     : { path, line, side, question: question.trim(), text: answer.trim() }
 }
 
@@ -99,12 +109,16 @@ async function lineInDiff(
   if (entry === undefined) {
     return null
   }
-  // A renamed file has its old name at the merge base.
+  // A renamed file has its old name at the merge base, and in the parent of the commit that renamed it.
   const [written, shown] = await Promise.all(
     decision.side === 'new'
       ? [fileLines(src.git, commit, decision.path), fileLines(src.git, src.headSha, decision.path)]
       : [
-          fileLines(src.git, `${commit}^`, decision.path),
+          fileLines(src.git, `${commit}^`, decision.path).then(lines =>
+            lines === null && entry.oldPath !== undefined
+              ? fileLines(src.git, `${commit}^`, entry.oldPath)
+              : lines
+          ),
           fileLines(src.git, src.mergeBaseSha, entry.oldPath ?? entry.path),
         ]
   )
@@ -130,7 +144,9 @@ function capReason(text: string): string {
 
 /**
  * The author's decisions on `mergeBase..head`, oldest first. A value that does not parse is not a
- * decision and is skipped. When two decisions land on the same line, the later commit's stands.
+ * decision and is skipped. When two decisions on the same line answer the same question, or both
+ * state none, the later one stands; two questions on one line are two decisions. A question asked
+ * without an answer is kept as context, where nothing resolves it, until a later line answers it.
  */
 export async function readSettledDecisions(src: DecisionSources): Promise<SettledDecision[]> {
   if (src.authorEmail === null) {
@@ -148,7 +164,7 @@ export async function readSettledDecisions(src: DecisionSources): Promise<Settle
           commit: commit.sha,
           date: commit.date,
           ...(parsed.question === undefined ? {} : { question: capReason(parsed.question) }),
-          text: capReason(parsed.text),
+          ...(parsed.text === undefined ? {} : { text: capReason(parsed.text) }),
           path: parsed.path,
           side: parsed.side,
           line: await lineInDiff(src, commit.sha, parsed),
@@ -156,11 +172,15 @@ export async function readSettledDecisions(src: DecisionSources): Promise<Settle
       }
     }
   }
-  const anchor = (decision: SettledDecision) => `${decision.path}\n${decision.side}\n${decision.line}`
-  const standing = decisions.filter(
-    (decision, index) =>
-      decision.line === null || !decisions.slice(index + 1).some(later => anchor(later) === anchor(decision))
-  )
+  // The question is compared as a title is: case and spacing aside.
+  const asked = (decision: SettledDecision) =>
+    `${decision.path}\n${decision.side}\n${decision.line}\n${normalizeTitle(decision.question ?? '')}`
+  const standing = decisions
+    .filter(
+      (decision, index) =>
+        decision.line === null || !decisions.slice(index + 1).some(later => asked(later) === asked(decision))
+    )
+    .map(decision => (decision.text === undefined ? { ...decision, line: null } : decision))
   const anchored = standing.filter(decision => decision.line !== null)
   const asContext = new Set(anchored.slice(0, Math.max(0, anchored.length - MAX_DECISION_POINTS)))
   return standing.map(decision => (asContext.has(decision) ? { ...decision, line: null } : decision))

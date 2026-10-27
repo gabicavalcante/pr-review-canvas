@@ -62,7 +62,7 @@ import {
 import { buildNavOrder, layerOf, readingItem, step } from './nav.js'
 import { inHiddenSection } from './one-layer.js'
 import { issueCommentHtml } from './overview.js'
-import { pendingCount, refreshPendingBar } from './pending.js'
+import { pendingCount, refreshPendingBar, refreshResolvedDrafts } from './pending.js'
 import { refreshReviewPanel } from './review-panel.js'
 import {
   applyPointStates,
@@ -250,7 +250,6 @@ export function padUnderStickyBar(doc, bar) {
  *   document?: Document,
  *   fetchReviewBody?: typeof fetchReviewBody,
  *   chat?: () => ChatHandle | null,
- *   quickQuestions?: () => { openFor: (el: HTMLElement) => void } | null,
  *   openSettings?: (el: HTMLElement) => void,
  *   setLayerView?: (view: string, place?: string) => void,
  *   openReview?: () => void,
@@ -380,6 +379,8 @@ export function wireReview(root, session, opts = {}) {
     }
     refreshPendingBar(root, state, session)
     refreshReviewPanel(root, state, { on: session, points: session.artifact.points })
+    // A draft about a point the author resolved since says so, wherever it is drawn.
+    refreshResolvedDrafts(root, state)
     refreshComposerCommands(root, state.pending.length > 0)
     opts.chat?.()?.refreshProposed()
     applyCapabilityGating(root, session.capabilities)

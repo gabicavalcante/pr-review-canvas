@@ -337,12 +337,19 @@ function decisionsMarkdown(decisions: readonly SettledDecision[]): string {
   if (decisions.length === 0) {
     return '_No settled decisions are recorded on these commits._'
   }
-  const anchored = decisions.filter(decision => decision.line !== null).map(decisionLine)
-  const context = decisions.filter(decision => decision.line === null).map(decisionLine)
+  const answered = decisions.filter(decision => decision.text !== undefined)
+  const anchored = answered.filter(decision => decision.line !== null).map(decisionLine)
+  const context = answered.filter(decision => decision.line === null).map(decisionLine)
+  const unanswered = decisions.filter(decision => decision.text === undefined).map(decisionLine)
   return [
     'The author already settled these questions, each in a `Settled-decision` line of one of the commits. Do not raise any of them again, and write no point for them. A question one of them answers comes back only if the code contradicts the answer.',
     `**In this diff** — publish adds each to the canvas as a point resolved with the author's reason:\n\n${anchored.length === 0 ? '_none_' : anchored.join('\n')}`,
     `**Not in this diff** — the code changed after the commit, or sits outside the diff:\n\n${context.length === 0 ? '_none_' : context.join('\n')}`,
+    ...(unanswered.length === 0
+      ? []
+      : [
+          `**Raised, not answered** — the author asked these in a commit and gave no answer, so they are not settled. Write a point for one when the code still raises it:\n\n${unanswered.join('\n')}`,
+        ]),
   ].join('\n\n')
 }
 

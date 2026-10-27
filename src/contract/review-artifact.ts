@@ -369,6 +369,13 @@ export const SettlementSchema = z.object({
 })
 export type Settlement = z.infer<typeof SettlementSchema>
 
+/** A settled decision the author reopened on the canvas: the commit whose answer it set aside, and when. */
+export const ReopenedDecisionSchema = z.object({
+  commit: z.string().regex(/^[0-9a-f]{40}$/),
+  at: z.string(),
+})
+export type ReopenedDecision = z.infer<typeof ReopenedDecisionSchema>
+
 export const GeneratorSchema = z.object({
   agent: z.string().min(1),
   model: z.string().optional(),
@@ -401,6 +408,11 @@ export const ReviewArtifactSchema = z.object({
     .optional(),
   /** The points the author settled, by fingerprint. Absent until the author settles one. */
   settled: z.record(z.string(), SettlementSchema).optional(),
+  /**
+   * The settled decisions the author reopened, by fingerprint. Publish leaves such a point open on
+   * every later canvas, until a later commit decides it again. A release that predates it drops it.
+   */
+  reopened: z.record(z.string(), ReopenedDecisionSchema).optional(),
   /**
    * When the author last changed the canvas after it was generated. An import keeps whichever copy
    * of a commit's canvas is newest by this time, or by `generatedAt` when it was never revised.

@@ -144,17 +144,20 @@ export const SettledDecisionSchema = z.object({
   date: z.string(),
   /** The question the decision answers, when the line states one before the answer. */
   question: z.string().min(1).optional(),
-  /** The decision and its reason, as the line states them after any question. */
-  text: z.string().min(1),
+  /**
+   * The decision and its reason, as the line states them after any question. Absent when the line
+   * asks its question and gives no answer; such a decision is always context (`line` null).
+   */
+  text: z.string().min(1).optional(),
   path: z.string().min(1),
   side: SideSchema,
   line: z.number().int().positive().nullable(),
 })
 export type SettledDecision = z.infer<typeof SettledDecisionSchema>
 
-/** A decision as its line states it: the question, when there is one, then the answer. */
+/** A decision as its line states it: the question, then the answer, each when there is one. */
 export function statedDecision(decision: SettledDecision): string {
-  return decision.question === undefined ? decision.text : `${decision.question} ${decision.text}`
+  return [decision.question, decision.text].filter(part => part !== undefined).join(' ')
 }
 
 /**
