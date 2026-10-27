@@ -128,13 +128,21 @@ export function stopOutside(fragment) {
  * way while it is `all`. Made once for the app element; `redraw` runs after every render, before the deep
  * links follow the URL, so a link into a layer lands on a layer that is showing. The URL names
  * the section on the first draw; after that the section last shown is the reader's place.
+ *
+ * It is the one owner of the view the page shows, and of the layer view read in last, which the
+ * rail's switch goes back to from the one-point view and this browser keeps across a reload.
  * @param {HTMLElement} root
- * @param {{ view: LayerView, win?: Window }} opts
- * @returns {{ stop: () => void, setView: (view: LayerView) => void, redraw: () => void, place: () => string }}
+ * @param {{ view: LayerView, win?: Window, storage?: Storage | null }} opts
+ * @returns {{ stop: () => void, setView: (view: LayerView) => void, redraw: () => void, place: () => string, readonly view: LayerView, readonly layersView: 'all' | 'one' }}
  */
 export function initOneLayer(root, opts) {
   const win = opts.win ?? window
+  const storage =
+    opts.storage === undefined ? (typeof localStorage === 'undefined' ? null : localStorage) : opts.storage
   let view = opts.view
+  /** @type {'all' | 'one'} */
+  let layersView = view === 'points' ? readLayersView(storage) : view
+  writeLayersView(storage, layersView)
   /**
    * The fragment of the section on screen while one shows at a time, empty before the first draw.
    * A fragment and not the element, since a render replaces the sections.
@@ -269,6 +277,10 @@ export function initOneLayer(root, opts) {
     setView(next) {
       if (next !== view) {
         view = next
+        if (next !== 'points') {
+          layersView = next
+          writeLayersView(storage, next)
+        }
         // Coming from `all`, the reader is on the section the rail marks as being read. The
         // one-point view starts where the URL points, else from its first stop.
         shownHash =
@@ -279,6 +291,12 @@ export function initOneLayer(root, opts) {
       }
     },
     redraw,
+    get view() {
+      return view
+    },
+    get layersView() {
+      return layersView
+    },
     /**
      * The section on screen, as `#id`, while one shows at a time; empty while all show. The URL
      * does not always name it: opening a view on its first section writes nothing there.
