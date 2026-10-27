@@ -375,3 +375,25 @@ test('the settings dialog keeps the view on screen when the reader keeps unfinis
   await page.reload()
   await expect(page.locator('section.point-step:not([hidden])')).toHaveCount(1)
 })
+
+test('a comment posted in the points view is still on the page after switching to the layers', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  const inStop = page.locator('#step-p-1 li.finding')
+  await inStop.locator('[data-act="point-post"]').click()
+  await expect(inStop).toHaveAttribute('data-status', 'posted')
+  // The page is drawn again for the layers, with the comment posted since it loaded.
+  await page.locator('nav.rail .rail-view [data-view="layers"]').click()
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  const card = page.locator('section.layer li.finding[data-fingerprint="fp-1"]')
+  await expect(card).toHaveAttribute('data-status', 'posted')
+  await expect(card.getByRole('link', { name: /view comment/ })).toHaveAttribute(
+    'href',
+    'https://github.com/acme/widgets/pull/42#discussion_r5001'
+  )
+  await expect(page.locator('section.layer tr.thread[data-thread="5001"]')).toHaveCount(1)
+})

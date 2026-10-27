@@ -1281,6 +1281,28 @@ describe('comment composers', () => {
     ).toContain('agreed')
   })
 
+  it('shows a reply in every copy of its thread, the one in a stop too', async () => {
+    const { root } = setup({ comments: comments.map(c => ({ ...c, resolved: false })) })
+    const thread = root.querySelector('tr.thread[data-thread="1001"]')
+    if (thread === null) throw new Error('no thread 1001')
+    // The one-point view draws the thread again in a stop, after the layer's copy.
+    root.insertAdjacentHTML(
+      'beforeend',
+      `<section class="point-step" id="step-p-1"><table><tbody>${thread.outerHTML}</tbody></table></section>`
+    )
+    click(root, '#step-p-1 tr.thread[data-thread="1001"] [data-act="thread-reply"]')
+    const area = root.querySelector('#step-p-1 .thread-full .composer-box textarea')
+    if (!(area instanceof HTMLTextAreaElement)) throw new Error('no textarea in the stop')
+    area.value = 'agreed'
+    click(root, '#step-p-1 .thread-full [data-act="composer-post"]')
+    await flush()
+    const last = (/** @type {Element} */ copy) =>
+      [...copy.querySelectorAll('.cmt .prose')].at(-1)?.textContent
+    expect(
+      [...root.querySelectorAll('tr.thread[data-thread="1001"]')].map(copy => last(copy)?.includes('agreed'))
+    ).toEqual([true, true])
+  })
+
   it('comments on the pull request itself', async () => {
     const { root, calls } = setup()
     click(root, '[data-act="pr-comment"]')

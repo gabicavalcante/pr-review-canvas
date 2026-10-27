@@ -40,6 +40,7 @@ import { wireDropZone } from './import-zone.js'
 import { wireReview } from './interactions.js'
 import {
   defineLayerElements,
+  getRenderContext,
   pathSet,
   renderLayers,
   renderRail,
@@ -674,12 +675,23 @@ export class PrAppElement extends HTMLElement {
       writeLayersView(typeof localStorage === 'undefined' ? null : localStorage, next)
     }
     if (redraw && !kept && this.shown) {
-      // Drawn from the marks made since the bundle came, not the bundle's own.
+      // Drawn from what the page holds now, not what the bundle came with: the marks and settled
+      // points of the review session, and the comments posted since, which the page draws as
+      // they go out.
       const { session, shown } = this
+      const posted = getRenderContext()?.comments
       await this.render(
         session === null || shown.artifact === undefined
           ? shown
-          : { ...shown, state: session.state, artifact: { ...shown.artifact, settled: session.settled } },
+          : {
+              ...shown,
+              state: session.state,
+              artifact: { ...shown.artifact, settled: session.settled },
+              comments: {
+                ...shown.comments,
+                reviewComments: posted === undefined ? shown.comments.reviewComments : [...posted],
+              },
+            },
         undefined,
         { asked: true }
       )

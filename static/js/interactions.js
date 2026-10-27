@@ -722,18 +722,19 @@ export function wireReview(root, session, opts = {}) {
     /** @type {Element} */ composerNode,
     /** @type {ReviewComment} */ comment
   ) => {
-    const thread = root.querySelector(
-      `tr.thread[data-thread="${cssEscape(String(comment.inReplyToId ?? comment.id))}"]`
+    // The one-point view draws a thread again in a stop, so a reply goes into every copy of it.
+    const threads = Array.from(
+      root.querySelectorAll(
+        `tr.thread[data-thread="${cssEscape(String(comment.inReplyToId ?? comment.id))}"]`
+      )
     )
     const now = getRenderContext()?.now ?? new Date()
-    if (comment.inReplyToId !== undefined && thread !== null) {
-      const full = thread.querySelector('.thread-full')
-      const tbtns = full?.querySelector('.tbtns')
-      const template = doc.createElement('template')
-      template.innerHTML = commentHtml(comment, now)
-      const node = template.content.firstElementChild
-      if (node !== null) {
-        tbtns?.before(node)
+    if (comment.inReplyToId !== undefined && threads.length > 0) {
+      for (const thread of threads) {
+        const node = nodeFrom(doc, commentHtml(comment, now))
+        if (node !== null) {
+          thread.querySelector('.thread-full .tbtns')?.before(node)
+        }
       }
       composerNode.remove()
       return
