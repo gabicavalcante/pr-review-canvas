@@ -58,6 +58,22 @@ const STOP_SELECTOR = 'section.point-step'
 export const SHOW_IN_LAYERS = 'show-in-layers'
 
 /**
+ * The event a target in a card a stop holds sends up to the page, for a link the URL names: the
+ * stop gives its cards back to their layers, so the target lands in its layer, as every URL does.
+ */
+export const RETURN_STOP_CARDS = 'return-stop-cards'
+
+/**
+ * Sends the card that holds `el` back to its layer when a stop of the one-point view holds it.
+ * @param {Element} el
+ */
+export function bringHome(el) {
+  if (el.closest('[data-away]') !== null) {
+    el.dispatchEvent(new Event(RETURN_STOP_CARDS, { bubbles: true }))
+  }
+}
+
+/**
  * @typedef {{ path: string, side: 'new' | 'old', line: number, startLine?: number, body?: string, proposalFingerprint?: string, pointFingerprint?: string }} ComposeRequest
  * @typedef {{ href: string, compose?: ComposeRequest }} ShowInLayers
  */
@@ -68,14 +84,6 @@ export const SHOW_IN_LAYERS = 'show-in-layers'
  */
 export function showsStops(root) {
   return root.querySelector(STOP_SELECTOR) !== null
-}
-
-/**
- * A value quoted for a CSS attribute selector.
- * @param {string} value
- */
-function cssString(value) {
-  return `"${value.replace(/["\\]/g, '\\$&')}"`
 }
 
 /**
@@ -96,8 +104,8 @@ function stopShowing(root, el, prefer = null) {
   }
   const hunk = el.closest('table.diff')?.getAttribute('data-hunk') ?? null
   const showing =
-    `${STOP_SELECTOR}[data-stop-layer=${cssString(layer)}][data-stop-path=${cssString(path)}]` +
-    (hunk === null ? '' : `[data-stop-hunk=${cssString(hunk)}]`)
+    `${STOP_SELECTOR}[data-stop-layer="${cssEscape(layer)}"][data-stop-path="${cssEscape(path)}"]` +
+    (hunk === null ? '' : `[data-stop-hunk="${cssEscape(hunk)}"]`)
   if (prefer?.matches(showing) === true) {
     return prefer
   }
@@ -129,11 +137,11 @@ export function rowPreferringStop(root, key, side, line, prefer = null) {
  * @returns {{ el: HTMLElement, stop: HTMLElement | null } | null}
  */
 export function pointPreferringStop(root, fingerprint) {
-  const fp = cssString(fingerprint)
+  const fp = cssEscape(fingerprint)
   const el =
-    root.querySelector(`li.finding[data-fingerprint=${fp}]`) ??
-    root.querySelector(`[data-point][data-fingerprint=${fp}]`)
-  const stop = root.querySelector(`${STOP_SELECTOR}[data-stop-fingerprint=${fp}]`)
+    root.querySelector(`li.finding[data-fingerprint="${fp}"]`) ??
+    root.querySelector(`[data-point][data-fingerprint="${fp}"]`)
+  const stop = root.querySelector(`${STOP_SELECTOR}[data-stop-fingerprint="${fp}"]`)
   return el instanceof HTMLElement ? { el, stop: stop instanceof HTMLElement ? stop : null } : null
 }
 
@@ -237,6 +245,7 @@ export function jumpTo(href, root = document, preferStops = false) {
     }
     return true
   }
+  bringHome(el)
   scrollIntoViewSafe(el, block)
   flash(el)
   return true

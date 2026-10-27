@@ -7,7 +7,7 @@
 // layer on screen. With `points` it shows one stop of the one-point view at a time the same way
 // (`point-view.js`), and a link to a whole section swaps it in under a page that stays at the top.
 // With `all` this module does nothing.
-import { cssEscape } from './anchors.js'
+import { cssEscape, RETURN_STOP_CARDS } from './anchors.js'
 import { decodeHash, plainClick } from './deep-link.js'
 import { scrollIntoViewSafe } from './dom.js'
 import { layerAnchorId, layerStepAnchorId, pointAnchorId, stepAnchorId } from './keys.js'
@@ -111,14 +111,6 @@ export function writeLayersView(storage, view) {
 /** The style sheet that shows, in the stop on screen, only its point's chunk and its point's row. */
 const LENS_ID = 'stop-lens'
 
-/**
- * A value quoted for a CSS attribute selector.
- * @param {string} value
- */
-function cssString(value) {
-  return `"${value.replace(/["\\]/g, '\\$&')}"`
-}
-
 /** How many nodes were moved into a stop, so each move's way home has a name of its own. */
 let moves = 0
 
@@ -163,7 +155,7 @@ export function placeStopCards(root, stop) {
   const card =
     path === null || layer === null
       ? null
-      : root.querySelector(`article.file[data-layer=${cssString(layer)}][data-path=${cssString(path)}]`)
+      : root.querySelector(`article.file[data-layer="${cssEscape(layer)}"][data-path="${cssEscape(path)}"]`)
   if (!(card instanceof HTMLElement) || fileSlot === null || hunk === null) {
     return
   }
@@ -180,8 +172,8 @@ export function placeStopCards(root, stop) {
     root.append(lens)
   }
   lens.textContent =
-    `.point-step article.file table.diff:not([data-hunk=${cssString(hunk)}]) { display: none; }\n` +
-    `.point-step article.file tr.ifind:not([data-fingerprint=${cssString(fingerprint)}]) { display: none; }`
+    `.point-step article.file table.diff:not([data-hunk="${cssEscape(hunk)}"]) { display: none; }\n` +
+    `.point-step article.file tr.ifind:not([data-fingerprint="${cssEscape(fingerprint)}"]) { display: none; }`
 }
 
 /**
@@ -191,7 +183,7 @@ export function placeStopCards(root, stop) {
  */
 export function returnStopCards(root) {
   for (const node of Array.from(root.querySelectorAll('[data-away]'))) {
-    const home = root.querySelector(`[data-home=${cssString(node.getAttribute('data-away') ?? '')}]`)
+    const home = root.querySelector(`[data-home="${cssEscape(node.getAttribute('data-away') ?? '')}"]`)
     node.removeAttribute('data-away')
     home?.replaceWith(node)
     const card = node.matches('article.file') ? node : node.querySelector('article.file')
@@ -310,6 +302,7 @@ export function initOneLayer(root, opts) {
 
   // Everything that scrolls to a target raises `reveal-code` on it first; a target inside a
   // hidden layer brings that layer on screen the same way it opens a code fold around it.
+  root.addEventListener(RETURN_STOP_CARDS, () => returnStopCards(root), { signal: listeners.signal })
   root.addEventListener('reveal-code', event => show(sectionOf(root, event.target)), {
     signal: listeners.signal,
   })

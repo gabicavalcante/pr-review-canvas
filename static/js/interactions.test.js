@@ -1524,6 +1524,15 @@ describe('keyboard', () => {
     expect(card?.hasAttribute('data-expanded')).toBe(false)
   })
 
+  it('steps to another point’s stop with its card in focus, though the card comes in only as it shows', () => {
+    const { root } = setup({ points: true })
+    // Back to the layer's opening stop: the point's card goes home to its layer.
+    key('p')
+    expect(root.querySelector('#step-p-1 #point-p-1')).toBeNull()
+    key('n')
+    expect(root.querySelector('#step-p-1 .is-focused')?.id).toBe('point-p-1')
+  })
+
   it('steps to the point on screen with ], its card in focus, and says in the stop a dismissal failed', async () => {
     const { root } = setup({
       points: true,

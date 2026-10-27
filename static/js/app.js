@@ -361,11 +361,11 @@ export class PrAppElement extends HTMLElement {
         bundle.marksCarriedFrom === undefined
           ? ''
           : marksCarriedBarHtml(bundle.marksCarriedFrom, bundle.canvas?.headSha ?? '')
-      const points = this.layerView?.view === 'points'
+      // The layers' page; the one-point view adds its parts once the review session exists.
       this.innerHTML =
         header +
         bannerHtml(bundle.warnings) +
-        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state, { points })}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now, ...(points ? { wayOn: overviewWayOnHtml(artifact) } : {}) })}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}${points ? renderPointSteps(artifact, files, bundle.state, bundle.comments.reviewComments) : ''}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
+        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state)}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now })}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
         footerHtml(boot.version, bundle)
       // A bar the reader dismissed goes before the review wiring measures the outdated bar.
       wireBarDismissal(this, storage)
@@ -396,6 +396,7 @@ export class PrAppElement extends HTMLElement {
         ...(canvasManifest === null ? {} : { canvasMergeBaseSha: canvasManifest.mergeBaseSha }),
       })
       this.session = session
+      if (this.layerView?.view === 'points') this.drawPointsParts(true)
       const interactions = wireReview(this, session, {
         chat: () => this.chat,
         openReview: () => (this.chat ?? this.reviewPane)?.openReview(),
@@ -568,57 +569,74 @@ export class PrAppElement extends HTMLElement {
     }
   }
 
-  /**
-   * Whether a composer, the review message, the sign-off or AI Chat holds text not sent yet; inside
-   * `scope` only, when it is given.
-   * @param {ParentNode} [scope]
-   */
-  holdsUnfinishedText(scope) {
+  /** Whether a composer, the review message, the sign-off or AI Chat holds text not sent yet. */
+  holdsUnfinishedText() {
     return (
-      (scope === undefined && this.chat?.holdsUnsent() === true) ||
-      [
-        ...(scope ?? this).querySelectorAll('.composer-box textarea, #msg, #signoff-dialog[open] textarea'),
-      ].some(el => el instanceof HTMLTextAreaElement && el.value !== el.defaultValue)
+      this.chat?.holdsUnsent() === true ||
+      [...this.querySelectorAll('.composer-box textarea, #msg, #signoff-dialog[open] textarea')].some(
+        el => el instanceof HTMLTextAreaElement && el.value !== el.defaultValue
+      )
     )
   }
 
   /**
-   * Whether moving to `view` would take away text the reader has not sent: leaving the one-point
-   * view takes its stops off the page, with a composer open in one of them.
+   * Whether moving to `view` would take away text the reader has not sent. Leaving the one-point
+   * view takes its stops off the page, but a card a stop holds goes back to its layer first, with
+   * whatever is typed in it; only a stop's own card, a point's the layers draw none for, goes away.
    * @param {import('./layer-views.js').LayerView} view
    */
   switchDiscards(view) {
     const stops = this.querySelector(`#${POINT_STEPS_ID}`)
-    return view !== 'points' && stops !== null && this.holdsUnfinishedText(stops)
+    return (
+      view !== 'points' &&
+      stops !== null &&
+      [...stops.querySelectorAll('.composer-box textarea')].some(
+        el =>
+          el instanceof HTMLTextAreaElement &&
+          el.value !== el.defaultValue &&
+          el.closest('[data-away]') === null
+      )
+    )
   }
 
   /**
-   * Shows `view` on the page as it is, without drawing it again. Only the one-point view adds to
-   * the page, its stops after the layers, the overview's way on and the rail's points, so a move
-   * into or out of it puts them in or takes them away, drawn from the marks, settled points and
-   * comments the page holds now. Every other part, and what the reader did in it, stays.
+   * Puts on the page what the one-point view adds to it, or takes it away: its stops after the
+   * layers, the overview's way on, and the rail's points. They are drawn from what the page holds
+   * now, the marks and settled points of the review session and the comments the page shows, both
+   * when the page is drawn in that view and when the reader switches to it.
+   * @param {boolean} points
+   * @returns {boolean} false on a screen with no canvas, which has none of them
+   */
+  drawPointsParts(points) {
+    const ctx = getRenderContext()
+    const session = this.session
+    const main = qs('#main', this)
+    if (ctx === null || session === null || main === null) {
+      return false
+    }
+    const artifact = { ...ctx.artifact, settled: session.settled }
+    // The cards a stop holds are the layers' own: they go home before the stops go away.
+    this.layerView?.returnCards()
+    this.querySelector(`#${POINT_STEPS_ID}`)?.remove()
+    this.querySelector('#overview > nav.step-nav')?.remove()
+    if (points) {
+      main.insertAdjacentHTML('beforeend', renderPointSteps(artifact, ctx.files, session.state, ctx.comments))
+      qs('#overview', this)?.insertAdjacentHTML('beforeend', overviewWayOnHtml(artifact))
+    }
+    qs('nav.rail', this)?.toggleAttribute('data-points', points)
+    refreshRail(this, artifact, session.state)
+    return true
+  }
+
+  /**
+   * Shows `view` on the page as it is, without drawing it again: a move into or out of the
+   * one-point view adds or takes away its parts, and every other part, and what the reader did in
+   * it, stays.
    * @param {import('./layer-views.js').LayerView} view
    */
   showView(view) {
     const points = view === 'points'
-    const ctx = getRenderContext()
-    const session = this.session
-    const main = qs('#main', this)
-    if ((this.layerView?.view === 'points') !== points && ctx !== null && session !== null && main !== null) {
-      const artifact = { ...ctx.artifact, settled: session.settled }
-      // The cards a stop holds are the layers' own: they go home before the stops go away.
-      this.layerView?.returnCards()
-      this.querySelector(`#${POINT_STEPS_ID}`)?.remove()
-      this.querySelector('#overview > nav.step-nav')?.remove()
-      if (points) {
-        main.insertAdjacentHTML(
-          'beforeend',
-          renderPointSteps(artifact, ctx.files, session.state, ctx.comments)
-        )
-        qs('#overview', this)?.insertAdjacentHTML('beforeend', overviewWayOnHtml(artifact))
-      }
-      qs('nav.rail', this)?.toggleAttribute('data-points', points)
-      refreshRail(this, artifact, session.state)
+    if ((this.layerView?.view === 'points') !== points && this.drawPointsParts(points)) {
       // The spy reads the rail's links, and the diagrams the page, once each: both start again.
       this.diagrams?.stop()
       this.diagrams = initDiagrams(this)

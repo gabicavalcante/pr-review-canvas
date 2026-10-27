@@ -4,9 +4,10 @@
 // so `…/review/278#line:path/to/file.ts:40` opens the page on that line and a click on a link
 // leaves a URL the reader can share. The jump itself is `jumpTo` in anchors.js; this module
 // decides when it runs. A link the reader follows on the page, in the one-point view, opens the
-// stop that draws its line, or the layers when no stop does; the URL the page opens with, and back
-// and forward, land in the layer.
+// stop that shows its target, or the layers when no stop does; the URL the page opens with, and
+// back and forward, land in the layer, a stop giving back the card it holds first.
 import {
+  bringHome,
   drawCardsOf,
   jumpTo,
   keyFromPath,
@@ -44,7 +45,8 @@ export function decodeHash(hash) {
  * with its escapes resolved, which is how the same link comes back out of the URL bar.
  * @param {string} href
  * @param {ParentNode} [root]
- * @param {{ preferStops?: boolean }} [opts] `preferStops` sends a line link to a stop that draws it
+ * @param {{ preferStops?: boolean }} [opts] `preferStops`, for a link the reader follows: in the
+ *   one-point view it goes to the stop that shows its target
  * @returns {boolean}
  */
 export function followLink(href, root = document, opts = {}) {
@@ -113,13 +115,14 @@ function jumpToLine(root, link) {
   if (near.approx) {
     near.row.classList.add('is-approx')
   }
+  bringHome(near.row)
   scrollIntoViewSafe(near.row)
   flash(near.row)
   return true
 }
 
 /**
- * In the one-point view, a line link the reader follows goes to the stop that draws the line, or
+ * In the one-point view, a line link the reader follows goes to the stop that shows the line, or
  * asks the page for its layers when no stop does. False outside that view, and for a line on no
  * row at all, which `jumpToLine` then lands near.
  * @param {ParentNode} root

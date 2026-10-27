@@ -598,7 +598,9 @@ export function wireReview(root, session, opts = {}) {
         ? stops.find((stop, index) => index > at && fits(stop))
         : stops.findLast((stop, index) => at >= 0 && index < at && fits(stop)))
     if (next !== undefined) {
-      // A point's stop puts its card in focus, so the point keys act on that point.
+      // The stop shows first, which moves its point's card into it; then the card takes the focus,
+      // so the point keys act on that point.
+      next.dispatchEvent(new Event('reveal-code', { bubbles: true }))
       const card = next.querySelector('li.finding[data-point]')
       focusItem(card ?? next, card === null ? 'start' : 'center')
       if (next !== shown) {
@@ -678,8 +680,8 @@ export function wireReview(root, session, opts = {}) {
 
   /**
    * Opens the composer on a line the reader did not click, such as an attention point's or one a
-   * chat proposal names. In the one-point view it opens in the stop that draws the line, `scope`
-   * first; with no stop drawing it, the page moves to its layers and opens it there. Returns why it
+   * chat proposal names. In the one-point view it opens in the stop that shows the line, `stop`
+   * first; with no stop showing it, the page moves to its layers and opens it there. Returns why it
    * could not, or null.
    * @param {import('./anchors.js').ComposeRequest} request
    * @param {HTMLElement | null} [stop] the stop to open it in when that stop shows the line, such as

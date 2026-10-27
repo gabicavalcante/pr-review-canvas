@@ -10,6 +10,7 @@ import { pointSteps, stopsOf } from './point-steps.js'
 import { pointCollapses } from './points.js'
 import { hunkIdForPoint, renderLayers } from './layers.js'
 import { placeStopCards, returnStopCards } from './one-layer.js'
+import { cssEscape } from './anchors.js'
 
 const artifact = syntheticArtifact()
 const files = SYNTHETIC_FILES.map(toFileEntry)
@@ -206,7 +207,7 @@ describe('a stop on screen holds the layer’s own cards', () => {
     expect(file?.querySelector('.file-body')?.hasAttribute('hidden')).toBe(false)
     // Only the point’s chunk and its own row show in the stop.
     const lens = document.querySelector('#stop-lens')?.textContent ?? ''
-    expect(lens).toContain(`data-hunk="${stop.getAttribute('data-stop-hunk')}"`)
+    expect(lens).toContain(`data-hunk="${cssEscape(stop.getAttribute('data-stop-hunk') ?? '')}"`)
     expect(lens).toContain('data-fingerprint="fp-1"')
 
     returnStopCards(root)

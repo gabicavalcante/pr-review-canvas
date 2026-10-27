@@ -333,8 +333,34 @@ test('a switch keeps unfinished text in the layers, with no question', async ({ 
   expect(questions).toEqual([])
 })
 
-test('leaving the points view asks before it takes away text in a stop', async ({ page, reviewUrl }) => {
+test('leaving the points view keeps text typed in a stop, in its layer, with no question', async ({
+  page,
+  reviewUrl,
+}) => {
   await page.goto(reviewUrl)
+  const questions: string[] = []
+  page.on('dialog', dialog => {
+    questions.push(dialog.message())
+    void dialog.dismiss()
+  })
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  const stop = page.locator('#step-p-1')
+  await stop.locator('#L-src_app_ts-new-4 td.ln').nth(1).click()
+  await stop.locator('tr.sel-bar [data-act="comment-selection"]').click()
+  await stop.locator('tr.composer .composer-box textarea').fill('in the stop')
+  // The stop holds the layer's own card, which goes home with what is typed in it.
+  await page.locator('nav.rail .rail-view [data-view="layers"]').click()
+  await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(page.locator('pr-layer tr.composer .composer-box textarea')).toHaveValue('in the stop')
+  expect(questions).toEqual([])
+})
+
+test('leaving the points view asks before it takes away text in a stop’s own card', async ({
+  page,
+  selfReviewUrl,
+}) => {
+  await page.goto(selfReviewUrl)
   const saves: unknown[] = []
   page.on('request', request => {
     if (request.method() === 'PUT' && new URL(request.url()).pathname.endsWith('/api/settings')) {
@@ -342,12 +368,11 @@ test('leaving the points view asks before it takes away text in a stop', async (
     }
   })
   await page.locator('nav.rail .rail-view [data-view="points"]').click()
-  await page.locator('nav.rail a[href="#step-p-1"]').click()
-  const stop = page.locator('#step-p-1')
-  await stop.locator('#L-src_app_ts-new-4 td.ln').nth(1).click()
-  await stop.locator('tr.sel-bar [data-act="comment-selection"]').click()
-  const draft = stop.locator('tr.composer .composer-box textarea')
-  await draft.fill('in the stop')
+  // The Other layer lists no point cards, so this point's card is its stop's own.
+  await page.locator('nav.rail a[href="#step-p-2"]').click()
+  const card = page.locator('#step-p-2 #point-p-2')
+  await card.locator('[data-act="point-settle"]').click()
+  await card.locator('.settle-box textarea').fill('a reason not saved yet')
   const before = saves.length
   // Keeping the text keeps the view and the setting.
   page.once('dialog', dialog => void dialog.dismiss())
@@ -356,7 +381,7 @@ test('leaving the points view asks before it takes away text in a stop', async (
     'aria-pressed',
     'true'
   )
-  await expect(draft).toHaveValue('in the stop')
+  await expect(card.locator('.settle-box textarea')).toHaveValue('a reason not saved yet')
   expect(saves.length).toBe(before)
   // Discarding it switches.
   page.once('dialog', dialog => void dialog.accept())
@@ -365,28 +390,24 @@ test('leaving the points view asks before it takes away text in a stop', async (
   expect(saves.length).toBe(before + 1)
 })
 
-test('the settings dialog keeps the points view when the reader keeps text in a stop', async ({
+test('the settings dialog keeps the points view when the reader keeps text in a stop’s own card', async ({
   page,
-  reviewUrl,
+  selfReviewUrl,
 }) => {
-  await page.goto(reviewUrl)
+  await page.goto(selfReviewUrl)
   await page.locator('nav.rail .rail-view [data-view="points"]').click()
-  await page.locator('nav.rail a[href="#step-p-1"]').click()
-  const stop = page.locator('#step-p-1')
-  await stop.locator('#L-src_app_ts-new-4 td.ln').nth(1).click()
-  await stop.locator('tr.sel-bar [data-act="comment-selection"]').click()
-  const draft = stop.locator('tr.composer .composer-box textarea')
-  await draft.fill('not sent yet')
+  await page.locator('nav.rail a[href="#step-p-2"]').click()
+  const card = page.locator('#step-p-2 #point-p-2')
+  await card.locator('[data-act="point-settle"]').click()
+  await card.locator('.settle-box textarea').fill('a reason not saved yet')
   await page.locator('#settings').click()
   await page.locator('#set-layer-view').selectOption('one')
   page.once('dialog', dialog => void dialog.dismiss())
   await page.locator('[data-act="settings-save"]').click()
   // The setting is saved, but the page stays as it is, and says when the view changes.
   await expect(page.locator('.toast')).toContainText('the view changes to one at a time on the next load')
-  await expect(stop).toBeVisible()
-  await expect(draft).toHaveValue('not sent yet')
-  await page.reload()
-  await expect(page.locator('section.point-step')).toHaveCount(0)
+  await expect(page.locator('#step-p-2')).toBeVisible()
+  await expect(card.locator('.settle-box textarea')).toHaveValue('a reason not saved yet')
 })
 
 test('a comment posted in the points view is still on the page after switching to the layers', async ({
@@ -480,4 +501,21 @@ test('r and R mark the file and the layer of the stop on screen reviewed', async
   await expect(file.locator('input[data-reviewed-id]')).toBeChecked()
   // The stop keeps its code in sight.
   await expect(file.locator('.file-body')).toBeVisible()
+})
+
+test('a line link the URL names lands in its layer, also while a stop holds its card', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  await expect(page.locator('#step-p-1 #L-src_app_ts-new-4')).toHaveCount(1)
+  // A fragment the URL gets, as back and forward give it, not a link the reader follows.
+  await page.evaluate(() => {
+    window.location.hash = '#line:src/app.ts:4'
+  })
+  await expect(page.locator('pr-layer #L-src_app_ts-new-4')).toBeInViewport()
+  await expect(page.locator('#layer-run-path')).toBeVisible()
+  await expect(page.locator('#step-p-1')).toBeHidden()
 })
