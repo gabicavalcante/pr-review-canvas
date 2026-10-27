@@ -589,15 +589,22 @@ export function wireReview(root, session, opts = {}) {
     const at = stops.findIndex(stop => stop instanceof HTMLElement && !stop.hidden)
     const fits = (/** @type {Element} */ stop) =>
       kind === 'file' || (kind === 'layer' ? stop.classList.contains('layer-step') : open.has(stop.id))
+    const shown = stops[at]
+    // The point on screen comes first while nothing in its stop is in focus, as ] does elsewhere.
+    const onScreen =
+      kind === 'point' && shown !== undefined && fits(shown) && !shown.contains(focused()) ? shown : undefined
     const next =
-      direction === 1
+      onScreen ??
+      (direction === 1
         ? stops.find((stop, index) => index > at && fits(stop))
-        : stops.findLast((stop, index) => at >= 0 && index < at && fits(stop))
+        : stops.findLast((stop, index) => at >= 0 && index < at && fits(stop)))
     if (next !== undefined) {
       // A point's stop puts its card in focus, so the point keys act on that point.
       const card = next.querySelector('li.finding[data-point]')
       focusItem(card ?? next, card === null ? 'start' : 'center')
-      window.history.pushState(null, '', `#${next.id}`)
+      if (next !== shown) {
+        window.history.pushState(null, '', `#${next.id}`)
+      }
     }
     return true
   }
