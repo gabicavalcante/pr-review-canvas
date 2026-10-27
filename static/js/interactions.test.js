@@ -93,6 +93,11 @@ function bundleFor(state, canvas = artifact) {
 /** The one-layer controller of a page set up in the one-point view, stopped after each test. */
 /** @type {ReturnType<typeof initOneLayer> | null} */
 let pointsView = null
+afterEach(() => {
+  pointsView?.stop()
+  pointsView = null
+  window.location.hash = ''
+})
 
 /**
  * The whole review screen, hydrated and wired, with a fake API in place of the server.
@@ -1291,26 +1296,19 @@ describe('comment composers', () => {
     ).toContain('agreed')
   })
 
-  it('shows a reply in every copy of its thread, the one in a stop too', async () => {
-    const { root } = setup({ comments: comments.map(c => ({ ...c, resolved: false })) })
-    const thread = root.querySelector('tr.thread[data-thread="1001"]')
-    if (thread === null) throw new Error('no thread 1001')
-    // The one-point view draws the thread again in a stop, after the layer's copy.
-    root.insertAdjacentHTML(
-      'beforeend',
-      `<section class="point-step" id="step-p-1"><table><tbody>${thread.outerHTML}</tbody></table></section>`
-    )
+  it('shows a reply posted in a stop in that stop, with the thread on the page once', async () => {
+    const { root } = setup({ points: true, comments: comments.map(c => ({ ...c, resolved: false })) })
+    expect(root.querySelectorAll('tr.thread[data-thread="1001"]')).toHaveLength(1)
+    expect(root.querySelector('#step-p-1 tr.thread[data-thread="1001"]')).not.toBeNull()
     click(root, '#step-p-1 tr.thread[data-thread="1001"] [data-act="thread-reply"]')
     const area = root.querySelector('#step-p-1 .thread-full .composer-box textarea')
     if (!(area instanceof HTMLTextAreaElement)) throw new Error('no textarea in the stop')
     area.value = 'agreed'
     click(root, '#step-p-1 .thread-full [data-act="composer-post"]')
     await flush()
-    const last = (/** @type {Element} */ copy) =>
-      [...copy.querySelectorAll('.cmt .prose')].at(-1)?.textContent
     expect(
-      [...root.querySelectorAll('tr.thread[data-thread="1001"]')].map(copy => last(copy)?.includes('agreed'))
-    ).toEqual([true, true])
+      [...root.querySelectorAll('#step-p-1 tr.thread[data-thread="1001"] .cmt .prose')].at(-1)?.textContent
+    ).toContain('agreed')
   })
 
   it('comments on the pull request itself', async () => {
@@ -1526,31 +1524,20 @@ describe('keyboard', () => {
     expect(card?.hasAttribute('data-expanded')).toBe(false)
   })
 
-  it('steps to a point’s stop with its card in focus, and acts on the copy in that stop', async () => {
+  it('steps to the point on screen with ], its card in focus, and says in the stop a dismissal failed', async () => {
     const { root } = setup({
+      points: true,
       api: {
         putDismissed: async () => {
           throw new Error('offline')
         },
       },
     })
-    const card = root.querySelector('#point-p-1')
-    if (card === null) throw new Error('no card for p-1')
-    root.insertAdjacentHTML(
-      'beforeend',
-      '<section class="point-step layer-step" id="step-layer-run-path"></section>' +
-        `<section class="point-step" id="step-p-1" hidden><ol class="findings">${card.outerHTML.replace('id="point-p-1"', 'id="step-p-1-card"')}</ol></section>`
-    )
     key(']')
-    expect(root.querySelector('.is-focused')?.id).toBe('step-p-1-card')
-    // The one-point view shows the stop and hides the rest; the layer's copy is out of sight.
-    root.querySelector('#step-layer-run-path')?.setAttribute('hidden', '')
-    root.querySelector('#step-p-1')?.removeAttribute('hidden')
+    expect(root.querySelector('#step-p-1 .is-focused')?.id).toBe('point-p-1')
     key('d')
     await flush()
-    // A refused dismissal says so next to the copy the reader is on.
-    const error = (/** @type {string} */ id) => root.querySelector(`#${id} .cmd-err`)?.textContent ?? null
-    expect([error('step-p-1-card'), error('point-p-1')]).toEqual(['offline', null])
+    expect(root.querySelector('#step-p-1 .cmd-err')?.textContent).toBe('offline')
   })
 
   it('moves the keyboard focus with the ring', () => {
@@ -2461,12 +2448,6 @@ describe('the AI Chat commands', () => {
 })
 
 describe('in the one-point view’s stops', () => {
-  afterEach(() => {
-    pointsView?.stop()
-    pointsView = null
-    window.location.hash = ''
-  })
-
   /** @param {ParentNode} root @param {string} selector */
   function pointerDown(root, selector) {
     const cell = root.querySelector(selector)

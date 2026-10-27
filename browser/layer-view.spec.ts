@@ -439,3 +439,45 @@ test('a stop keeps its code open when the reading level changes, a reviewed file
   await page.locator('#fold-level').selectOption('aggressive')
   await expect(file.locator('.file-body')).toBeVisible()
 })
+
+test('a chunk, file or layer link followed in the points view lands on the stop that shows it', async ({
+  page,
+  reviewUrl,
+}) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  const follow = async (href: string) => {
+    await page.evaluate(link => {
+      const a = document.createElement('a')
+      a.href = link
+      a.setAttribute('data-link', link)
+      a.textContent = link
+      a.className = 'test-link'
+      document.querySelector('section.point-step:not([hidden]) .step-h')?.append(a)
+    }, href)
+    await page.locator('a.test-link').last().click()
+  }
+  // The point's chunk and its file are the stop's own: the reader stays there.
+  await follow('#hunk:src/app.ts#1')
+  await expect(page.locator('#step-p-1')).toBeVisible()
+  await follow('#file:src/app.ts')
+  await expect(page.locator('#step-p-1')).toBeVisible()
+  // A layer opens on its opening stop, not on its section.
+  await follow('#layer:run-path')
+  await expect(page.locator('#step-layer-run-path')).toBeVisible()
+  await expect(page.locator('section.layer:visible')).toHaveCount(0)
+})
+
+test('r and R mark the file and the layer of the stop on screen reviewed', async ({ page, reviewUrl }) => {
+  await page.goto(reviewUrl)
+  await page.locator('nav.rail .rail-view [data-view="points"]').click()
+  await page.locator('nav.rail a[href="#step-p-1"]').click()
+  await page.keyboard.press(']')
+  await expect(page.locator('#step-p-1 #point-p-1')).toHaveClass(/is-focused/)
+  await page.keyboard.press('r')
+  const file = page.locator('#step-p-1 article.file')
+  await expect(file.locator('input[data-reviewed-id]')).toBeChecked()
+  // The stop keeps its code in sight.
+  await expect(file.locator('.file-body')).toBeVisible()
+})

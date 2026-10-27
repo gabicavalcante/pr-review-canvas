@@ -262,12 +262,6 @@ export function wireReview(root, session, opts = {}) {
   const readReviewBody = opts.fetchReviewBody ?? fetchReviewBody
   /** @type {Selection | null} */
   let selection = null
-  /**
-   * The file card the selection was made in: the one-point view draws a file again in a stop,
-   * under the same row ids, so the rows are marked and commented on in that card.
-   * @type {Element | null}
-   */
-  let selectionCard = null
   /** The element that holds the focus ring: a card, an attention point, or a point's row. */
   /** @type {HTMLElement | null} */
   let focusedEl = null
@@ -617,7 +611,7 @@ export function wireReview(root, session, opts = {}) {
   /** @param {Selection | null} next */
   const setSelection = next => {
     selection = next
-    markSelection(root, selection, selectionCard ?? root)
+    markSelection(root, selection)
     applyCapabilityGating(root, session.capabilities)
   }
 
@@ -671,13 +665,11 @@ export function wireReview(root, session, opts = {}) {
   }
 
   /**
-   * Opens the composer on a line the reader picked in a file card. `scope` is that card: the
-   * one-point view draws a file again in a stop, under the same row ids.
+   * Opens the composer on a line the reader picked in a file card.
    * @param {{ key: string, path: string, side: 'new' | 'old', line: number, startLine?: number }} target
-   * @param {ParentNode} [scope]
    */
-  const openLineComposer = (target, scope = root) => {
-    const row = findRow(scope, target.key, target.side, target.line)
+  const openLineComposer = target => {
+    const row = findRow(root, target.key, target.side, target.line)
     if (row === null) {
       return null
     }
@@ -728,26 +720,21 @@ export function wireReview(root, session, opts = {}) {
     /** @type {Element} */ composerNode,
     /** @type {ReviewComment} */ comment
   ) => {
-    // The one-point view draws a thread again in a stop, so a reply goes into every copy of it.
-    const threads = Array.from(
-      root.querySelectorAll(
-        `tr.thread[data-thread="${cssEscape(String(comment.inReplyToId ?? comment.id))}"]`
-      )
+    const thread = root.querySelector(
+      `tr.thread[data-thread="${cssEscape(String(comment.inReplyToId ?? comment.id))}"]`
     )
     const now = getRenderContext()?.now ?? new Date()
-    if (comment.inReplyToId !== undefined && threads.length > 0) {
-      for (const thread of threads) {
-        const node = nodeFrom(doc, commentHtml(comment, now))
-        if (node !== null) {
-          thread.querySelector('.thread-full .tbtns')?.before(node)
-        }
+    if (comment.inReplyToId !== undefined && thread !== null) {
+      const node = nodeFrom(doc, commentHtml(comment, now))
+      if (node !== null) {
+        thread.querySelector('.thread-full .tbtns')?.before(node)
       }
       composerNode.remove()
       return
     }
     const host = composerNode.closest('tr') ?? composerNode
     // The thread is on its line already once posting drew it into the cards; the box just goes.
-    if (threads.length === 0) {
+    if (thread === null) {
       const template = doc.createElement('template')
       template.innerHTML = `<table><tbody>${threadRowHtml({ root: comment, replies: [], resolved: false, outdated: comment.outdated, path: comment.path, side: comment.side, line: comment.line }, { now })}</tbody></table>`
       const row = template.content.querySelector('tr')
@@ -1144,17 +1131,11 @@ export function wireReview(root, session, opts = {}) {
       if (path === undefined || !Number.isInteger(line) || line <= 0) {
         return
       }
-      openLineComposer(
-        { key, path, side: el.getAttribute('data-side') === 'old' ? 'old' : 'new', line },
-        el.closest('article.file') ?? root
-      )
+      openLineComposer({ key, path, side: el.getAttribute('data-side') === 'old' ? 'old' : 'new', line })
     },
     'comment-selection': () => {
       if (selection !== null) {
-        openLineComposer(
-          { ...selection, line: selection.end, startLine: selection.start },
-          selectionCard ?? root
-        )
+        openLineComposer({ ...selection, line: selection.end, startLine: selection.start })
       }
     },
     'composer-post': el => {
@@ -1389,7 +1370,6 @@ export function wireReview(root, session, opts = {}) {
       return
     }
     event.preventDefault()
-    selectionCard = event.target instanceof Element ? event.target.closest('article.file') : null
     setSelection(
       selectionReducer(
         selection,
@@ -1472,8 +1452,9 @@ export function wireReview(root, session, opts = {}) {
       }
       case 'reviewed-file':
       case 'reviewed-layer': {
-        // A point in focus stands for the card that holds it.
-        const itemId = itemAround(order, focused())
+        // A point in focus stands for the card that holds it; in a stop, for the file the stop shows.
+        const inStop = focused()?.closest('section.point-step')?.querySelector('article.file') ?? null
+        const itemId = itemAround(order, inStop ?? focused())
         const item = order.find(i => i.id === itemId)
         const wanted = decided.action === 'reviewed-file' ? 'file' : 'layer'
         const found =
@@ -1491,10 +1472,7 @@ export function wireReview(root, session, opts = {}) {
       }
       case 'comment': {
         if (selection !== null) {
-          openLineComposer(
-            { ...selection, line: selection.end, startLine: selection.start },
-            selectionCard ?? root
-          )
+          openLineComposer({ ...selection, line: selection.end, startLine: selection.start })
           break
         }
         // With nothing selected, c comments on the line of the attention point in focus, in the
@@ -1512,7 +1490,7 @@ export function wireReview(root, session, opts = {}) {
       }
       case 'dismiss': {
         const point = focusedPoint(points)
-        // The point in focus, in its stop or its layer, before any other copy of it.
+        // The point in focus, its card or its row in the diff.
         const holder = focused()?.closest('[data-point]') ?? null
         const button =
           point === undefined

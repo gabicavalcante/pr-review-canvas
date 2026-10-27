@@ -124,14 +124,11 @@ export function selectionToolbarHtml(selection) {
 /**
  * Marks the selected rows and puts the toolbar under the last one. Removes the marks of the
  * previous selection first, so calling it again with any selection leaves one set of marks.
- * `scope` is the file card the selection was made in: the one-point view draws a file again in a
- * stop, under the same row ids.
  * @param {ParentNode} root
  * @param {Selection | null} selection
- * @param {ParentNode} [scope]
  * @returns {HTMLTableRowElement | null} the row the toolbar was added after
  */
-export function markSelection(root, selection, scope = root) {
+export function markSelection(root, selection) {
   for (const row of Array.from(root.querySelectorAll('tr.is-selected'))) {
     row.classList.remove('is-selected')
   }
@@ -144,7 +141,7 @@ export function markSelection(root, selection, scope = root) {
   /** @type {HTMLTableRowElement | null} */
   let last = null
   for (let line = selection.start; line <= selection.end; line++) {
-    const row = findRow(scope, selection.key, selection.side, line)
+    const row = findRow(root, selection.key, selection.side, line)
     if (row) {
       row.classList.add('is-selected')
       last = row

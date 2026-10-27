@@ -2,7 +2,7 @@
 // Ids and lookups for diff rows. The id builders live in keys.js (shared with the server);
 // this module adds the DOM side: finding a row, the nearest visible row, and jumping to a link.
 import { flash, scrollIntoViewSafe } from './dom.js'
-import { buildLineId, fileAnchorId, sanitizeKey } from './keys.js'
+import { buildLineId, fileAnchorId, layerStepAnchorId, sanitizeKey } from './keys.js'
 import { linkTargetId, parseLink } from './links.js'
 
 export {
@@ -79,22 +79,25 @@ function cssString(value) {
 }
 
 /**
- * The stop of the one-point view that shows a line's row: the stop of a point on the row's chunk
- * of the row's file card, the one on screen when it is one of them. Null for a row no stop shows.
+ * The stop of the one-point view that shows `el`, a line's row, a chunk, or a file card: the stop
+ * of a point on that chunk of that file card (on any of its chunks, for the card itself), the one
+ * on screen when it is one of them. Null for something no stop shows.
  * @param {ParentNode} root
- * @param {Element} row
- * @param {HTMLElement | null} prefer a stop to take when it shows the row, such as its point's own
+ * @param {Element} el
+ * @param {HTMLElement | null} [prefer] a stop to take when it shows `el`, such as its point's own
  * @returns {HTMLElement | null}
  */
-function stopShowingRow(root, row, prefer) {
-  const card = row.closest('article.file')
-  const hunk = row.closest('table.diff')?.getAttribute('data-hunk') ?? null
+function stopShowing(root, el, prefer = null) {
+  const card = el.closest('article.file')
   const layer = card?.getAttribute('data-layer') ?? null
   const path = card?.getAttribute('data-path') ?? null
-  if (hunk === null || layer === null || path === null) {
+  if (layer === null || path === null) {
     return null
   }
-  const showing = `${STOP_SELECTOR}[data-stop-layer=${cssString(layer)}][data-stop-path=${cssString(path)}][data-stop-hunk=${cssString(hunk)}]`
+  const hunk = el.closest('table.diff')?.getAttribute('data-hunk') ?? null
+  const showing =
+    `${STOP_SELECTOR}[data-stop-layer=${cssString(layer)}][data-stop-path=${cssString(path)}]` +
+    (hunk === null ? '' : `[data-stop-hunk=${cssString(hunk)}]`)
   if (prefer?.matches(showing) === true) {
     return prefer
   }
@@ -115,7 +118,7 @@ function stopShowingRow(root, row, prefer) {
  */
 export function rowPreferringStop(root, key, side, line, prefer = null) {
   const row = findRow(root, key, side, line)
-  return row === null ? null : { row, stop: stopShowingRow(root, row, prefer) }
+  return row === null ? null : { row, stop: stopShowing(root, row, prefer) }
 }
 
 /**
@@ -199,12 +202,14 @@ function isRowVisible(row) {
 
 /**
  * Scrolls to the element a canvas link points at and highlights it. Returns false when the
- * link does not parse or its target is not on the page.
+ * link does not parse or its target is not on the page. `preferStops`, for a link the reader
+ * follows: in the one-point view, the stop that shows the target comes on screen with it.
  * @param {string} href
  * @param {ParentNode} [root]
+ * @param {boolean} [preferStops]
  * @returns {boolean}
  */
-export function jumpTo(href, root = document) {
+export function jumpTo(href, root = document, preferStops = false) {
   const link = parseLink(href)
   if (!link) {
     return false
@@ -219,7 +224,20 @@ export function jumpTo(href, root = document) {
   if (!(el instanceof HTMLElement)) {
     return false
   }
-  scrollIntoViewSafe(el, link.kind === 'file' || link.kind === 'layer' ? 'start' : 'center')
+  const block = link.kind === 'file' || link.kind === 'layer' ? 'start' : 'center'
+  // In the one-point view a layer opens on its opening stop, and a chunk or a file on the stop that
+  // shows it; with no stop showing it, the page is asked for its layers.
+  if (preferStops && showsStops(root)) {
+    const opening =
+      link.kind === 'layer' ? root.querySelector(`#${cssEscape(layerStepAnchorId(link.layerKey))}`) : null
+    const found =
+      opening instanceof HTMLElement ? { el: opening, stop: opening } : { el, stop: stopShowing(root, el) }
+    if (revealPreferringStop(found, root, { href }, block)) {
+      flash(found.el)
+    }
+    return true
+  }
+  scrollIntoViewSafe(el, block)
   flash(el)
   return true
 }

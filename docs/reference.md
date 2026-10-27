@@ -727,13 +727,13 @@ leading to its opening stop, and marks the stop that shows. A stop takes the pla
 under a page that stays at the top, and the URL names it, so a reload or back and forward keep your
 place. On a canvas with no point the view shows the overview and the layers, one at a time.
 
-A stop draws its file again, so what you do in it stays in it: selecting lines, commenting on a
-line, and the jumps between lines. Whatever leads to a line or a point from elsewhere follows the
-same rule, so the view you chose stays: a line link you click in the canvas or the AI Chat, **go to
-code** in a thread, `c` on the point in focus, and editing a comment the chat proposed. When a stop
-draws the line or the point, that stop opens on it; when none does, the page moves to your layers and
-goes there. A link to a line or a chunk in the URL, on a reload or with back and forward, lands in
-its layer.
+A stop shows its layer's own cards, moved into it while it shows and back when it does not, so
+every line, thread and comment is on the page once, and what you do in a stop is what the layer
+has. Whatever leads to a line, a chunk, a file, a layer or a point from elsewhere keeps the view you
+chose: a link you click in the canvas or the AI Chat, **go to code** in a thread, `c` on the point
+in focus, and editing a comment the chat proposed. When a stop shows the target, that stop opens on
+it, a layer on its opening stop; when none does, the page moves to your layers and goes there. A
+link in the URL, on a reload or with back and forward, lands in its layer.
 
 On a canvas with points, a switch at the head of the rail moves between **Attention points** and
 **Layers**, and the rail lists what the view shows. **Layers** goes back to the layer view you read

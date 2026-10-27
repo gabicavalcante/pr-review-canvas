@@ -87,7 +87,7 @@ function jumpToTarget(target, root, preferStops) {
   if (link.kind === 'line') {
     return (preferStops && jumpToLineInStop(root, link, target)) || jumpToLine(root, link)
   }
-  if (!jumpTo(target, root)) {
+  if (!jumpTo(target, root, preferStops)) {
     return false
   }
   if (link.kind === 'layer') {

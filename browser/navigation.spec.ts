@@ -32,13 +32,13 @@ for (const layerView of ['all', 'one', 'points'] as const) {
         .locator('#overview')
         .getByRole('link', { name: target === 'line' ? 'Later line' : 'Later hunk', exact: true })
         .click()
-      // A point's stop in the one-point view draws its chunk again. A line link followed on the
-      // page opens that stop; the URL, on forward and on a reload, lands in the layer.
-      const destination = page.locator(
-        `pr-layer ${target === 'line' ? '#L-src_app_ts-new-13' : '#hunk-src_app_ts-2'}`
-      )
-      const inStop = layerView === 'points' && target === 'line'
-      const clicked = inStop ? page.locator('#step-p-2 #L-src_app_ts-new-13') : destination
+      // In the one-point view a link followed on the page opens the stop that shows its target,
+      // which holds the layer's own card while it shows; the URL, on forward and on a reload,
+      // lands in the layer.
+      const id = target === 'line' ? '#L-src_app_ts-new-13' : '#hunk-src_app_ts-2'
+      const destination = page.locator(`pr-layer ${id}`)
+      const inStop = layerView === 'points'
+      const clicked = inStop ? page.locator(`#step-p-2 ${id}`) : destination
       await expect(clicked).toHaveClass(/is-target/)
       await expect(clicked).not.toHaveClass(/is-approx/)
       await expect(clicked).toBeInViewport()
