@@ -48,24 +48,34 @@ const POSTED_INLINE = ghPost(body => ({
 }))
 
 export const test = base.extend<{
+  /**
+   * The reader's `readByPoints`. Off here, though on by default in the product, so a spec reads the
+   * layers it was written for; a spec of the one-point view turns it on with `test.use`.
+   */
+  readByPoints: boolean
   reviewUrl: string
   selfReviewUrl: string
   noChatUrl: string
   chatServer: (options?: ChatServerOptions) => Promise<ChatServer>
 }>({
-  chatServer: async ({ page }, use) => {
+  readByPoints: [false, { option: true }],
+  chatServer: async ({ page, readByPoints }, use) => {
     const stops: Array<() => Promise<void>> = []
     await use(async (options = {}) => {
-      const server = await startServer(page, {
-        projectConfig: {
-          config: { ...DEFAULT_PROJECT_CONFIG, chat: { ...DEFAULT_PROJECT_CONFIG.chat, enabled: true } },
-          warnings: [],
-          source: null,
+      const server = await startServer(
+        page,
+        {
+          projectConfig: {
+            config: { ...DEFAULT_PROJECT_CONFIG, chat: { ...DEFAULT_PROJECT_CONFIG.chat, enabled: true } },
+            warnings: [],
+            source: null,
+          },
+          runner: createFakeRunner(options.runner),
+          checkoutGit: createFakeCheckoutGit(options.checkout),
+          ...(options.noCanvas ? { fixtureArtifact: null } : {}),
         },
-        runner: createFakeRunner(options.runner),
-        checkoutGit: createFakeCheckoutGit(options.checkout),
-        ...(options.noCanvas ? { fixtureArtifact: null } : {}),
-      })
+        readByPoints
+      )
       stops.push(server.stop)
       await options.setup?.(server.t)
       return { url: server.url, ctx: server.t.ctx }
@@ -75,22 +85,26 @@ export const test = base.extend<{
     }
   },
   /** PR #42 with AI Chat turned off, so the side pane holds the review alone. */
-  noChatUrl: async ({ page }, use) => {
-    const server = await startServer(page, {
-      projectConfig: {
-        config: { ...DEFAULT_PROJECT_CONFIG, chat: { ...DEFAULT_PROJECT_CONFIG.chat, enabled: false } },
-        warnings: [],
-        source: null,
+  noChatUrl: async ({ page, readByPoints }, use) => {
+    const server = await startServer(
+      page,
+      {
+        projectConfig: {
+          config: { ...DEFAULT_PROJECT_CONFIG, chat: { ...DEFAULT_PROJECT_CONFIG.chat, enabled: false } },
+          warnings: [],
+          source: null,
+        },
       },
-    })
+      readByPoints
+    )
     try {
       await use(server.url)
     } finally {
       await server.stop()
     }
   },
-  reviewUrl: async ({ page }, use) => {
-    const server = await startServer(page)
+  reviewUrl: async ({ page, readByPoints }, use) => {
+    const server = await startServer(page, {}, readByPoints)
     try {
       await use(server.url)
     } finally {
@@ -98,7 +112,7 @@ export const test = base.extend<{
     }
   },
   /** PR #42 with a published canvas, served to its author, who may settle its points. */
-  selfReviewUrl: async ({ page }, use) => {
+  selfReviewUrl: async ({ page, readByPoints }, use) => {
     let shared: Record<string, unknown> | null = null
     const share = ghPost(body => {
       shared = {
@@ -109,21 +123,25 @@ export const test = base.extend<{
       }
       return shared
     })
-    const server = await startServer(page, {
-      gh: ghFor42({
-        routes: {
-          'repos/acme/widgets/issues/42/comments': ghHandler(() =>
-            shared === null ? GH_ISSUE_COMMENTS : [...GH_ISSUE_COMMENTS, shared]
-          ),
-        },
-        postRoutes: {
-          'repos/acme/widgets/pulls/42/comments': POSTED_INLINE,
-          'repos/acme/widgets/issues/42/comments': share,
-          'repos/acme/widgets/issues/comments/6001': share,
-        },
-      }),
-      fixtureArtifact: null,
-    })
+    const server = await startServer(
+      page,
+      {
+        gh: ghFor42({
+          routes: {
+            'repos/acme/widgets/issues/42/comments': ghHandler(() =>
+              shared === null ? GH_ISSUE_COMMENTS : [...GH_ISSUE_COMMENTS, shared]
+            ),
+          },
+          postRoutes: {
+            'repos/acme/widgets/pulls/42/comments': POSTED_INLINE,
+            'repos/acme/widgets/issues/42/comments': share,
+            'repos/acme/widgets/issues/comments/6001': share,
+          },
+        }),
+        fixtureArtifact: null,
+      },
+      readByPoints
+    )
     try {
       const artifact = syntheticArtifact()
       await server.t.ctx.canvases.write(artifact.pr.headSha, artifact, {
@@ -148,7 +166,8 @@ export const test = base.extend<{
 /** Serves PR 42 on a free port; `stop` fails the test if the page threw or a request 500ed. */
 async function startServer(
   page: Page,
-  extra: Partial<TestContextOptions> = {}
+  extra: Partial<TestContextOptions> = {},
+  readByPoints = false
 ): Promise<{ url: string; t: TestContext; stop: () => Promise<void> }> {
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
@@ -209,6 +228,7 @@ async function startServer(
   // data dir. `stop` waits for every handler to return before that dir is removed, or `rm` races
   // the write and fails with ENOTEMPTY.
   // Served as the shared server serves it: under the project's base path, behind the hub's front.
+  await t.ctx.settings.write({ readByPoints })
   let port = 0
   const hub = await createHub({ registry: t.dataDir, load: async () => t.ctx, log: () => undefined })
   // As `open` does: with the shell's environment, so the project runs under it.

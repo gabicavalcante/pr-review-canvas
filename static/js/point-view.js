@@ -96,7 +96,7 @@ export function overviewWayOnHtml(artifact) {
  * one-point view that is the layer's opening stop, or '' for the view's first stop when the layer
  * has none or the place is no layer's; into a layer view, the layer's section, or the place as it is.
  * @param {ReviewArtifact} artifact
- * @param {import('./layer-views.js').LayerView} view the view switched to
+ * @param {import('./layer-views.js').PageView} view the view switched to
  * @param {string} hash the place, as `#id`
  */
 export function viewSwitchTarget(artifact, view, hash) {

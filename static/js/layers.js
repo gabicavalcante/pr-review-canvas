@@ -196,11 +196,12 @@ function railPointsHtml(artifact, state, current) {
 
 /**
  * With a render context, each layer shows the lines it adds and removes. `points` draws, in place
- * of the layers, the attention points the one-point view walks. A canvas with points heads the
- * rail's group with the switch between the two.
+ * of the layers, the attention points the one-point view walks. `switchable`, on a page that reads
+ * by attention points, heads the rail's group of a canvas with points with the switch between the
+ * two.
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
- * @param {{ activeId?: string, points?: boolean }} [opts]
+ * @param {{ activeId?: string, points?: boolean, switchable?: boolean }} [opts]
  * @returns {string}
  */
 export function railInnerHtml(artifact, state, opts = {}) {
@@ -237,18 +238,23 @@ export function railInnerHtml(artifact, state, opts = {}) {
   if (opts.points === true && hasPoints) {
     return `<ul class="tree">${overview}${railPointsHtml(artifact, state, current)}</ul>`
   }
-  const heading = hasPoints ? railViewSwitchHtml(false) : '<span class="lbl grp-lbl">Layers</span>'
+  const heading =
+    hasPoints && opts.switchable === true
+      ? railViewSwitchHtml(false)
+      : '<span class="lbl grp-lbl">Layers</span>'
   return `<ul class="tree">${overview}<li class="grp">${heading}<ul class="layers">${items}</ul></li>${otherItem}</ul>`
 }
 
 /**
+ * `switchable` marks the rail of a page that reads by attention points, which keeps the switch
+ * between them and the layers when the rail is drawn again.
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
- * @param {{ activeId?: string }} [opts]
+ * @param {{ activeId?: string, switchable?: boolean }} [opts]
  * @returns {string}
  */
 export function renderRail(artifact, state, opts = {}) {
-  return `<nav class="rail" aria-label="Review layers">${railInnerHtml(artifact, state, opts)}</nav>`
+  return `<nav class="rail" aria-label="Review layers"${opts.switchable === true ? ' data-switchable' : ''}>${railInnerHtml(artifact, state, opts)}</nav>`
 }
 
 /**
@@ -266,6 +272,7 @@ export function refreshRail(root, artifact, state) {
   rail.innerHTML = railInnerHtml(artifact, state, {
     ...(active === undefined ? {} : { activeId: active }),
     points: rail.hasAttribute('data-points'),
+    switchable: rail.hasAttribute('data-switchable'),
   })
   return true
 }

@@ -14,6 +14,7 @@ import { layerAnchorId, layerStepAnchorId, pointAnchorId, stepAnchorId } from '.
 import { refoldCard, setCardCollapsed } from './layers.js'
 
 /** @typedef {import('./layer-views.js').LayerView} LayerView */
+/** @typedef {import('./layer-views.js').PageView} PageView */
 
 /** The overview, every stop of the one-point view, and every layer section: the parts of the page the rail links to. */
 const SECTION_SELECTOR = '#overview, section.point-step, pr-layer > section'
@@ -84,28 +85,6 @@ export function elementForHash(root, hash) {
   const id = decodeHash(hash.startsWith('#') ? hash.slice(1) : hash)
   const el = id === '' ? null : root.querySelector(`#${cssEscape(id)}`)
   return el instanceof HTMLElement ? el : null
-}
-
-/** Where this browser keeps the layer view the rail's switch goes back to from the one-point view. */
-export const LAYERS_VIEW_KEY = 'pr-review.layers-view'
-
-/**
- * The layer view the reader read in last, all at once or one at a time; all at once when this
- * browser has none. The setting cannot hold it while it says `points`, and a reload starts from
- * the setting.
- * @param {Storage | null} storage
- * @returns {'all' | 'one'}
- */
-export function readLayersView(storage) {
-  return storage?.getItem(LAYERS_VIEW_KEY) === 'one' ? 'one' : 'all'
-}
-
-/**
- * @param {Storage | null} storage
- * @param {'all' | 'one'} view
- */
-export function writeLayersView(storage, view) {
-  storage?.setItem(LAYERS_VIEW_KEY, view)
 }
 
 /** The style sheet that shows, in the stop on screen, only its point's chunk and its point's row. */
@@ -219,20 +198,18 @@ export function stopOutside(fragment) {
  * links follow the URL, so a link into a layer lands on a layer that is showing. The URL names
  * the section on the first draw; after that the section last shown is the reader's place.
  *
- * It is the one owner of the view the page shows, and of the layer view read in last, which the
- * rail's switch goes back to from the one-point view and this browser keeps across a reload.
+ * It is the one owner of the view the page shows, and of the layer view the settings choose, which
+ * the rail's switch goes to from the one-point view.
  * @param {HTMLElement} root
- * @param {{ view: LayerView, win?: Window, storage?: Storage | null }} opts
- * @returns {{ stop: () => void, setView: (view: LayerView) => void, redraw: () => void, place: () => string, returnCards: () => void, readonly view: LayerView, readonly layersView: 'all' | 'one' }}
+ * @param {{ view: PageView, layersView?: LayerView, win?: Window }} opts `layersView` defaults to
+ *   `view` when that is a layer view
+ * @returns {{ stop: () => void, setView: (view: PageView) => void, setLayersView: (view: LayerView) => void, redraw: () => void, place: () => string, returnCards: () => void, readonly view: PageView, readonly layersView: LayerView }}
  */
 export function initOneLayer(root, opts) {
   const win = opts.win ?? window
-  const storage =
-    opts.storage === undefined ? (typeof localStorage === 'undefined' ? null : localStorage) : opts.storage
   let view = opts.view
-  /** @type {'all' | 'one'} */
-  let layersView = view === 'points' ? readLayersView(storage) : view
-  writeLayersView(storage, layersView)
+  /** @type {LayerView} */
+  let layersView = opts.layersView ?? (view === 'points' ? 'all' : view)
   /**
    * The fragment of the section on screen while one shows at a time, empty before the first draw.
    * A fragment and not the element, since a render replaces the sections.
@@ -278,6 +255,23 @@ export function initOneLayer(root, opts) {
     return row instanceof HTMLElement ? row : null
   }
 
+  /**
+   * The section the URL names, as this view shows it: in the one-point view a layer's section, which
+   * a reload can bring back after the reader moved to the layers, opens on the layer's opening stop,
+   * or on the view's first stop for a layer with none.
+   * @param {HTMLElement | null} section
+   */
+  const inThisView = section => {
+    const layerPrefix = layerAnchorId('')
+    if (view !== 'points' || section === null || !section.matches('pr-layer > section')) {
+      return section
+    }
+    const opening = root.querySelector(
+      `#${cssEscape(layerStepAnchorId(section.id.slice(layerPrefix.length)))}`
+    )
+    return opening instanceof HTMLElement ? opening : null
+  }
+
   const redraw = () => {
     if (view === 'all') {
       returnStopCards(root)
@@ -290,7 +284,7 @@ export function initOneLayer(root, opts) {
     const firstStop = view === 'points' ? root.querySelector('section.point-step') : null
     const section =
       sectionFor(shownHash) ??
-      sectionFor(win.location.hash) ??
+      inThisView(sectionFor(win.location.hash)) ??
       sectionOf(root, standIn(win.location.hash)) ??
       (firstStop instanceof HTMLElement ? firstStop : null) ??
       pageSections(root)[0] ??
@@ -371,21 +365,22 @@ export function initOneLayer(root, opts) {
     stop: () => listeners.abort(),
     setView(next) {
       if (next !== view) {
-        view = next
-        if (next !== 'points') {
-          layersView = next
-          writeLayersView(storage, next)
-        }
         // Coming from `all`, the reader is on the section the rail marks as being read. The
-        // one-point view starts where the URL points, else from its first stop.
+        // one-point view, and a view left from it, start where the URL points, else from the
+        // first section.
         shownHash =
-          next === 'points'
+          view === 'points' || next === 'points'
             ? ''
             : (root.querySelector('nav.rail a[aria-current]')?.getAttribute('href') ?? '')
+        view = next
         redraw()
       }
     },
     redraw,
+    /** The layer view the settings now choose, which the rail's switch goes to. */
+    setLayersView(next) {
+      layersView = next
+    },
     /** Puts the cards the stop on screen holds back in their layers, before the stops go away. */
     returnCards: () => returnStopCards(root),
     get view() {

@@ -53,11 +53,13 @@ export const SettingsSchema = z.object({
   theme: z.enum(THEMES),
   /** The reading level every review opens at; the control on the page changes it for one page. */
   foldLevel: z.enum(FOLD_LEVELS),
-  /**
-   * Whether a review shows every layer on one page, the overview or one layer at a time, or one
-   * attention point at a time.
-   */
+  /** Whether a review shows every layer on one page, or the overview or one layer at a time. */
   layerView: z.enum(LAYER_VIEWS),
+  /**
+   * Whether a review opens on its attention points, one at a time, with the rail's switch to its
+   * layers; false reads the layers alone, as `layerView` shows them.
+   */
+  readByPoints: z.boolean(),
   /** The palette of the attention point level icons; their shapes are the same in each. */
   pointColors: z.enum(POINT_COLORS),
   /** The agent that answers in AI Chat. Canvas generation does not read it. */
@@ -90,6 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: DEFAULT_THEME,
   foldLevel: DEFAULT_FOLD_LEVEL,
   layerView: DEFAULT_LAYER_VIEW,
+  readByPoints: true,
   pointColors: DEFAULT_POINT_COLORS,
   chatAgent: 'claude',
   chatModel: null,
@@ -120,6 +123,7 @@ export const SettingsInputSchema = z.strictObject({
   theme: z.enum(THEMES).optional(),
   foldLevel: z.enum(FOLD_LEVELS).optional(),
   layerView: z.enum(LAYER_VIEWS).optional(),
+  readByPoints: z.boolean().optional(),
   pointColors: z.enum(POINT_COLORS).optional(),
   chatAgent: z.enum(CHAT_AGENTS).optional(),
   chatModel: z.string().max(200).nullable().optional(),

@@ -2,16 +2,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_LAYER_VIEW, isLayerView, LAYER_VIEW_LABELS, LAYER_VIEWS } from './layer-views.js'
-import {
-  elementForHash,
-  initOneLayer,
-  LAYERS_VIEW_KEY,
-  pageSections,
-  readLayersView,
-  sectionOf,
-  showOnly,
-  writeLayersView,
-} from './one-layer.js'
+import { elementForHash, initOneLayer, pageSections, sectionOf, showOnly } from './one-layer.js'
 import {
   pointPreferringStop,
   revealPreferringStop,
@@ -76,14 +67,14 @@ const click = el => el?.dispatchEvent(new MouseEvent('click', { bubbles: true, c
 const reveal = el => el?.dispatchEvent(new Event('reveal-code', { bubbles: true }))
 
 describe('the layer views', () => {
-  it('names three views, all by default, each with a label', () => {
-    expect(LAYER_VIEWS).toEqual(['all', 'one', 'points'])
+  it('names the two layer views, all by default, each with a label; the points are a setting of their own', () => {
+    expect(LAYER_VIEWS).toEqual(['all', 'one'])
     expect(DEFAULT_LAYER_VIEW).toBe('all')
     expect(isLayerView('one')).toBe(true)
-    expect(isLayerView('points')).toBe(true)
+    expect(isLayerView('points')).toBe(false)
     expect(isLayerView('some')).toBe(false)
     expect(isLayerView(1)).toBe(false)
-    expect(Object.keys(LAYER_VIEW_LABELS)).toEqual(['all', 'one', 'points'])
+    expect(Object.keys(LAYER_VIEW_LABELS)).toEqual(['all', 'one'])
   })
 })
 
@@ -343,6 +334,40 @@ describe('the one-point view', () => {
     expect(shownIds()).toEqual(['step-p-1'])
   })
 
+  it('leaves the one-point view for one layer at a time on the layer the URL names, not the rail’s mark', () => {
+    oneLayer = initOneLayer(root, { view: 'points' })
+    root.querySelector('nav.rail a[href="#layer-auth"]')?.setAttribute('aria-current', 'location')
+    window.location.hash = '#layer-storage'
+    oneLayer.setView('one')
+    expect(shownIds()).toEqual(['layer-storage'])
+  })
+
+  it('goes to the layer view the settings choose, which the dialog can change', () => {
+    oneLayer = initOneLayer(root, { view: 'points', layersView: 'one' })
+    expect(oneLayer.layersView).toBe('one')
+    oneLayer.setLayersView('all')
+    expect(oneLayer.layersView).toBe('all')
+    // Moving to a view leaves the settings' choice as it is.
+    oneLayer.setView('one')
+    oneLayer.setView('points')
+    expect(oneLayer.layersView).toBe('all')
+  })
+
+  it('opens a layer’s section the URL names on the layer’s opening stop, or the first stop', () => {
+    section('overview').insertAdjacentHTML(
+      'afterend',
+      '<section class="point-step layer-step" id="step-layer-auth"></section>'
+    )
+    window.location.hash = '#layer-auth'
+    oneLayer = initOneLayer(root, { view: 'points' })
+    expect(shownIds()).toEqual(['step-layer-auth'])
+    oneLayer.stop()
+    // A layer with no opening stop, one with neither points nor tests.
+    window.location.hash = '#layer-storage'
+    oneLayer = initOneLayer(root, { view: 'points' })
+    expect(shownIds()).toEqual(['step-layer-auth'])
+  })
+
   it('names the reader’s place, which the URL does not when a view opens on its first section', () => {
     oneLayer = initOneLayer(root, { view: 'points' })
     expect(window.location.hash).toBe('')
@@ -352,19 +377,6 @@ describe('the one-point view', () => {
     // While every section shows, none is on screen alone.
     oneLayer.setView('all')
     expect(oneLayer.place()).toBe('')
-  })
-})
-
-describe('the layer view read in last', () => {
-  it('is kept by the browser, all at once when it has none or something else', () => {
-    localStorage.removeItem(LAYERS_VIEW_KEY)
-    expect(readLayersView(localStorage)).toBe('all')
-    writeLayersView(localStorage, 'one')
-    expect(readLayersView(localStorage)).toBe('one')
-    localStorage.setItem(LAYERS_VIEW_KEY, 'points')
-    expect(readLayersView(localStorage)).toBe('all')
-    expect(readLayersView(null)).toBe('all')
-    localStorage.removeItem(LAYERS_VIEW_KEY)
   })
 })
 
@@ -410,7 +422,7 @@ describe('finding a line or a point, and the stop that shows it', () => {
     /** @type {unknown[]} */
     const asked = []
     root.addEventListener(SHOW_IN_LAYERS, event => asked.push(/** @type {CustomEvent} */ (event).detail))
-    oneLayer = initOneLayer(root, { view: 'points', storage: null })
+    oneLayer = initOneLayer(root, { view: 'points' })
     const inStop = rowPreferringStop(root, 'a_ts', 'new', 4)
     if (inStop === null) throw new Error('no row')
     expect(revealPreferringStop({ el: inStop.row, stop: inStop.stop }, root, { href: '#line:a.ts:4' })).toBe(

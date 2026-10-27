@@ -46,6 +46,7 @@ describe('createSettingsStore', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
+      readByPoints: true,
       pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: 'gpt-5.2',
@@ -74,6 +75,7 @@ describe('createSettingsStore', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
+      readByPoints: true,
       pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,
@@ -225,6 +227,22 @@ describe('applySettings', () => {
     expect(parseSettings('layerView: some\n')).toEqual(DEFAULT_SETTINGS)
   })
 
+  it('reads by attention points unless the file turns it off, and saves the choice under its comment', () => {
+    expect(parseSettings('layerView: one\n').readByPoints).toBe(true)
+    const { text, settings } = applySettings(SETTINGS_TEMPLATE, { readByPoints: false })
+    expect(settings.readByPoints).toBe(false)
+    expect(text).toContain('# Whether a review opens on its attention points')
+    expect(text).toContain('readByPoints: false')
+    expect(parseSettings(text).readByPoints).toBe(false)
+  })
+
+  it('reads the points view a build saved as a layer view as reading by points, keeping every other setting', () => {
+    const old = parseSettings('skin: olive\nlayerView: points\n')
+    expect([old.skin, old.layerView, old.readByPoints]).toEqual(['olive', 'all', true])
+    // A file that also says where it stands on reading by points keeps that.
+    expect(parseSettings('layerView: points\nreadByPoints: false\n').readByPoints).toBe(false)
+  })
+
   it('saves the point colors under their comment, reads a file without them as classic, and refuses one it does not know', () => {
     const { text, settings } = applySettings(SETTINGS_TEMPLATE, { pointColors: 'action' })
     expect(settings.pointColors).toBe('action')
@@ -275,6 +293,7 @@ describe('two saves that arrive together', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
+      readByPoints: true,
       pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,

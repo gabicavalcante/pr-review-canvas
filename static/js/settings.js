@@ -187,7 +187,9 @@ export function settingsDialogHtml(data, agents, tab = 'reading') {
       '<div class="field"><label for="set-layer-view">Show layers</label>' +
       `<select id="set-layer-view">${optionsHtml(LAYER_VIEWS, settings.layerView, LAYER_VIEW_LABELS)}</select></div>` +
       '<p class="muted small">One at a time shows the overview or a single layer. The rail and the <span class="mono">j</span> and <span class="mono">k</span> keys move between them.</p>' +
-      '<p class="muted small">One point at a time opens each layer with its description and tests, then shows its attention points one by one with their code, then the rest of the diff.</p>' +
+      '<div class="field field-check"><label for="set-read-by-points">Read by attention points</label>' +
+      `<input id="set-read-by-points" type="checkbox"${settings.readByPoints ? ' checked' : ''}></div>` +
+      '<p class="muted small">A review opens on its attention points, one at a time: each layer opens with its description and tests, then shows its points with their code. The switch at the head of the rail moves to the layers, shown as above. Off, a review shows its layers alone.</p>' +
       '<div class="field"><label for="set-point-colors">Point colors</label>' +
       `<select id="set-point-colors">${optionsHtml(POINT_COLORS, settings.pointColors, POINT_COLORS_LABELS)}</select></div>` +
       '<p class="muted small">The colors of the attention point icons. The shapes say the level in both: a diamond to decide, a checked box to check, an i for context.</p>',
@@ -314,6 +316,7 @@ export function readSettingsForm(/** @type {ParentNode} */ dialog) {
   const timeout = qs('#set-timeout', dialog)
   const turns = qs('#set-turns', dialog)
   const threadPerPlace = qs('#set-thread-per-place', dialog)
+  const readByPoints = qs('#set-read-by-points', dialog)
   const checkoutEnabled = qs('#set-checkout-enabled', dialog)
   const checkoutIdle = qs('#set-checkout-idle', dialog)
   const checkoutSweep = qs('#set-checkout-sweep', dialog)
@@ -324,6 +327,9 @@ export function readSettingsForm(/** @type {ParentNode} */ dialog) {
   }
   if (layerView instanceof HTMLSelectElement && isLayerView(layerView.value)) {
     input.layerView = layerView.value
+  }
+  if (readByPoints instanceof HTMLInputElement) {
+    input.readByPoints = readByPoints.checked
   }
   if (pointColors instanceof HTMLSelectElement && isPointColors(pointColors.value)) {
     input.pointColors = pointColors.value

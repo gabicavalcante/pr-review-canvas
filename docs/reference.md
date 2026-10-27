@@ -553,7 +553,8 @@ The data directory's `settings.yml` accepts these keys and values:
 | `skin`                 | `github`  | `terminal`, `github`, `olive`                                                    |
 | `theme`                | `auto`    | `auto`, `light`, `dark`                                                          |
 | `foldLevel`            | `light`   | `light`, `moderate`, `aggressive`                                                |
-| `layerView`            | `all`     | `all`, `one`, `points`                                                           |
+| `layerView`            | `all`     | `all`, `one`                                                                     |
+| `readByPoints`         | `true`    | `true`, `false`                                                                  |
 | `pointColors`          | `classic` | `classic`, `action`                                                              |
 | `chatAgent`            | `claude`  | `claude`, `codex` (2)                                                            |
 | `chatModel`            | `null`    | A model ID, or `null` for the agent's default (1) (2)                            |
@@ -705,8 +706,8 @@ holds for every review until changed.
 
 ### One point at a time
 
-Switch the rail to **Attention points**, or set **Show layers** to **one point at a time** in the
-settings dialog, to read the canvas by its attention points, one section at a time:
+With **Read by attention points** on in the settings dialog (`readByPoints`, on by default), a
+review opens on its attention points, one section at a time:
 
 - Each layer with points or tests opens with a stop of its own: its heading with the **reviewed**
   mark and **ask about this layer**, its description, and its tests table. **go to its N attention
@@ -725,7 +726,8 @@ settings dialog, to read the canvas by its attention points, one section at a ti
 The view opens on its first stop. The rail lists the points under their layers, each layer's title
 leading to its opening stop, and marks the stop that shows. A stop takes the place of the one before
 under a page that stays at the top, and the URL names it, so a reload or back and forward keep your
-place. On a canvas with no point the view shows the overview and the layers, one at a time.
+place; a layer's section the URL names opens on that layer's opening stop. On a canvas with no point
+the view shows the overview and the layers, one at a time.
 
 A stop shows its layer's own cards, moved into it while it shows and back when it does not, so
 every line, thread and comment is on the page once, and what you do in a stop is what the layer
@@ -736,10 +738,11 @@ it, a layer on its opening stop; when none does, the page moves to your layers a
 link in the URL, on a reload or with back and forward, lands in its layer.
 
 On a canvas with points, a switch at the head of the rail moves between **Attention points** and
-**Layers**, and the rail lists what the view shows. **Layers** goes back to the layer view you read
-in last, all at once or one at a time, which the browser remembers across a reload. The switch keeps your place: from a layer, or a point of it,
-to the layer's opening stop, and from a stop to its layer's section. It saves `layerView` as the
-settings dialog does.
+**Layers**, and the rail lists what the view shows. **Layers** shows the layer view **Show layers**
+chooses, all at once or one at a time. The switch keeps your place: from a layer, or a point of it,
+to the layer's opening stop, and from a stop to its layer's section. It changes the open page only;
+a reload opens on what the settings say. With **Read by attention points** off, a review shows its
+layers alone, with no switch.
 
 ### Finding shared canvases
 

@@ -21,10 +21,14 @@ theme: auto
 # control on the page changes it for that page only.
 foldLevel: light
 
-# How a review shows its layers: all on one page (all), one at a time with the rail to move between
-# them (one), or one attention point at a time, each layer opening with its description and tests,
-# then the rest of the diff (points).
+# How a review shows its layers: all on one page, or one at a time with the rail to move between
+# them.
 layerView: all
+
+# Whether a review opens on its attention points, one at a time, each layer opening with its
+# description and tests; the rail's switch moves between them and the layers. false reads the
+# layers alone.
+readByPoints: true
 
 # The colors of the attention point level icons: classic (red, amber, gray) or action (purple,
 # blue, gray). The shapes say the level either way.
@@ -141,7 +145,7 @@ export function parseSettings(text: string): Settings {
   if (typeof raw !== 'object' || raw === null) {
     return DEFAULT_SETTINGS
   }
-  const merged = { ...DEFAULT_SETTINGS, ...withChatKeys(raw), version: 1 }
+  const merged = { ...DEFAULT_SETTINGS, ...withLayerView(withChatKeys(raw)), version: 1 }
   const parsed = SettingsSchema.safeParse(merged)
   return parsed.success ? parsed.data : DEFAULT_SETTINGS
 }
@@ -159,6 +163,20 @@ function withChatKeys(raw: object): object {
       out[key] = out[legacy]
     }
     delete out[legacy]
+  }
+  return out
+}
+
+/**
+ * `layerView: points` from a build that offered the attention points as a layer view: they are
+ * `readByPoints` now, so the file reads as the layers all at once with the points first, unless it
+ * says otherwise. Without this the value fails the schema and every setting falls back to its default.
+ */
+function withLayerView(raw: object): object {
+  const out: Record<string, unknown> = { ...raw }
+  if (out['layerView'] === 'points') {
+    out['layerView'] = DEFAULT_SETTINGS.layerView
+    out['readByPoints'] ??= true
   }
   return out
 }
@@ -240,6 +258,9 @@ function stripUndefined(input: SettingsInput): Partial<Settings> {
   }
   if (input.layerView !== undefined) {
     out.layerView = input.layerView
+  }
+  if (input.readByPoints !== undefined) {
+    out.readByPoints = input.readByPoints
   }
   if (input.pointColors !== undefined) {
     out.pointColors = input.pointColors

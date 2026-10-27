@@ -160,7 +160,7 @@ describe('rail', () => {
    * @param {import('./contract-types.js').ReviewArtifact} canvas
    */
   function pointsRail(canvas) {
-    document.body.innerHTML = renderRail(canvas, state)
+    document.body.innerHTML = renderRail(canvas, state, { switchable: true })
     document.querySelector('nav.rail')?.setAttribute('data-points', '')
     refreshRail(document, canvas, state)
   }
@@ -234,12 +234,19 @@ describe('rail', () => {
     ])
     expect(document.querySelector('.layers')).toBeNull()
     expect(document.querySelector('li.other')).toBeNull()
-    document.body.innerHTML = renderRail(artifact, state)
+    document.body.innerHTML = renderRail(artifact, state, { switchable: true })
     expect(pressed()).toEqual([
       ['Attention points', 'points', 'false'],
       ['Layers', 'layers', 'true'],
     ])
     expect(document.querySelector('.layers')).not.toBeNull()
+    // A page that does not read by attention points names its layers, with no switch, and keeps
+    // that when the rail is drawn again.
+    document.body.innerHTML = renderRail(artifact, state)
+    expect(pressed()).toEqual([])
+    expect(document.querySelector('.grp-lbl')?.textContent).toBe('Layers')
+    refreshRail(document, artifact, state)
+    expect(pressed()).toEqual([])
   })
 
   it('names the layers with no switch, and in either view, for a canvas without points', () => {

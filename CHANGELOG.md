@@ -4,16 +4,17 @@
 
 ### One point at a time
 
-- **Show layers: one point at a time** in **settings** reads a canvas by its attention points. Each
-  layer opens with its description and tests, then shows its points one at a time from the most
-  severe, each with only the chunk of code that holds it; the rest of the diff follows by layer. The
-  rail lists the points under their layers. A stop takes the place of the one before under a page
-  that stays at the top.
+- A review opens on its attention points, one at a time: each layer opens with its description and
+  tests, then shows its points from the most severe, each with only the chunk of code that holds it.
+  The rail lists the points under their layers. A stop takes the place of the one before under a page
+  that stays at the top. **Read by attention points** in **settings** (`readByPoints`, on by default)
+  turns it off, for the layers alone.
 - A switch at the head of the rail moves between **Attention points** and **Layers**, keeping your
-  place, and the rail lists what the view shows. **Layers** goes back to the layer view read last.
-- In a stop, selecting lines, commenting and jumping between lines happen in that stop. A line or
-  point reached from elsewhere (a link, **go to code**, `c`, a proposed comment) opens the stop that
-  draws it, or moves to the layers when none does.
+  place, and the rail lists what the view shows. **Layers** shows the layer view **Show layers**
+  chooses. The switch changes the open page only; a reload opens on what the settings say.
+- In a stop, selecting lines, commenting and jumping between lines happen in that stop, on the
+  layer's own card. A line or point reached from elsewhere (a link, **go to code**, `c`, a proposed
+  comment) opens the stop that shows it, or moves to the layers when none does.
 
 ## 0.10.0
 

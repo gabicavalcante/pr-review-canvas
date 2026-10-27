@@ -21,6 +21,7 @@ const SETTINGS = {
     theme: 'auto',
     foldLevel: 'light',
     layerView: 'all',
+    readByPoints: true,
     pointColors: 'classic',
     chatAgent: 'claude',
     chatModel: null,
@@ -231,6 +232,7 @@ describe('readSettingsForm', () => {
     expect(readSettingsForm(holder)).toEqual({
       foldLevel: 'light',
       layerView: 'all',
+      readByPoints: true,
       pointColors: 'classic',
       chatAgent: 'claude',
       chatModel: null,
@@ -350,6 +352,7 @@ describe('openSettingsDialog', () => {
     expect(saved[0]).toEqual({
       foldLevel: 'light',
       layerView: 'all',
+      readByPoints: true,
       pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,
@@ -438,6 +441,7 @@ describe('the dialog with parts missing', () => {
     expect(readSettingsForm(holder)).toEqual({
       foldLevel: 'light',
       layerView: 'all',
+      readByPoints: true,
       pointColors: 'classic',
       chatAgent: 'claude',
       chatModel: 'gpt-5.2',

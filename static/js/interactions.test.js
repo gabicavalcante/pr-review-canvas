@@ -138,7 +138,7 @@ function setup(opts = {}) {
   const paths = new Set(files.map(f => f.path))
   document.body.innerHTML =
     `<pr-app id="root">${renderHeader(bundle, { host: 'localhost:3010', theme: 'auto', skin: 'terminal', now: NOW })}` +
-    `<div class="layout">${renderRail(artifact, state)}<main id="main">${renderOverview(bundle, { paths, now: NOW })}` +
+    `<div class="layout">${renderRail(artifact, state, { switchable: true })}<main id="main">${renderOverview(bundle, { paths, now: NOW })}` +
     `${renderLayers(canvas, files, state, threadComments)}` +
     `${opts.points === true ? renderPointSteps(canvas, files, state, threadComments) : ''}</main></div></pr-app>`
   const root = document.querySelector('#root')
@@ -151,7 +151,7 @@ function setup(opts = {}) {
     refreshRail(root, artifact, state)
     window.location.hash = '#step-p-1'
     pointsView?.stop()
-    pointsView = initOneLayer(root, { view: 'points', storage: null })
+    pointsView = initOneLayer(root, { view: 'points' })
   }
   if (opts.drawn !== false) {
     hydrateAll(root, ctx)

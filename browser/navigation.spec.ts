@@ -20,7 +20,8 @@ for (const layerView of ['all', 'one', 'points'] as const) {
       await page.goto(server.url)
       if (layerView !== 'all') {
         await page.locator('#settings').click()
-        await page.locator('#set-layer-view').selectOption(layerView)
+        if (layerView === 'points') await page.locator('#set-read-by-points').check()
+        else await page.locator('#set-layer-view').selectOption(layerView)
         await page.locator('[data-act="settings-save"]').click()
         await expect(page.locator('#settings-dialog')).toBeHidden()
       }
@@ -284,9 +285,9 @@ test('refresh stops regeneration polling before waiting for patches', async ({ p
 
 test.describe('in the one-point view', () => {
   const asPoints = async (t: {
-    ctx: { settings: { write: (input: { layerView: 'points' }) => Promise<unknown> } }
+    ctx: { settings: { write: (input: { readByPoints: true }) => Promise<unknown> } }
   }) => {
-    await t.ctx.settings.write({ layerView: 'points' })
+    await t.ctx.settings.write({ readByPoints: true })
   }
 
   test('selecting lines in a stop marks them and opens the comment there', async ({ page, chatServer }) => {
@@ -331,10 +332,11 @@ test.describe('in the one-point view', () => {
 
   test('go to code from lines no stop draws moves to the layers', async ({ page, chatServer }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop')
-    const { url } = await chatServer()
+    const { url } = await chatServer({ setup: asPoints })
     await page.goto(url)
     // A thread on lines of the test file, which has no attention point, asked in the layers. Its
     // diff is drawn once its card comes on screen.
+    await page.locator('nav.rail .rail-view [data-view="layers"]').click()
     await page.locator('pr-layer article.file[data-path="src/app.test.ts"]').scrollIntoViewIfNeeded()
     await page.locator('pr-layer #L-src_app_test_ts-new-2 td.ln').nth(1).click()
     await page.locator('tr.sel-bar [data-act="ask"]').click()
