@@ -154,8 +154,19 @@ describe('rail', () => {
     setRenderContext(null)
   })
 
+  /**
+   * The rail of the one-point view, drawn as the page draws it: the layers' rail, marked for the
+   * points view, then drawn again.
+   * @param {import('./contract-types.js').ReviewArtifact} canvas
+   */
+  function pointsRail(canvas) {
+    document.body.innerHTML = renderRail(canvas, state)
+    document.querySelector('nav.rail')?.setAttribute('data-points', '')
+    refreshRail(document, canvas, state)
+  }
+
   it('lists the points under their layers in the one-point view, and dims one acted on', () => {
-    document.body.innerHTML = renderRail(artifact, state, { points: true })
+    pointsRail(artifact)
     const group = () =>
       [...document.querySelectorAll('.rail-points li')].map(li =>
         li.classList.contains('pt-layer')
@@ -186,7 +197,7 @@ describe('rail', () => {
       ...artifact,
       points: artifact.points.map(p => (p.layerId === first.id ? { ...p, layerId: 'gone' } : p)),
     }
-    document.body.innerHTML = renderRail(testsOnly, state, { points: true })
+    pointsRail(testsOnly)
     const group = [...document.querySelectorAll('.rail-points li')].map(li =>
       li.classList.contains('pt-layer')
         ? `[${li.querySelector('.t')?.textContent}]`
@@ -216,7 +227,7 @@ describe('rail', () => {
         button.getAttribute('data-view'),
         button.getAttribute('aria-pressed'),
       ])
-    document.body.innerHTML = renderRail(artifact, state, { points: true })
+    pointsRail(artifact)
     expect(pressed()).toEqual([
       ['Attention points', 'points', 'true'],
       ['Layers', 'layers', 'false'],
@@ -233,8 +244,12 @@ describe('rail', () => {
 
   it('names the layers with no switch, and in either view, for a canvas without points', () => {
     const pointless = { ...artifact, points: [] }
-    for (const opts of [{}, { points: true }]) {
-      document.body.innerHTML = renderRail(pointless, state, opts)
+    for (const points of [false, true]) {
+      if (points) {
+        pointsRail(pointless)
+      } else {
+        document.body.innerHTML = renderRail(pointless, state)
+      }
       expect(document.querySelector('.rail-view')).toBeNull()
       expect(document.querySelector('.grp-lbl')?.textContent).toBe('Layers')
       expect(document.querySelector('.layers')).not.toBeNull()

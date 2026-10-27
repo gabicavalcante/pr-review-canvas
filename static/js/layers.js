@@ -224,11 +224,11 @@ export function railInnerHtml(artifact, state, opts = {}) {
 /**
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
- * @param {{ activeId?: string, points?: boolean }} [opts]
+ * @param {{ activeId?: string }} [opts]
  * @returns {string}
  */
 export function renderRail(artifact, state, opts = {}) {
-  return `<nav class="rail" aria-label="Review layers"${opts.points === true ? ' data-points' : ''}>${railInnerHtml(artifact, state, opts)}</nav>`
+  return `<nav class="rail" aria-label="Review layers">${railInnerHtml(artifact, state, opts)}</nav>`
 }
 
 /**

@@ -24,6 +24,7 @@ import {
   hydrateAll,
   getRenderContext,
   hydrateFileCard,
+  refreshRail,
   renderLayers,
   renderRail,
   setCardCollapsed,
@@ -137,7 +138,7 @@ function setup(opts = {}) {
   const paths = new Set(files.map(f => f.path))
   document.body.innerHTML =
     `<pr-app id="root">${renderHeader(bundle, { host: 'localhost:3010', theme: 'auto', skin: 'terminal', now: NOW })}` +
-    `<div class="layout">${renderRail(artifact, state, { points: opts.points === true })}<main id="main">${renderOverview(bundle, { paths, now: NOW })}` +
+    `<div class="layout">${renderRail(artifact, state)}<main id="main">${renderOverview(bundle, { paths, now: NOW })}` +
     `${renderLayers(canvas, files, state, threadComments)}` +
     `${opts.points === true ? renderPointSteps(canvas, files, state, threadComments) : ''}</main></div></pr-app>`
   const root = document.querySelector('#root')
@@ -145,6 +146,9 @@ function setup(opts = {}) {
     throw new Error('no root')
   }
   if (opts.points === true) {
+    // The page marks its rail for the points view and draws it again, as drawPointsParts does.
+    root.querySelector('nav.rail')?.setAttribute('data-points', '')
+    refreshRail(root, artifact, state)
     window.location.hash = '#step-p-1'
     pointsView?.stop()
     pointsView = initOneLayer(root, { view: 'points', storage: null })

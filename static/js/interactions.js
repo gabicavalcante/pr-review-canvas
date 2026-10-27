@@ -530,11 +530,7 @@ export function wireReview(root, session, opts = {}) {
      * @returns {{ point: Point, el: Element, exact: boolean } | null}
      */
     const place = point => {
-      // In the one-point view a point's card in its stop, before its card in its layer.
-      const el =
-        byId(`${stepAnchorId(point.id)}-card`) ??
-        byId(pointAnchorId(point.id)) ??
-        root.querySelector(`[data-point="${cssEscape(point.id)}"]`)
+      const el = byId(pointAnchorId(point.id)) ?? root.querySelector(`[data-point="${cssEscape(point.id)}"]`)
       if (el !== null) {
         return { point, el, exact: true }
       }
