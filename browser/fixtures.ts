@@ -223,12 +223,16 @@ async function startServer(
     vendorRoots: resolveVendorRoots(),
     ...extra,
   })
+  // A spec that reads by attention points saves the setting; every other one runs with no
+  // settings file, on the defaults.
+  if (readByPoints) {
+    await t.ctx.settings.write({ readByPoints })
+  }
   // Closing the server drops the sockets, not the handlers: a request the page fired and the test
   // never waited for (a rebuild of `derived/` behind a reload or refresh) keeps writing into the
   // data dir. `stop` waits for every handler to return before that dir is removed, or `rm` races
   // the write and fails with ENOTEMPTY.
   // Served as the shared server serves it: under the project's base path, behind the hub's front.
-  await t.ctx.settings.write({ readByPoints })
   let port = 0
   const hub = await createHub({ registry: t.dataDir, load: async () => t.ctx, log: () => undefined })
   // As `open` does: with the shell's environment, so the project runs under it.

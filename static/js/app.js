@@ -371,7 +371,7 @@ export class PrAppElement extends HTMLElement {
       this.innerHTML =
         header +
         bannerHtml(bundle.warnings) +
-        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state, { switchable: this.railSwitchable(this.layerView?.view) })}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now })}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
+        `<div class="layout${chatEnabled && !chatMinimized ? '' : ' no-chat'}">${renderRail(artifact, bundle.state, { switchable: this.readByPoints })}<main id="main">${staleBar}${marksBar}${renderOverview(bundle, { paths, now })}${renderLayers(artifact, files, bundle.state, bundle.comments.reviewComments, on)}</main>${chatEnabled ? renderChatShell({ enabled: true, width: readChatWidth(storage), minimized: chatMinimized }) : reviewPaneHtml()}</div>` +
         footerHtml(boot.version, bundle)
       // A bar the reader dismissed goes before the review wiring measures the outdated bar.
       wireBarDismissal(this, storage)
@@ -636,18 +636,8 @@ export class PrAppElement extends HTMLElement {
     }
     const rail = qs('nav.rail', this)
     rail?.toggleAttribute('data-points', points)
-    rail?.toggleAttribute('data-switchable', this.railSwitchable(points ? 'points' : undefined))
     refreshRail(this, artifact, session.state)
     return true
-  }
-
-  /**
-   * Whether the rail offers the switch between the attention points and the layers: on a page that
-   * reads by attention points, and on one that shows them still, so the reader can leave.
-   * @param {import('./layer-views.js').PageView} [view] the view the page shows, or is about to
-   */
-  railSwitchable(view) {
-    return this.readByPoints || view === 'points'
   }
 
   /**
@@ -727,17 +717,19 @@ export class PrAppElement extends HTMLElement {
     this.readByPoints = readByPoints
     this.layerView?.setLayersView(layerView)
     const shown = this.layerView?.view
-    const next = turned ? (readByPoints ? 'points' : layerView) : shown === 'points' ? 'points' : layerView
+    const points = turned ? readByPoints : shown === 'points'
+    const next = points ? 'points' : layerView
     if (next !== shown && this.switchDiscards(next) && !window.confirm(DISCARD_QUESTION)) {
       toast(this, 'the view changes on the next load')
     } else if (next !== shown) {
       this.showView(next)
     }
-    // The switch shows on a page that reads by attention points, or that shows them still.
+    // The layers' heading is the switch on a page that reads by attention points; the points view
+    // heads its list with the switch either way.
     const ctx = getRenderContext()
     const rail = qs('nav.rail', this)
-    if (ctx !== null && this.session !== null && rail !== null) {
-      rail.toggleAttribute('data-switchable', this.railSwitchable(this.layerView?.view))
+    if (turned && ctx !== null && this.session !== null && rail !== null) {
+      rail.toggleAttribute('data-switchable', readByPoints)
       refreshRail(this, { ...ctx.artifact, settled: this.session.settled }, this.session.state)
     }
     this.chat?.followSettings(data.settings)

@@ -36,7 +36,7 @@ function railPointsLayerHtml(layer) {
 
 /**
  * The switch at the head of the rail, for a canvas with points: the one-point view's attention
- * points, or the layers, in the layer view the reader read them in last. The one shown is pressed.
+ * points, or the layers, in the layer view **Show layers** chooses. The one shown is pressed.
  * @param {boolean} points
  */
 function railViewSwitchHtml(points) {
