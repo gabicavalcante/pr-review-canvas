@@ -182,7 +182,7 @@ test('saving Reading settings migrates legacy chat keys and preserves sharing ov
     setup: async t => {
       await writeFile(
         t.ctx.settings.file,
-        'agent: codex\nmodel: chosen-model\ncanvasComment: false\nmentionCanvas: false\nreadByPoints: false\n'
+        'agent: codex\nmodel: chosen-model\ncanvasComment: false\nmentionCanvas: false\n'
       )
     },
   })

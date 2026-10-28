@@ -4,11 +4,11 @@
 
 ### One point at a time
 
-- A review opens on its attention points, one at a time: each layer opens with its description and
-  tests, then shows its points from the most severe, each with only the chunk of code that holds it.
-  The rail lists the points under their layers. A stop takes the place of the one before under a page
-  that stays at the top. **Read by attention points** in **settings** (`readByPoints`, on by default)
-  turns it off, for the layers alone.
+- **Read by attention points** in **settings** (`readByPoints`, off by default) opens a review on its
+  attention points, one at a time: each layer opens with its description and tests, then shows its
+  points from the most severe, each with only the chunk of code that holds it. The rail lists the
+  points under their layers. A stop takes the place of the one before under a page that stays at the
+  top.
 - A switch at the head of the rail moves between **Attention points** and **Layers**, keeping your
   place, and the rail lists what the view shows. **Layers** shows the layer view **Show layers**
   chooses. The switch changes the open page only; a reload opens on what the settings say.

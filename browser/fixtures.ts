@@ -49,8 +49,8 @@ const POSTED_INLINE = ghPost(body => ({
 
 export const test = base.extend<{
   /**
-   * The reader's `readByPoints`. Off here, though on by default in the product, so a spec reads the
-   * layers it was written for; a spec of the one-point view turns it on with `test.use`.
+   * The reader's `readByPoints`. Off, as in the product, so a spec reads the layers it was written
+   * for; a spec of the one-point view turns it on with `test.use`.
    */
   readByPoints: boolean
   reviewUrl: string

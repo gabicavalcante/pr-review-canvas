@@ -26,9 +26,9 @@ foldLevel: light
 layerView: all
 
 # Whether a review opens on its attention points, one at a time, each layer opening with its
-# description and tests; the rail's switch moves between them and the layers. false reads the
-# layers alone.
-readByPoints: true
+# description and tests, with the rail's switch to move between them and the layers. Off by
+# default: true opens a review on its points.
+readByPoints: ${DEFAULT_SETTINGS.readByPoints}
 
 # The colors of the attention point level icons: classic (red, amber, gray) or action (purple,
 # blue, gray). The shapes say the level either way.

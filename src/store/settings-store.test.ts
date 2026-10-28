@@ -46,7 +46,7 @@ describe('createSettingsStore', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
-      readByPoints: true,
+      readByPoints: false,
       pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: 'gpt-5.2',
@@ -75,7 +75,7 @@ describe('createSettingsStore', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
-      readByPoints: true,
+      readByPoints: false,
       pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,
@@ -227,13 +227,13 @@ describe('applySettings', () => {
     expect(parseSettings('layerView: some\n')).toEqual(DEFAULT_SETTINGS)
   })
 
-  it('reads by attention points unless the file turns it off, and saves the choice under its comment', () => {
-    expect(parseSettings('layerView: one\n').readByPoints).toBe(true)
-    const { text, settings } = applySettings(SETTINGS_TEMPLATE, { readByPoints: false })
-    expect(settings.readByPoints).toBe(false)
+  it('reads the layers alone unless the file turns reading by points on, and saves the choice under its comment', () => {
+    expect(parseSettings('layerView: one\n').readByPoints).toBe(false)
+    const { text, settings } = applySettings(SETTINGS_TEMPLATE, { readByPoints: true })
+    expect(settings.readByPoints).toBe(true)
     expect(text).toContain('# Whether a review opens on its attention points')
-    expect(text).toContain('readByPoints: false')
-    expect(parseSettings(text).readByPoints).toBe(false)
+    expect(text).toContain('readByPoints: true')
+    expect(parseSettings(text).readByPoints).toBe(true)
   })
 
   it('saves the point colors under their comment, reads a file without them as classic, and refuses one it does not know', () => {
@@ -286,7 +286,7 @@ describe('two saves that arrive together', () => {
       theme: 'auto',
       foldLevel: 'light',
       layerView: 'all',
-      readByPoints: true,
+      readByPoints: false,
       pointColors: 'classic',
       chatAgent: 'codex',
       chatModel: null,

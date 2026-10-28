@@ -91,7 +91,7 @@ test('shows one layer at a time once the setting is saved, on this page and afte
   await expect(other).toBeVisible()
 })
 
-// From here on a review reads by attention points, as `readByPoints` sets by default.
+// From here on a review reads by attention points, as `readByPoints` turns on in the settings.
 test.describe('reading by attention points', () => {
   test.use({ readByPoints: true })
 

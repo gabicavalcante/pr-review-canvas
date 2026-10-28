@@ -92,7 +92,7 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: DEFAULT_THEME,
   foldLevel: DEFAULT_FOLD_LEVEL,
   layerView: DEFAULT_LAYER_VIEW,
-  readByPoints: true,
+  readByPoints: false,
   pointColors: DEFAULT_POINT_COLORS,
   chatAgent: 'claude',
   chatModel: null,

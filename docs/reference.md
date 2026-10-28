@@ -554,7 +554,7 @@ The data directory's `settings.yml` accepts these keys and values:
 | `theme`                | `auto`    | `auto`, `light`, `dark`                                                          |
 | `foldLevel`            | `light`   | `light`, `moderate`, `aggressive`                                                |
 | `layerView`            | `all`     | `all`, `one`                                                                     |
-| `readByPoints`         | `true`    | `true`, `false`                                                                  |
+| `readByPoints`         | `false`   | `true`, `false`                                                                  |
 | `pointColors`          | `classic` | `classic`, `action`                                                              |
 | `chatAgent`            | `claude`  | `claude`, `codex` (2)                                                            |
 | `chatModel`            | `null`    | A model ID, or `null` for the agent's default (1) (2)                            |
@@ -706,8 +706,8 @@ holds for every review until changed.
 
 ### One point at a time
 
-With **Read by attention points** on in the settings dialog (`readByPoints`, on by default), a
-review opens on its attention points, one section at a time:
+With **Read by attention points** turned on in the settings dialog (`readByPoints`, off by default),
+a review opens on its attention points, one section at a time:
 
 - Each layer with points or tests opens with a stop of its own: its heading with the **reviewed**
   mark and **ask about this layer**, its description, and its tests table. **go to its N attention
