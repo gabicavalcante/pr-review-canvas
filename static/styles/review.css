@@ -647,8 +647,9 @@ img.av {
 .point-step tr.ifind:not([data-expanded]) :is(.prose, .p-outcome, .tbtns, .settle-box, .p-summary) {
   display: none;
 }
+/* Only the height: the sides stay the diff's own, which hold the text inside the visible width. */
 .point-step tr.ifind:not([data-expanded]) .x {
-  padding: 4px 14px;
+  padding-block: 4px;
 }
 .point-step tr.ifind:not([data-expanded]) .f-title {
   margin: 0;

@@ -457,6 +457,21 @@ test.describe('reading by attention points', () => {
     }
   })
 
+  test('a stop’s point line keeps its show command inside the diff’s visible width', async ({
+    page,
+    reviewUrl,
+  }) => {
+    await page.goto(`${reviewUrl}#step-p-1`)
+    const diff = page.locator('#step-p-1 .diff-wrap').first()
+    const toggle = page.locator('#step-p-1 tr.ifind [data-act="point-expand"]')
+    await expect(toggle).toBeVisible()
+    const box = await diff.boundingBox()
+    const button = await toggle.boundingBox()
+    expect(button!.x + button!.width).toBeLessThanOrEqual(box!.x + box!.width - 14)
+    // The line adds no width of its own, so it gives the diff no sideways scroll.
+    expect(await diff.evaluate(el => el.scrollWidth - el.clientWidth)).toBe(0)
+  })
+
   test('a stop keeps its code open when the reading level changes, a reviewed file’s too', async ({
     page,
     reviewUrl,
