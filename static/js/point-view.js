@@ -14,6 +14,11 @@
 /** @typedef {ReviewArtifact['layers'][number]} Layer */
 /** @typedef {import('./point-steps.js').PointStep} PointStep */
 /** @typedef {import('./point-steps.js').Stop} Stop */
+/**
+ * Where a way from a stop goes and what it says. `attrs` carry what a link there needs to switch
+ * the view; `lead` marks the way on a layer's opening stop leads its reader to.
+ * @typedef {{ href: string, label: string, attrs: string, lead?: boolean }} StopWay
+ */
 import { askButtonHtml } from './ask.js'
 import { esc } from './dom.js'
 import { layerAnchorId, layerStepAnchorId, reviewedId, stepAnchorId } from './keys.js'
@@ -37,35 +42,82 @@ function layerPosition(artifact, layer) {
 }
 
 /**
- * The way on from a stop: back to the one before, and on to the next, whose label says what it is.
- * After the last stop come the layers, for the rest of the diff: the link switches to them as the
- * rail's switch does, on the first layer, so the rail lists every layer again.
+ * The ways from a stop: back to the one before, and on to the next, whose label says what it is.
+ * After the last stop come the layers, for the rest of the diff: the way there switches to them as
+ * the rail's switch does, on the first layer, so the rail lists every layer again.
  * @param {ReadonlyArray<Stop>} stops
  * @param {number} index
  * @param {ReviewArtifact} artifact
+ * @returns {{ back: StopWay, on: StopWay | null }}
  */
-function stopNavHtml(stops, index, artifact) {
+function stopWays(stops, index, artifact) {
   const stop = stops[index]
   const previous = stops[index - 1]
   const next = stops[index + 1]
   const firstLayer = artifact.layers[0]
   const back =
     previous === undefined
-      ? '<a href="#overview">&larr; overview</a>'
-      : `<a href="#${esc(previous.id)}">&larr; ${previous.kind === 'layer' ? esc(previous.layer.title) : 'previous point'}</a>`
-  let on = ''
+      ? { href: '#overview', label: 'overview', attrs: '' }
+      : {
+          href: `#${previous.id}`,
+          label: previous.kind === 'layer' ? previous.layer.title : 'previous point',
+          attrs: '',
+        }
   if (next === undefined) {
-    on =
-      firstLayer === undefined
-        ? ''
-        : `<a href="#${esc(layerAnchorId(firstLayer.key))}" data-act="layer-view" data-view="layers">the rest of the diff, by layer &rarr;</a>`
-  } else if (stop?.kind === 'layer' && next.kind === 'point') {
-    const count = stop.points.length
-    on = `<a class="step-on" href="#${esc(next.id)}">go to its ${count} attention point${count === 1 ? '' : 's'} &rarr;</a>`
-  } else {
-    on = `<a href="#${esc(next.id)}">${next.kind === 'layer' ? `next layer: ${esc(next.layer.title)}` : 'next point'} &rarr;</a>`
+    return {
+      back,
+      on:
+        firstLayer === undefined
+          ? null
+          : {
+              href: `#${layerAnchorId(firstLayer.key)}`,
+              label: 'the rest of the diff, by layer',
+              attrs: ' data-act="layer-view" data-view="layers"',
+            },
+    }
   }
-  return `<nav class="step-nav" aria-label="Attention points">${back}${on}</nav>`
+  if (stop?.kind === 'layer' && next.kind === 'point') {
+    const count = stop.points.length
+    return {
+      back,
+      on: {
+        href: `#${next.id}`,
+        label: `go to its ${count} attention point${count === 1 ? '' : 's'}`,
+        attrs: '',
+        lead: true,
+      },
+    }
+  }
+  return {
+    back,
+    on: {
+      href: `#${next.id}`,
+      label: next.kind === 'layer' ? `next layer: ${next.layer.title}` : 'next point',
+      attrs: '',
+    },
+  }
+}
+
+/**
+ * The way on at the foot of a stop, each way named.
+ * @param {{ back: StopWay, on: StopWay | null }} ways
+ */
+function stopNavHtml({ back, on }) {
+  const link = /** @param {StopWay} way @param {string} text */ (way, text) =>
+    `<a${way.lead === true ? ' class="step-on"' : ''} href="${esc(way.href)}"${way.attrs}>${text}</a>`
+  const onLink = on === null ? '' : link(on, `${esc(on.label)} &rarr;`)
+  return `<nav class="step-nav" aria-label="Attention points">${link(back, `&larr; ${esc(back.label)}`)}${onLink}</nav>`
+}
+
+/**
+ * The same ways as arrows at the head of a stop, so a reader at the top of a tall one need not
+ * scroll down to move. Each says where it goes to a screen reader and on hover.
+ * @param {{ back: StopWay, on: StopWay | null }} ways
+ */
+function stopArrowsHtml({ back, on }) {
+  const arrow = /** @param {StopWay} way @param {string} glyph */ (way, glyph) =>
+    `<a href="${esc(way.href)}"${way.attrs} aria-label="${esc(way.label)}" title="${esc(way.label)}">${glyph}</a>`
+  return `<nav class="step-arrows" aria-label="Attention points, from the top">${arrow(back, '&larr;')}${on === null ? '' : arrow(on, '&rarr;')}</nav>`
 }
 
 /**
@@ -125,8 +177,9 @@ export function viewSwitchTarget(artifact, view, hash) {
  * @param {ReviewArtifact} artifact
  * @param {PrState} state
  * @param {ReadonlySet<string>} paths
+ * @param {string} arrows the ways on, at the head beside the layer's commands
  */
-function layerStopHtml(stop, artifact, state, paths) {
+function layerStopHtml(stop, artifact, state, paths, arrows) {
   const { layer } = stop
   const position = layerPosition(artifact, layer)
   const reviewed = layerProgress(layer, state) === 'done'
@@ -137,7 +190,7 @@ function layerStopHtml(stop, artifact, state, paths) {
         `${askButtonHtml({ kind: 'layer', layerId: layer.id }, { label: 'ask about this layer' })}</div>`
   return (
     `<section class="point-step layer-step" id="${esc(stop.id)}" data-layer="${esc(layer.id)}" aria-label="${esc(layer.title)}">` +
-    `<div class="panel-h layer-h"><h2>${position === null ? '' : `<span class="lbl">Layer ${position.number} of ${position.total}</span>`}${esc(layer.title)}</h2>${controls}</div>` +
+    `<div class="panel-h layer-h"><h2>${position === null ? '' : `<span class="lbl">Layer ${position.number} of ${position.total}</span>`}${esc(layer.title)}</h2>${controls}${arrows}</div>` +
     `<div class="body"><div class="rationale prose">${renderMarkdown(layer.rationale, { paths, diagrams: true })}</div></div>` +
     testMapHtml(layer, paths)
   )
@@ -166,9 +219,11 @@ export function renderPointSteps(artifact, files, state, comments = []) {
   }
   const stops = stopsOf(artifact, steps)
   const html = stops.map((stop, index) => {
-    const nav = stopNavHtml(stops, index, artifact)
+    const ways = stopWays(stops, index, artifact)
+    const nav = stopNavHtml(ways)
+    const arrows = stopArrowsHtml(ways)
     if (stop.kind === 'layer') {
-      return `${layerStopHtml(stop, artifact, state, ctx.paths)}${nav}</section>`
+      return `${layerStopHtml(stop, artifact, state, ctx.paths, arrows)}${nav}</section>`
     }
     const { point, layer } = stop.step
     const entry = files.find(f => f.path === point.path)
@@ -193,7 +248,7 @@ export function renderPointSteps(artifact, files, state, comments = []) {
         : ` · <a href="#${esc(layerStepAnchorId(layer.key))}">${esc(position === null ? layer.title : `Layer ${position.number} · ${layer.title}`)}</a>`
     return (
       `<section class="point-step" id="${esc(stop.id)}" data-stop-point="${esc(point.id)}" data-stop-fingerprint="${esc(point.fingerprint)}"${slotFor} aria-label="Attention point ${stop.number} of ${steps.length}">` +
-      `<p class="step-h"><span class="step-n">Point ${stop.number} of ${steps.length}</span>${where}</p>` +
+      `<div class="step-h"><p><span class="step-n">Point ${stop.number} of ${steps.length}</span>${where}</p>${arrows}</div>` +
       `<ol class="findings step-card" data-slot="card">${card}</ol>` +
       `<div class="files" data-slot="file">${code}</div>${nav}</section>`
     )

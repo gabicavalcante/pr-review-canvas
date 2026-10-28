@@ -608,6 +608,7 @@ img.av {
 .step-h {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 4px 8px;
   margin: 0;
   padding: 10px 16px;
@@ -615,8 +616,32 @@ img.av {
   background: var(--panel-2);
   font-size: 13px;
 }
+.step-h > p {
+  margin: 0;
+}
 .step-n {
   font-weight: 600;
+}
+/* The ways on, as arrows at the head of a stop, at its right end. */
+.step-arrows {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+/* A layer's heading already sends what follows it to the right, its commands then the arrows. */
+.layer-h .step-arrows {
+  margin-left: 0;
+}
+.step-arrows a {
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-size: 15px;
+  line-height: 24px;
+  text-decoration: none;
+}
+.step-arrows a:hover {
+  border-color: var(--ink);
 }
 .point-step > .findings {
   margin: 0;

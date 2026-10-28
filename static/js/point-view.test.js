@@ -114,6 +114,23 @@ describe('renderPointSteps', () => {
     ])
   })
 
+  it('puts the same ways at the head of each stop, as arrows named for where they go', () => {
+    draw(renderPointSteps(artifact, files, state))
+    for (const section of all('section.point-step')) {
+      const ways = (/** @type {string} */ nav) =>
+        all(`#${section.id} ${nav} a`).map(a => [a.getAttribute('href'), a.getAttribute('data-act')])
+      expect(ways('.step-arrows')).toEqual(ways('.step-nav'))
+    }
+    expect(
+      all(`#${stepAnchorId('p-1')} .step-arrows a`).map(a => [a.textContent, a.getAttribute('aria-label')])
+    ).toEqual([
+      ['←', 'Run path'],
+      ['→', 'next layer: Other changes'],
+    ])
+    // A layer's opening stop has them beside its commands.
+    expect(document.querySelector('#step-layer-run-path .layer-h .step-arrows')).not.toBeNull()
+  })
+
   it('keeps a point the reader acted on in its place, and draws nothing for a canvas without points', () => {
     const dismissed = { ...state, dismissed: { 'fp-2': { at: 'x' } } }
     draw(renderPointSteps(artifact, files, dismissed))

@@ -8,7 +8,7 @@
   attention points, one at a time: each layer opens with its description and tests, then shows its
   points from the most severe, each with only the chunk of code that holds it. The rail lists the
   points under their layers. A stop takes the place of the one before under a page that stays at the
-  top.
+  top, and its way back and on is both at its foot and, as arrows, at its head.
 - A switch at the head of the rail moves between **Attention points** and **Layers**, keeping your
   place, and the rail lists what the view shows. **Layers** shows the layer view **Show layers**
   chooses. The switch changes the open page only; a reload opens on what the settings say.

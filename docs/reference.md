@@ -718,7 +718,8 @@ a review opens on its attention points, one section at a time:
 - A layer's points come from the most severe: decide, then check, then fyi, a decide point's impact
   worst first. A point you acted on keeps its stop, and dims in the rail.
 - Every stop ends with the way back and on; after the last point, **the rest of the diff, by layer**
-  switches to **Layers**, as the rail's switch does, on the first layer. The overview ends with
+  switches to **Layers**, as the rail's switch does, on the first layer. The same two ways are arrows
+  at the stop's head, so a tall stop needs no scroll to its end to move on. The overview ends with
   **start with Layer 1**.
 - The step keys walk the stops: `j` and `k` the layers' opening stops, `n` and `p` every stop, and
   `]` and `[` the stops of the open points.

@@ -457,6 +457,21 @@ test.describe('reading by attention points', () => {
     }
   })
 
+  test('the arrows at the head of a stop move as its way on does, to the layers after the last', async ({
+    page,
+    reviewUrl,
+  }) => {
+    await page.goto(reviewUrl)
+    await page.locator('#step-layer-run-path .step-arrows a[aria-label^="go to its"]').click()
+    await expect(page.locator('#step-p-1')).toBeVisible()
+    await page.locator('#step-p-1 .step-arrows a[aria-label="Run path"]').click()
+    await expect(page.locator('#step-layer-run-path')).toBeVisible()
+    await page.goto(`${reviewUrl}#step-p-3`)
+    await page.locator('#step-p-3 .step-arrows a[aria-label="the rest of the diff, by layer"]').click()
+    await expect(page.locator('section.point-step')).toHaveCount(0)
+    await expect(page.locator('#layer-run-path')).toBeVisible()
+  })
+
   test('a stop’s point line keeps its show command inside the diff’s visible width', async ({
     page,
     reviewUrl,
