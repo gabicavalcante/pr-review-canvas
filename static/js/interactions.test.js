@@ -24,15 +24,14 @@ import {
   hydrateAll,
   getRenderContext,
   hydrateFileCard,
-  refreshRail,
   renderLayers,
-  renderRail,
   setCardCollapsed,
   setRenderContext,
 } from './layers.js'
 import { initOneLayer } from './one-layer.js'
 import { renderPointSteps } from './point-view.js'
 import { renderOverview } from './overview.js'
+import { refreshRail, renderRail } from './rail.js'
 import { createReviewSession } from './review-session.js'
 import { setSelfReview } from './self-review.js'
 

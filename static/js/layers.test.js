@@ -21,7 +21,6 @@ import {
 import {
   DEFERRED_DIFF_LINES,
   defineLayerElements,
-  dotColor,
   elsewhereHtml,
   fileCount,
   getFoldLevel,
@@ -40,8 +39,6 @@ import {
   renderLayerSection,
   renderLayers,
   refreshFolds,
-  refreshRail,
-  renderRail,
   setCardRenderedHook,
   setFoldLevel,
   setRenderContext,
@@ -49,6 +46,7 @@ import {
   threadsForHunks,
 } from './layers.js'
 import { hiddenLabel } from './reading-level.js'
+import { renderRail } from './rail.js'
 import { progressSummary } from './progress.js'
 import { buildThreads } from './threads.js'
 
@@ -98,169 +96,6 @@ describe('pending draft placement', () => {
     document.body.innerHTML = renderLayers(artifact, files, withDraft)
     hydrateAll(document, { ...ctx(), state: withDraft, headSha: 'f'.repeat(40) })
     expect(document.querySelectorAll('tr.pending-row')).toHaveLength(0)
-  })
-})
-
-describe('rail', () => {
-  it('lists overview, layers with dots, and Other muted', () => {
-    document.body.innerHTML = renderRail(artifact, state)
-    const items = [...document.querySelectorAll('.tree a')]
-    expect(items.map(a => a.getAttribute('href'))).toEqual(['#overview', '#layer-run-path', '#layer-other'])
-    expect(items[0]?.getAttribute('aria-current')).toBe('location')
-    expect(items[0]?.querySelector('.m')?.textContent).toBe('3 attention points')
-    expect(items[1]?.querySelector('.dot')?.getAttribute('aria-label')).toBe('not started')
-    expect(items[1]?.querySelector('.dot')?.getAttribute('style')).toBe('--dc:var(--s1)')
-    expect(items[1]?.querySelector('.m')?.textContent).toBe('3 files · schema')
-    expect(document.querySelector('li.other .m')?.textContent).toBe('3 files, ignored')
-    expect(dotColor(7)).toBe('var(--s2)')
-  })
-
-  it('shows partial and done dots and the active item', () => {
-    const partial = { ...state, reviewed: { 'layer:run-path/file:src_app_ts': /** @type {const} */ (true) } }
-    document.body.innerHTML = renderRail(artifact, partial, { activeId: 'layer-run-path' })
-    const a = document.querySelector('a[href="#layer-run-path"]')
-    expect(a?.getAttribute('aria-current')).toBe('location')
-    expect(a?.querySelector('.dot')?.className).toBe('dot half')
-    expect(a?.querySelector('.m')?.textContent).toBe('1 of 3 files · schema')
-    const done = { ...state, reviewed: { 'layer:run-path': /** @type {const} */ (true) } }
-    document.body.innerHTML = renderRail(artifact, done)
-    expect(document.querySelector('a[href="#layer-run-path"] .dot')?.className).toBe('dot on')
-    document.body.innerHTML = renderRail(
-      {
-        ...artifact,
-        layers: artifact.layers.filter(l => l.kind !== 'other'),
-        points: artifact.points.slice(0, 1),
-      },
-      state
-    )
-    expect(document.querySelector('li.other')).toBeNull()
-    expect(document.querySelector('a[href="#overview"] .m')?.textContent).toBe('1 attention point')
-  })
-
-  it('shows the lines each layer adds and removes next to its file count, after a state change too', () => {
-    setRenderContext(ctx())
-    document.body.innerHTML = renderRail(artifact, state)
-    const stat = document.querySelector('a[href="#layer-run-path"] .diffstat')
-    expect(stat?.getAttribute('title')).toBe('code +3 −2 · tests +2 −1')
-    expect(document.querySelector('a[href="#layer-run-path"] .m')?.textContent).toBe(
-      '3 files · +5 −3 (code +3 −2 · tests +2 −1) · schema'
-    )
-    expect(document.querySelector('li.other .m')?.textContent).toBe('3 files, ignored')
-    const partial = { ...state, reviewed: { 'layer:run-path/file:src_app_ts': /** @type {const} */ (true) } }
-    expect(refreshRail(document, artifact, partial)).toBe(true)
-    expect(document.querySelector('a[href="#layer-run-path"] .m')?.textContent).toBe(
-      '1 of 3 files · +5 −3 (code +3 −2 · tests +2 −1) · schema'
-    )
-    setRenderContext(null)
-  })
-
-  /**
-   * The rail of the one-point view, drawn as the page draws it: the layers' rail, marked for the
-   * points view, then drawn again.
-   * @param {import('./contract-types.js').ReviewArtifact} canvas
-   */
-  function pointsRail(canvas) {
-    document.body.innerHTML = renderRail(canvas, state, { switchable: true })
-    document.querySelector('nav.rail')?.setAttribute('data-points', '')
-    refreshRail(document, canvas, state)
-  }
-
-  it('lists the points under their layers in the one-point view, and dims one acted on', () => {
-    pointsRail(artifact)
-    const group = () =>
-      [...document.querySelectorAll('.rail-points li')].map(li =>
-        li.classList.contains('pt-layer')
-          ? `[${li.querySelector('.t')?.textContent}]`
-          : li.querySelector('a')?.getAttribute('href')
-      )
-    expect(group()).toEqual(['[Run path]', '#step-p-1', '[Other changes]', '#step-p-2', '#step-p-3'])
-    expect(document.querySelector('a[href="#step-p-1"] .lv.decide')).not.toBeNull()
-    // A layer's heading leads to the layer's opening stop.
-    expect(document.querySelector('.rail-points .pt-layer a')?.getAttribute('href')).toBe(
-      '#step-layer-run-path'
-    )
-    const dismissed = { ...state, dismissed: { 'fp-2': { at: 'x' } } }
-    expect(refreshRail(document, artifact, dismissed)).toBe(true)
-    expect(group()).toEqual(['[Run path]', '#step-p-1', '[Other changes]', '#step-p-2', '#step-p-3'])
-    expect(
-      document.querySelector('a[href="#step-p-2"]')?.parentElement?.classList.contains('is-handled')
-    ).toBe(true)
-    expect(
-      document.querySelector('a[href="#step-p-1"]')?.parentElement?.classList.contains('is-handled')
-    ).toBe(false)
-  })
-
-  it('lists a layer that opens with a stop though it has no points, and points of no layer last', () => {
-    const [first] = artifact.layers
-    if (first === undefined) throw new Error('the synthetic canvas has a layer')
-    const testsOnly = {
-      ...artifact,
-      points: artifact.points.map(p => (p.layerId === first.id ? { ...p, layerId: 'gone' } : p)),
-    }
-    pointsRail(testsOnly)
-    const group = [...document.querySelectorAll('.rail-points li')].map(li =>
-      li.classList.contains('pt-layer')
-        ? `[${li.querySelector('.t')?.textContent}]`
-        : li.querySelector('a')?.getAttribute('href')
-    )
-    expect(group).toEqual([
-      '[Run path]',
-      '[Other changes]',
-      '#step-p-2',
-      '#step-p-3',
-      '[No layer]',
-      '#step-p-1',
-    ])
-  })
-
-  it('has no points group in the other views', () => {
-    document.body.innerHTML = renderRail(artifact, state)
-    expect(document.querySelector('.rail-points')).toBeNull()
-    expect(refreshRail(document, artifact, state)).toBe(true)
-    expect(document.querySelector('.rail-points')).toBeNull()
-  })
-
-  it('shows the points or the layers, under a switch between the two that presses the one shown', () => {
-    const pressed = () =>
-      [...document.querySelectorAll('.rail-view button')].map(button => [
-        button.textContent,
-        button.getAttribute('data-view'),
-        button.getAttribute('aria-pressed'),
-      ])
-    pointsRail(artifact)
-    expect(pressed()).toEqual([
-      ['Attention points', 'points', 'true'],
-      ['Layers', 'layers', 'false'],
-    ])
-    expect(document.querySelector('.layers')).toBeNull()
-    expect(document.querySelector('li.other')).toBeNull()
-    document.body.innerHTML = renderRail(artifact, state, { switchable: true })
-    expect(pressed()).toEqual([
-      ['Attention points', 'points', 'false'],
-      ['Layers', 'layers', 'true'],
-    ])
-    expect(document.querySelector('.layers')).not.toBeNull()
-    // A page that does not read by attention points names its layers, with no switch, and keeps
-    // that when the rail is drawn again.
-    document.body.innerHTML = renderRail(artifact, state)
-    expect(pressed()).toEqual([])
-    expect(document.querySelector('.grp-lbl')?.textContent).toBe('Layers')
-    refreshRail(document, artifact, state)
-    expect(pressed()).toEqual([])
-  })
-
-  it('names the layers with no switch, and in either view, for a canvas without points', () => {
-    const pointless = { ...artifact, points: [] }
-    for (const points of [false, true]) {
-      if (points) {
-        pointsRail(pointless)
-      } else {
-        document.body.innerHTML = renderRail(pointless, state)
-      }
-      expect(document.querySelector('.rail-view')).toBeNull()
-      expect(document.querySelector('.grp-lbl')?.textContent).toBe('Layers')
-      expect(document.querySelector('.layers')).not.toBeNull()
-    }
   })
 })
 

@@ -43,14 +43,13 @@ import {
   drawnCanvas,
   getRenderContext,
   pathSet,
-  refreshRail,
   renderLayers,
-  renderRail,
   setFoldLevel,
   setRenderContext,
 } from './layers.js'
 import { renderOverview } from './overview.js'
 import { initOneLayer } from './one-layer.js'
+import { refreshRail, renderRail } from './rail.js'
 import { wireQuickQuestions } from './quick-questions.js'
 import { createGeneration } from './generate.js'
 import { overviewWayOnHtml, POINT_STEPS_ID, renderPointSteps, viewSwitchTarget } from './point-view.js'
